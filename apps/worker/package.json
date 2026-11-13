@@ -12,7 +12,7 @@
     "@upskill/core": "workspace:*",
     "@upskill/db": "workspace:*",
     "@upskill/infra": "workspace:*",
-    "bullmq": "6.7.0",
+    "bullmq": "6.7.1",
     "playwright": "1.65.0",
     "qrcode": "1.5.4"
   },
