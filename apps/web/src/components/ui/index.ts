@@ -26,3 +26,4 @@ export * from "./command";
 export * from "./toast";
 export * from "./form-layout";
 export * from "./button-styles";
+export * from "./theme-script";

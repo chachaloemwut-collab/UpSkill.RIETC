@@ -8,6 +8,7 @@ import { CheckIcon, MoonIcon, PaletteIcon, SunIcon } from "./icons";
 import { prefersReducedMotion, springEasing } from "./motion";
 import { Popover } from "./overlay";
 import { ThemeIcon } from "./animated-icons";
+import { THEME_STORAGE_KEY as KEY } from "./theme-script";
 
 export const THEME_COLORS = [
   { id: "zinc", label: "Zinc", hsl: "240 6% 10%" },
@@ -27,14 +28,7 @@ export interface ThemeSettings {
 }
 type Point = { clientX: number; clientY: number };
 
-const KEY = "vec-ui-theme";
 export const DEFAULT_THEME: ThemeSettings = { dark: false, color: "zinc", radius: 0.625 };
-
-/**
- * Inline <head> script (rendered with the CSP nonce) that applies the saved theme before first paint, so there is
- * no light-to-dark flash. Kept in sync with `apply()` below.
- */
-export const THEME_INIT_SCRIPT = `try{var s=JSON.parse(localStorage.getItem("${KEY}")||"{}");var d=typeof s.dark==="boolean"?s.dark:matchMedia("(prefers-color-scheme: dark)").matches;var r=document.documentElement;r.classList.toggle("dark",d);r.dataset.theme=typeof s.color==="string"?s.color:"zinc";if(typeof s.radius==="number")r.style.setProperty("--radius",s.radius+"rem")}catch(e){}`;
 
 function load(): ThemeSettings {
   const fallback: ThemeSettings = { ...DEFAULT_THEME, dark: window.matchMedia("(prefers-color-scheme: dark)").matches };

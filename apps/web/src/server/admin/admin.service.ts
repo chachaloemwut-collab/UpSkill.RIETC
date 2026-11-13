@@ -33,7 +33,16 @@ export async function adminOverview() {
     .orderBy("n", "desc")
     .limit(20)
     .execute();
-  return { courses, flags, topFlagged };
+  const stats = await db
+    .selectNoFrom([
+      sql<number>`(select count(*)::int from users)`.as("users"),
+      sql<number>`(select count(*)::int from courses where visibility = 'published')`.as("publishedCourses"),
+      sql<number>`(select count(*)::int from enrollments)`.as("enrollments"),
+      sql<number>`(select count(*)::int from certificates where revoked_at is null)`.as("certificates"),
+      sql<number>`(select count(*)::int from anticheat_events where created_at > now() - interval '7 days')`.as("flags7d"),
+    ])
+    .executeTakeFirstOrThrow();
+  return { courses, flags, topFlagged, stats };
 }
 
 export async function adminUpdateCourse(

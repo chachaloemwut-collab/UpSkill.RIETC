@@ -13,6 +13,8 @@ export async function listPublishedCourses() {
       "c.id", "c.slug", "c.title", "c.description", "c.thumbnail_url", "c.is_verified_course", "c.total_duration_sec",
       sql<string>`coalesce(u.legal_full_name_th, u.legal_full_name_en, split_part(u.email, '@', 1))`.as("instructor_name"),
       sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("lesson_count"),
+      sql<number>`(select count(*)::int from enrollments e where e.course_id = c.id)`.as("learner_count"),
+      sql<string | null>`(select l.youtube_video_id from lessons l where l.course_id = c.id order by l.sequence_order limit 1)`.as("cover_video_id"),
     ])
     .where("c.visibility", "=", "published")
     .orderBy("c.published_at", "desc")
@@ -119,4 +121,43 @@ export async function myEnrollments(userId: string) {
     .where("e.user_id", "=", userId)
     .orderBy("e.enrolled_at", "desc")
     .execute();
+}
+
+/** Learner dashboard: every enrollment with lesson progress, plus totals. */
+export async function learnerOverview(userId: string) {
+  const { db } = ctx();
+  const rows = await db
+    .selectFrom("enrollments as e")
+    .innerJoin("courses as c", "c.id", "e.course_id")
+    .leftJoin("certificates as cert", "cert.enrollment_id", "e.id")
+    .select([
+      "e.id as enrollment_id", "e.status", "e.enrolled_at", "e.completed_at",
+      "c.id as course_id", "c.slug", "c.title", "c.is_verified_course", "c.total_duration_sec",
+      "cert.certificate_code", "cert.revoked_at", "cert.issued_at",
+      sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("lesson_count"),
+      sql<number>`(select count(*)::int from lesson_progress p where p.enrollment_id = e.id and p.is_completed)`.as("completed_lessons"),
+      sql<number>`(select coalesce(sum(p.accumulated_valid_sec), 0)::int from lesson_progress p where p.enrollment_id = e.id)`.as("study_sec"),
+      sql<string | null>`(select l.youtube_video_id from lessons l where l.course_id = c.id order by l.sequence_order limit 1)`.as("cover_video_id"),
+      sql<string | null>`(select l.id from lessons l left join lesson_progress p on p.lesson_id = l.id and p.enrollment_id = e.id
+        where l.course_id = c.id and l.video_status = 'active' and coalesce(p.is_completed, false) = false order by l.sequence_order limit 1)`.as("next_lesson_id"),
+      sql<string | null>`(select l.title from lessons l left join lesson_progress p on p.lesson_id = l.id and p.enrollment_id = e.id
+        where l.course_id = c.id and l.video_status = 'active' and coalesce(p.is_completed, false) = false order by l.sequence_order limit 1)`.as("next_lesson_title"),
+    ])
+    .where("e.user_id", "=", userId)
+    .orderBy("e.enrolled_at", "desc")
+    .execute();
+
+  const enrollments = rows.map((r) => ({
+    ...r,
+    progressPercent: r.lesson_count ? Math.round((r.completed_lessons / r.lesson_count) * 100) : 0,
+  }));
+  return {
+    enrollments,
+    stats: {
+      enrolled: enrollments.filter((e) => e.status !== "revoked").length,
+      completed: enrollments.filter((e) => e.status === "completed").length,
+      certificates: enrollments.filter((e) => e.certificate_code && !e.revoked_at).length,
+      studySec: enrollments.reduce((n, e) => n + e.study_sec, 0),
+    },
+  };
 }

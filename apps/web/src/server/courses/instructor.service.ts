@@ -54,6 +54,8 @@ export async function listMyCourses(user: CurrentUser) {
       sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("lesson_count"),
       sql<number>`(select count(*)::int from enrollments e where e.course_id = c.id)`.as("enrollment_count"),
       sql<number>`(select count(*)::int from lessons l where l.course_id = c.id and l.video_status <> 'active')`.as("broken_count"),
+      sql<number>`(select count(*)::int from enrollments e where e.course_id = c.id and e.status = 'completed')`.as("completed_count"),
+      sql<string | null>`(select l.youtube_video_id from lessons l where l.course_id = c.id order by l.sequence_order limit 1)`.as("cover_video_id"),
     ])
     .where("c.instructor_id", "=", user.id)
     .orderBy("c.updated_at", "desc")
