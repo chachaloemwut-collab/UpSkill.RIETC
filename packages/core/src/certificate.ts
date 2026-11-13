@@ -1,0 +1,125 @@
+/**
+ * Certificate signing with Ed25519 (replaces the spec's HMAC-SHA256).
+ *
+ * Why not HMAC:
+ *  - HMAC uses one shared secret for both sign and verify -> anyone holding the verification key can forge
+ *  - the key can never be rotated (the spec itself says "never change this key")
+ *  - third parties cannot verify offline
+ * Ed25519 + kid: rotate by adding a new key; old public keys are kept forever.
+ *
+ * We store `signedPayload` (the exact signed string) instead of rebuilding it from DB columns at verify time,
+ * because rebuilding risks precision bugs (e.g. Postgres timestamps are microseconds but JS Date is milliseconds)
+ * and delimiter injection (names containing "|"). At verify time, check the signature first,
+ * then compare every field in the payload against the DB columns (catches direct DB edits).
+ */
+import { createPrivateKey, createPublicKey, randomBytes, sign, verify } from "node:crypto";
+
+export interface CertificatePayload {
+  v: 1;
+  code: string;
+  enrollmentId: string;
+  userId: string;
+  courseId: string;
+  recipientName: string;
+  courseTitle: string;
+  instructorName: string;
+  totalStudySec: number;
+  /** Decimal as a string (e.g. "92.50") to avoid float serialization issues */
+  quizScore: string;
+  verifiedCourse: boolean;
+  /** ISO-8601 UTC, millisecond precision. Store the same value in certificates.issued_at */
+  issuedAt: string;
+}
+
+const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/** CERT-2026-XXXX-XXXX-XXXX : 60 bits (spec used 32 bits = easy to enumerate the public verify page) */
+export function generateCertificateCode(year: number): string {
+  const bytes = randomBytes(8);
+  let n = bytes.readBigUInt64BE() >> 4n; // 60 bits
+  let s = "";
+  for (let i = 0; i < 12; i++) {
+    s = CROCKFORD.charAt(Number(n & 31n)) + s;
+    n >>= 5n;
+  }
+  return `CERT-${year}-${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8, 12)}`;
+}
+
+export const CERTIFICATE_CODE_RE = /^CERT-\d{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/;
+
+/** Normalize Unicode for names (Thai vowel/tone marks can have more than one code point sequence) */
+export function normalizeName(name: string): string {
+  return name.normalize("NFC").replace(/\s+/gu, " ").trim();
+}
+
+/** Canonical JSON: keys sorted recursively, no whitespace. Accepts only string/int/bool/object/array. */
+export function canonicalJson(value: unknown): string {
+  if (value === null || typeof value === "boolean" || typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) throw new Error("canonicalJson: only safe integers are allowed");
+    return String(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
+  }
+  throw new Error(`canonicalJson: unsupported type ${typeof value}`);
+}
+
+export interface SignedCertificate {
+  signedPayload: string;
+  signature: string; // base64url
+  keyId: string;
+}
+
+export function signCertificate(payload: CertificatePayload, keyId: string, privateKeyPkcs8B64u: string): SignedCertificate {
+  const key = createPrivateKey({ key: Buffer.from(privateKeyPkcs8B64u, "base64url"), format: "der", type: "pkcs8" });
+  const signedPayload = canonicalJson(payload);
+  const signature = sign(null, Buffer.from(signedPayload, "utf8"), key).toString("base64url");
+  return { signedPayload, signature, keyId };
+}
+
+export type VerifyResult =
+  | { ok: true; payload: CertificatePayload }
+  | { ok: false; reason: "UNKNOWN_KEY" | "BAD_SIGNATURE" | "MALFORMED" | "RECORD_MISMATCH" };
+
+/**
+ * @param record DB columns to cross-check against the signed payload
+ */
+export function verifyCertificate(
+  signed: SignedCertificate,
+  publicKeys: Readonly<Record<string, string>>,
+  record: Omit<CertificatePayload, "v">,
+): VerifyResult {
+  const pub = publicKeys[signed.keyId];
+  if (!pub) return { ok: false, reason: "UNKNOWN_KEY" };
+  const key = createPublicKey({ key: Buffer.from(pub, "base64url"), format: "der", type: "spki" });
+  let valid: boolean;
+  try {
+    valid = verify(null, Buffer.from(signed.signedPayload, "utf8"), key, Buffer.from(signed.signature, "base64url"));
+  } catch {
+    return { ok: false, reason: "MALFORMED" };
+  }
+  if (!valid) return { ok: false, reason: "BAD_SIGNATURE" };
+
+  let payload: CertificatePayload;
+  try {
+    payload = JSON.parse(signed.signedPayload) as CertificatePayload;
+  } catch {
+    return { ok: false, reason: "MALFORMED" };
+  }
+  if (payload.v !== 1) return { ok: false, reason: "MALFORMED" };
+  if (canonicalJson({ ...record, v: 1 }) !== signed.signedPayload) return { ok: false, reason: "RECORD_MISMATCH" };
+  return { ok: true, payload };
+}
+
+/** "2 ชั่วโมง 15 นาที" (2 hours 15 minutes) */
+export function formatStudyDurationTh(totalSec: number): string {
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  if (h === 0) return `${m} นาที`;
+  return m === 0 ? `${h} ชั่วโมง` : `${h} ชั่วโมง ${m} นาที`;
+}

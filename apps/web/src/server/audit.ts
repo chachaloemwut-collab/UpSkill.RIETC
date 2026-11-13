@@ -1,0 +1,44 @@
+import "server-only";
+import type { Database } from "@upskill/db";
+
+export type AuditAction =
+  | "auth.login"
+  | "auth.login_failed"
+  | "auth.logout"
+  | "auth.google_linked"
+  | "auth.unverified_account_taken_over"
+  | "auth.password_reset"
+  | "user.legal_name_locked"
+  | "course.published"
+  | "course.suspended"
+  | "certificate.issued"
+  | "certificate.revoked"
+  | "learning.session_superseded"
+  | "learning.cheat_flag";
+
+/** The app role can INSERT only (UPDATE/DELETE are blocked by both grant and trigger) */
+export async function audit(
+  db: Database,
+  e: {
+    action: AuditAction;
+    userId?: string | null;
+    entityType?: string;
+    entityId?: string;
+    ip?: string;
+    userAgent?: string;
+    details?: Record<string, unknown>;
+  },
+): Promise<void> {
+  await db
+    .insertInto("audit_logs")
+    .values({
+      action: e.action,
+      user_id: e.userId ?? null,
+      entity_type: e.entityType ?? null,
+      entity_id: e.entityId ?? null,
+      ip_address: e.ip ?? null,
+      user_agent: e.userAgent ?? null,
+      details: JSON.stringify(e.details ?? {}),
+    })
+    .execute();
+}

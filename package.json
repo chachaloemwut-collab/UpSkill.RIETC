@@ -1,0 +1,22 @@
+{
+  "name": "upskill-rietc",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @upskill/web --filter @upskill/worker dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "infra:up": "docker compose up -d --wait",
+    "infra:down": "docker compose down",
+    "db:migrate": "pnpm --filter @upskill/db migrate",
+    "db:codegen": "pnpm --filter @upskill/db codegen",
+    "keys:generate": "node scripts/generate-signing-key.mjs",
+    "audit": "pnpm audit --prod --audit-level high"
+  }
+}

@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Supply-chain hardening
+# - Only these packages may run install scripts (postinstall etc.).
+# - Do not install versions published less than 7 days ago (protects against hijacked releases).
+onlyBuiltDependencies:
+  - "@node-rs/argon2"
+  - esbuild
+  - sharp
+minimumReleaseAge: 10080
