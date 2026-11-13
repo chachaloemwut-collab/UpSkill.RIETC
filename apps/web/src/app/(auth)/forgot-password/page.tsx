@@ -4,11 +4,11 @@ import { isGoogleEnabled } from "@/server/auth/google";
 
 export const metadata: Metadata = { title: "ลืมรหัสผ่าน" };
 
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage() {
   return (
     <>
       <AuthHeading title="ลืมรหัสผ่าน" description="เราจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปที่อีเมลของคุณ" />
-      <ForgotPasswordForm googleEnabled={isGoogleEnabled()} />
+      <ForgotPasswordForm googleEnabled={await isGoogleEnabled()} />
     </>
   );
 }

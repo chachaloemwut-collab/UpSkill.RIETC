@@ -213,6 +213,17 @@ export interface Enrollments {
   user_id: string;
 }
 
+export interface GoogleOauthSettings {
+  client_id: string | null;
+  client_secret_encrypted: string | null;
+  created_at: Generated<Timestamp>;
+  enabled: Generated<boolean>;
+  id: Generated<number>;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+  version: Generated<number>;
+}
+
 export interface LearningGroupMembers {
   added_at: Generated<Timestamp>;
   group_id: string;
@@ -367,6 +378,7 @@ export interface DB {
   email_suppressions: EmailSuppressions;
   email_verification_tokens: EmailVerificationTokens;
   enrollments: Enrollments;
+  google_oauth_settings: GoogleOauthSettings;
   learning_group_members: LearningGroupMembers;
   learning_groups: LearningGroups;
   learning_sessions: LearningSessions;

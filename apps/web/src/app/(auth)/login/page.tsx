@@ -12,7 +12,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <AuthHeading title="ยินดีต้อนรับกลับ" description="เข้าสู่ระบบเพื่อเรียนต่อจากที่ค้างไว้" />
-      <LoginForm googleEnabled={isGoogleEnabled()} initialError={error?.slice(0, 64)} />
+      <LoginForm googleEnabled={await isGoogleEnabled()} initialError={error?.slice(0, 64)} />
     </>
   );
 }

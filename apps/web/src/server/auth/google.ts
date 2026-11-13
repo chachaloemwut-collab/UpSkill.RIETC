@@ -13,27 +13,28 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
 import type { GoogleClaims } from "@upskill/core";
-import { googleConfig, isHttpsOrigin } from "@upskill/infra/env";
+import { isHttpsOrigin } from "@upskill/infra/env";
 import { ctx } from "../context";
 import { HttpError } from "../http";
+import { getGoogleRuntimeConfig } from "../settings/google-oauth.service";
 
 export type OAuthMode = "login" | "link" | "reset";
 
 const stateCookie = () => (isHttpsOrigin(ctx().env) ? "__Host-oauth_state" : "oauth_state");
 const GOOGLE_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
 
-function config() {
-  const cfg = googleConfig(ctx().env);
+async function config() {
+  const cfg = await getGoogleRuntimeConfig();
   if (!cfg) throw new HttpError(503, "GOOGLE_NOT_CONFIGURED");
   return cfg;
 }
 
-export function isGoogleEnabled(): boolean {
-  return googleConfig(ctx().env) !== null;
+export async function isGoogleEnabled(): Promise<boolean> {
+  return (await getGoogleRuntimeConfig()) !== null;
 }
 
 export async function buildGoogleAuthUrl(mode: OAuthMode, linkUserId?: string): Promise<URL> {
-  const cfg = config();
+  const cfg = await config();
   const { redis } = ctx();
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
@@ -62,7 +63,7 @@ export async function completeGoogleCallback(
   stateParam: string | null,
   code: string | null,
 ): Promise<{ claims: GoogleClaims; mode: OAuthMode; linkUserId?: string }> {
-  const cfg = config();
+  const cfg = await config();
   const { redis } = ctx();
   const jar = await cookies();
   const cookieState = jar.get(stateCookie())?.value;

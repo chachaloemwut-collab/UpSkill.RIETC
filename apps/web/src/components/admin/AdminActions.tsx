@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Ban, BadgeCheck, MoreHorizontal, RotateCcw, Save, Send } from "lucide-react";
+import { Ban, BadgeCheck, ExternalLink, MoreHorizontal, RotateCcw, Save, Send } from "lucide-react";
 import { api } from "@/lib/api";
 import { Alert, AlertDialog, Button, Checkbox, DropdownMenu, Field, Input, PasswordInput, Select, Textarea, useToast } from "@/components/ui";
 
@@ -21,6 +21,58 @@ type EmailSettingsDefaults = {
   lastTestStatus: string | null;
   lastTestError: string | null;
 };
+
+type GoogleOAuthSettingsDefaults = {
+  enabled: boolean;
+  clientId: string;
+  secretConfigured: boolean;
+  redirectUri: string;
+  source: "environment" | "database";
+  version: number;
+};
+
+export function GoogleOAuthSettingsForm({ defaults }: { defaults: GoogleOAuthSettingsDefaults }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setBusy(true);
+    const result = await api("/api/admin/google/settings", {
+      method: "PATCH",
+      body: {
+        enabled: f.get("enabled") === "on",
+        clientId: f.get("clientId"),
+        ...(f.get("clientSecret") ? { clientSecret: f.get("clientSecret") } : {}),
+      },
+    });
+    setBusy(false);
+    if (result.ok) {
+      toast({ title: "บันทึกการเข้าสู่ระบบด้วย Google แล้ว", description: "หน้าสมัครสมาชิกและเข้าสู่ระบบจะใช้ค่าใหม่ทันที", variant: "success" });
+      router.refresh();
+    } else toast({ title: "บันทึกไม่สำเร็จ", description: result.message, variant: "destructive" });
+  }
+  return (
+    <form onSubmit={onSubmit} className="grid gap-5 p-5">
+      {defaults.source === "environment" && <Alert variant="default" title="ยังไม่ได้บันทึกจากหน้าผู้ดูแล">กรอกค่าจาก Google Cloud แล้วบันทึกเพื่อเปิดใช้งาน</Alert>}
+      <Checkbox name="enabled" defaultChecked={defaults.enabled} label="เปิดให้สมัครสมาชิกและเข้าสู่ระบบด้วย Google" />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="Google Client ID"><Input name="clientId" defaultValue={defaults.clientId} autoComplete="off" placeholder="000000000000-xxxx.apps.googleusercontent.com" /></Field>
+        <Field label="Google Client Secret" hint={defaults.secretConfigured ? "มีค่าลับอยู่แล้ว เว้นว่างเพื่อใช้ค่าเดิม" : "ค่านี้จะถูกเข้ารหัสก่อนจัดเก็บ"}>
+          <PasswordInput name="clientSecret" autoComplete="new-password" placeholder={defaults.secretConfigured ? "••••••••••••" : ""} />
+        </Field>
+      </div>
+      <Field label="Authorized redirect URI" hint="นำ URL นี้ไปเพิ่มใน OAuth Client ของ Google Cloud">
+        <Input value={defaults.redirectUri} readOnly className="font-mono text-xs" />
+      </Field>
+      <div className="flex flex-wrap gap-3">
+        <Button type="submit" loading={busy}><Save className="h-4 w-4" /> บันทึก Google OAuth</Button>
+        {defaults.enabled && defaults.secretConfigured && <a href="/api/auth/google?mode=login" className="inline-flex h-9 items-center justify-center gap-2 rounded-md border px-4 text-sm font-medium hover:bg-accent"><ExternalLink className="h-4 w-4" /> ทดลองเชื่อมต่อ Google</a>}
+      </div>
+    </form>
+  );
+}
 
 export function EmailSettingsForm({ defaults }: { defaults: EmailSettingsDefaults }) {
   const router = useRouter();

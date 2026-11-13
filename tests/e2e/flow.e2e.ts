@@ -125,6 +125,16 @@ describe("authorization", () => {
     );
     expect(owner.rows[0]).toMatchObject({ username: "superadmin", role: "admin", status: "active", is_system_owner: true });
   });
+
+  it("lets only admins manage Google OAuth and rejects enabling incomplete credentials", async () => {
+    expect((await learner.req("/api/admin/google/settings")).status).toBe(403);
+    const current = await admin.req("/api/admin/google/settings");
+    expect(current.status).toBe(200);
+    expect(current.json.redirectUri).toMatch(/\/api\/auth\/google\/callback$/);
+    const incomplete = await admin.req("/api/admin/google/settings", { method: "PATCH", body: { enabled: true, clientId: "" } });
+    expect(incomplete.status).toBe(400);
+    expect(incomplete.json.error).toBe("GOOGLE_CREDENTIALS_REQUIRED");
+  });
 });
 
 describe("instructor builds and publishes a course", () => {

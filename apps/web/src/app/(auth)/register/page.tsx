@@ -11,7 +11,7 @@ export default async function RegisterPage() {
   return (
     <>
       <AuthHeading title="สร้างบัญชีใหม่" description="สมัครสมาชิกเพื่อเข้าถึงหลักสูตรและติดตามผลการเรียน" />
-      <RegisterForm googleEnabled={isGoogleEnabled()} />
+      <RegisterForm googleEnabled={await isGoogleEnabled()} />
     </>
   );
 }

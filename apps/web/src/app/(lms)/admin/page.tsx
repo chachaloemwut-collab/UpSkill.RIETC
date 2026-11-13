@@ -5,11 +5,12 @@ import { Award, BadgeCheck, Ban, BookOpen, Flag, GraduationCap, Mail, ShieldAler
 import { Badge, Card, EmptyState, Table, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
-import { CourseAdminControls, EmailSettingsForm, RemoveSuppressionButton, RetryEmailButton, RevokeCertificateForm, TestEmailSettingsForm, UserAdminForm } from "@/components/admin/AdminActions";
+import { CourseAdminControls, EmailSettingsForm, GoogleOAuthSettingsForm, RemoveSuppressionButton, RetryEmailButton, RevokeCertificateForm, TestEmailSettingsForm, UserAdminForm } from "@/components/admin/AdminActions";
 import { VISIBILITY, formatDateTimeTh } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { adminOverview } from "@/server/admin/admin.service";
 import { getEmailSettingsView } from "@/server/admin/email-settings.service";
+import { getGoogleOAuthSettingsView } from "@/server/settings/google-oauth.service";
 
 export const metadata: Metadata = { title: "ผู้ดูแลระบบ", robots: { index: false } };
 
@@ -18,7 +19,7 @@ const REASONS: Record<string, string> = { POSITION_JUMP: "กรอข้าม 
 export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") redirect("/");
-  const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings] = await Promise.all([adminOverview(), getEmailSettingsView()]);
+  const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings, googleSettings] = await Promise.all([adminOverview(), getEmailSettingsView(), getGoogleOAuthSettingsView()]);
 
   return (
     <>
@@ -38,7 +39,7 @@ export default async function AdminPage() {
           <TabsTrigger value="flags">พฤติกรรมผิดปกติ</TabsTrigger>
           <TabsTrigger value="users">ผู้ใช้</TabsTrigger>
           <TabsTrigger value="certs">ใบรับรอง</TabsTrigger>
-          <TabsTrigger value="email">อีเมล ({stats.emailPending}/{stats.emailFailed})</TabsTrigger>
+          <TabsTrigger value="email">อีเมลและ Google ({stats.emailPending}/{stats.emailFailed})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="courses" className="mt-4">
@@ -161,6 +162,10 @@ export default async function AdminPage() {
         </TabsContent>
 
         <TabsContent value="email" className="mt-4 grid gap-6">
+          <Card>
+            <div className="flex items-center gap-3 border-b px-5 py-4"><Mail className="h-5 w-5" /><div><h3 className="font-semibold">การเข้าสู่ระบบด้วย Google</h3><p className="text-xs text-muted-foreground">ตั้งค่าการสมัครสมาชิกและเข้าสู่ระบบด้วยบัญชี Google ภายหลังได้จากหน้านี้</p></div></div>
+            <GoogleOAuthSettingsForm defaults={googleSettings} />
+          </Card>
           <Card>
             <div className="flex items-center gap-3 border-b px-5 py-4"><Mail className="h-5 w-5" /><div><h3 className="font-semibold">ตั้งค่าอีเมลระบบ</h3><p className="text-xs text-muted-foreground">ผู้ส่ง การตอบกลับ และการเชื่อมต่อ SMTP · รหัสผ่านจะถูกเข้ารหัสก่อนจัดเก็บ</p></div></div>
             <EmailSettingsForm defaults={emailSettings} />

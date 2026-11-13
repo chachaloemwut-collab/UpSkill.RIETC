@@ -95,7 +95,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </Section>
         )}
 
-        {isGoogleEnabled() && (
+        {(await isGoogleEnabled()) && (
           <Section icon={<Link2 className="h-4 w-4" />} title="บัญชีที่เชื่อมต่อ" description="ใช้เข้าสู่ระบบ และยืนยันตัวตนเมื่อลืมรหัสผ่าน">
             <Card className="flex flex-wrap items-center gap-3 p-5">
               <span className="flex h-9 w-9 items-center justify-center rounded-md border font-semibold">G</span>

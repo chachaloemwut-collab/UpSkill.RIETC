@@ -24,6 +24,8 @@ const MESSAGES: Record<string, string> = {
   SMTP_PASSWORD_REQUIRED: "ต้องระบุรหัสผ่าน SMTP เมื่อกำหนดชื่อผู้ใช้",
   EMAIL_SENDING_DISABLED: "การส่งอีเมลถูกปิดอยู่",
   EMAIL_TEST_FAILED: "ทดสอบส่งอีเมลไม่สำเร็จ กรุณาตรวจสอบค่าการเชื่อมต่อ",
+  GOOGLE_SECRET_REQUIRED: "เมื่อเปลี่ยน Client ID ต้องกรอก Client Secret ใหม่ด้วย",
+  GOOGLE_CREDENTIALS_REQUIRED: "กรุณากรอก Google Client ID และ Client Secret ก่อนเปิดใช้งาน",
   CANNOT_ENROLL_OWN_COURSE: "ไม่สามารถลงทะเบียนหลักสูตรของตัวเองได้",
   PREVIOUS_LESSON_INCOMPLETE: "กรุณาเรียนบทก่อนหน้าให้ครบก่อน",
   VIDEO_BROKEN: "วิดีโอบทนี้ใช้งานไม่ได้ชั่วคราว",
