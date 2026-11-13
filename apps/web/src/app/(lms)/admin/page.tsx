@@ -28,7 +28,7 @@ export default async function AdminPage() {
         <StatCard index={1} label="หลักสูตรที่เผยแพร่" value={stats.publishedCourses} unit="หลักสูตร" icon={<BookOpen />} />
         <StatCard index={2} label="การลงทะเบียน" value={stats.enrollments} unit="ครั้ง" icon={<GraduationCap />} />
         <StatCard index={3} label="ใบรับรองที่ใช้งานได้" value={stats.certificates} unit="ใบ" icon={<Award />} />
-        <StatCard index={4} label="พฤติกรรมผิดปกติ (7 วัน)" value={stats.flags7d} unit="ครั้ง" icon={<Flag />} />
+        <StatCard index={4} label="ผิดปกติ (7 วัน)" value={stats.flags7d} unit="ครั้ง" icon={<Flag />} />
       </div>
 
       <Tabs defaultValue="courses" className="mt-8">

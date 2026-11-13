@@ -116,7 +116,7 @@ export function UserAdminForm() {
       <Field label="อีเมลผู้ใช้">
         <Input name="email" type="email" required placeholder="user@example.com" />
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid items-start gap-4 sm:grid-cols-2">
         <Field label="บทบาท">
           <Select name="role" defaultValue="">
             <option value="">ไม่เปลี่ยน</option>

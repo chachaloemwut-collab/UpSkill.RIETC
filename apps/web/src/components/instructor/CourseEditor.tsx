@@ -174,7 +174,7 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
         <Field label="คำอธิบาย">
           <Textarea name="description" defaultValue={course.description ?? ""} rows={5} />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid items-start gap-4 sm:grid-cols-2">
           <Field label="ดูวิดีโอขั้นต่ำ (%)" hint="50–100">
             <Input name="min_watch_percentage" type="number" min={50} max={100} defaultValue={course.min_watch_percentage} />
           </Field>
@@ -303,7 +303,7 @@ function LessonsSection({ base, lessons, devManualDuration }: { base: string; le
           <Field label="ลิงก์ YouTube" hint="รองรับ youtube.com/watch?v=, youtu.be/, youtube.com/shorts/ · ระบบดึงความยาวคลิปให้อัตโนมัติ">
             <Input name="url" required placeholder="https://www.youtube.com/watch?v=..." />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid items-start gap-4 sm:grid-cols-2">
             <Field label="ชื่อบท" hint="เว้นว่างเพื่อใช้ชื่อคลิป">
               <Input name="title" maxLength={255} />
             </Field>

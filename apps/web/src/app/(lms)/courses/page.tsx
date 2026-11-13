@@ -11,7 +11,7 @@ export default async function CoursesPage({ searchParams }: { searchParams: Prom
   const courses = await listPublishedCourses();
   return (
     <>
-      <PageHeader title="คลังหลักสูตร" description={`หลักสูตรที่เปิดให้เรียนฟรี ${courses.length.toLocaleString("th-TH")} หลักสูตร · ดูวิดีโอ ทำแบบทดสอบ รับใบรับรอง`} />
+      <PageHeader title="คลังหลักสูตร" description={`หลักสูตรที่เปิดให้ลงทะเบียน ${courses.length.toLocaleString("th-TH")} หลักสูตร · ดูบทเรียน ทำแบบทดสอบ และรับใบรับรองตามเกณฑ์`} />
       <CourseCatalog courses={courses} initialQuery={typeof q === "string" ? q.slice(0, 100) : ""} />
     </>
   );

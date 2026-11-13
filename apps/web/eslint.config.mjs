@@ -15,5 +15,19 @@ export default defineConfig([
       "react/jsx-no-target-blank": "error",
     },
   },
+  {
+    // Vendored VEC UI design system: keep it byte-close to upstream. Its animation hooks deliberately read refs
+    // during render and sync state in effects; those are perf/style rules, not security ones.
+    files: ["src/components/ui/**", "src/lib/smart-search.ts"],
+    linterOptions: { reportUnusedDisableDirectives: "off" },
+    rules: {
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/immutability": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "react/display-name": "off",
+      "@next/next/no-img-element": "off",
+    },
+  },
   globalIgnores([".next/**", "next-env.d.ts"]),
 ]);

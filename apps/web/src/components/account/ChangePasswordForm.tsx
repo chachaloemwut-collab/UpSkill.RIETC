@@ -33,7 +33,7 @@ export function ChangePasswordForm({ hasPassword }: { hasPassword: boolean }) {
           <PasswordInput name="current" autoComplete="current-password" required />
         </Field>
       )}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid items-start gap-4 sm:grid-cols-2">
         <Field label="รหัสผ่านใหม่" hint="อย่างน้อย 12 ตัวอักษร">
           <PasswordInput name="new" autoComplete="new-password" minLength={12} required />
         </Field>

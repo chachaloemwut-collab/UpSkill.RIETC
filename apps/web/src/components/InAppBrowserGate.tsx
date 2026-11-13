@@ -2,7 +2,9 @@
 // Spec 3.1 #1: LINE / Facebook / IG / TikTok WebViews block Google OAuth (403 disallowed_useragent)
 // and PDF downloads often fail -> tell the user to open the page in Safari/Chrome
 import { useState, useSyncExternalStore } from "react";
+import { ExternalLink } from "lucide-react";
 import { detectInAppBrowser, externalBrowserUrl } from "@upskill/core/user-agent";
+import { Button, buttonClass } from "@/components/ui";
 
 const noopSubscribe = () => () => {};
 
@@ -18,25 +20,26 @@ export function InAppBrowserGate() {
   const external = externalBrowserUrl(window.location.href, info);
 
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
-        <h2 className="text-lg font-semibold">กรุณาเปิดในเบราว์เซอร์หลัก</h2>
-        <p className="mt-2 text-sm text-neutral-600">
-          แอปที่คุณใช้อยู่ไม่รองรับการเข้าสู่ระบบด้วย Google และการดาวน์โหลดใบรับรอง
-        </p>
-        <div className="mt-4 flex flex-col gap-2">
+    <div role="dialog" aria-modal="true" aria-label="กรุณาเปิดในเบราว์เซอร์หลัก" className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 p-4 backdrop-blur-sm sm:items-center">
+      <div className="w-full max-w-sm animate-slide-up rounded-xl border bg-background p-5 shadow-xl">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+          <ExternalLink className="h-5 w-5" />
+        </span>
+        <h2 className="mt-3 text-lg font-semibold">กรุณาเปิดในเบราว์เซอร์หลัก</h2>
+        <p className="mt-1 text-sm text-muted-foreground">แอปที่คุณใช้อยู่ไม่รองรับการเข้าสู่ระบบด้วย Google และการดาวน์โหลดใบรับรอง</p>
+        <div className="mt-5 grid gap-2">
           {external ? (
-            <a href={external} className="rounded-lg bg-blue-600 px-4 py-2.5 text-center font-medium text-white">
+            <a href={external} className={buttonClass("default", "lg", "w-full")}>
               {info.os === "ios" ? "เปิดใน Safari" : "เปิดใน Chrome"}
             </a>
           ) : (
-            <p className="rounded-lg bg-neutral-100 p-3 text-sm">
+            <p className="rounded-md bg-muted p-3 text-sm">
               แตะเมนู <b>⋯</b> มุมขวาบน แล้วเลือก <b>เปิดในเบราว์เซอร์</b> หรือคัดลอกลิงก์ไปวางใน Safari
             </p>
           )}
-          <button
-            type="button"
-            className="rounded-lg border px-4 py-2.5 font-medium"
+          <Button
+            variant="outline"
+            size="lg"
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(window.location.href);
@@ -47,10 +50,10 @@ export function InAppBrowserGate() {
             }}
           >
             {copied ? "คัดลอกแล้ว ✓" : "คัดลอกลิงก์"}
-          </button>
-          <button type="button" className="py-2 text-sm text-neutral-500" onClick={() => setDismissed(true)}>
+          </Button>
+          <Button variant="ghost" onClick={() => setDismissed(true)} className="text-muted-foreground">
             ดำเนินการต่อในแอปนี้
-          </button>
+          </Button>
         </div>
       </div>
     </div>

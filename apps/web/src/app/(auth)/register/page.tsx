@@ -10,7 +10,7 @@ export default async function RegisterPage() {
   if (await getCurrentUser()) redirect("/");
   return (
     <>
-      <AuthHeading title="สร้างบัญชีใหม่" description="เรียนฟรีทุกหลักสูตร หรือสร้างหลักสูตรของคุณเอง" />
+      <AuthHeading title="สร้างบัญชีใหม่" description="สมัครสมาชิกเพื่อเข้าถึงหลักสูตรและติดตามผลการเรียน" />
       <RegisterForm googleEnabled={isGoogleEnabled()} />
     </>
   );

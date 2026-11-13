@@ -30,7 +30,7 @@ export default async function MyCoursesPage() {
         <EmptyState
           icon={<BookOpen className="h-5 w-5" />}
           title="ยังไม่ได้ลงทะเบียนเรียน"
-          description="เลือกหลักสูตรจากคลังหลักสูตร เรียนฟรีทุกคอร์ส"
+          description="เลือกหลักสูตรที่ต้องการจากคลังหลักสูตร"
           action={
             <Link href="/courses" className={buttonClass("default")}>
               ไปที่คลังหลักสูตร

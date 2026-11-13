@@ -49,7 +49,7 @@ export function LockLegalNameForm({ className }: { className?: string }) {
           </div>
         </div>
         {error && <Alert variant="destructive" title={error} />}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid items-start gap-4 sm:grid-cols-2">
           <Field label="ชื่อ-นามสกุล (ภาษาไทย)">
             <Input name="th" autoComplete="name" maxLength={120} placeholder="เช่น สมชาย ใจดี" />
           </Field>

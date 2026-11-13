@@ -33,7 +33,7 @@ export function EnrollButton({ courseId, loggedIn }: { courseId: string; loggedI
         } else toast({ title: "ลงทะเบียนไม่สำเร็จ", description: r.message, variant: "destructive" });
       }}
     >
-      ลงทะเบียนเรียน (ฟรี)
+      ลงทะเบียนเรียน
     </Button>
   );
 }

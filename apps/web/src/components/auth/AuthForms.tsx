@@ -119,7 +119,7 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
       <p className="text-center text-sm text-muted-foreground">
         ยังไม่มีบัญชี?{" "}
         <Link href="/register" className="font-medium text-foreground underline-offset-4 hover:underline">
-          สมัครสมาชิกฟรี
+          สมัครสมาชิก
         </Link>
       </p>
     </div>

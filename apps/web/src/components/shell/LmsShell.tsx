@@ -120,7 +120,7 @@ export function LmsShell({ user, children }: { user: ShellUser | null; children:
           ) : (
             <div className="grid gap-2">
               <Link href="/register" className={buttonClass("default", "sm")}>
-                <UserPlus /> สมัครสมาชิกฟรี
+                <UserPlus /> สมัครสมาชิก
               </Link>
               <Link href="/login" className={buttonClass("outline", "sm")}>
                 <LogIn /> เข้าสู่ระบบ
@@ -141,6 +141,12 @@ function TopBar({ title, user, onSignOut }: { title: string; user: ShellUser | n
   const router = useRouter();
   return (
     <>
+      <Link href="/" aria-label="UpSkill หน้าแรก" className="flex items-center gap-2 font-semibold md:hidden">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <GraduationCap className="h-4 w-4" />
+        </span>
+        <span className="sm:hidden">UpSkill</span>
+      </Link>
       <p className="hidden truncate text-sm font-medium sm:block">{title}</p>
       <div className="flex-1" />
       <form

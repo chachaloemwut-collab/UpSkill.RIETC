@@ -64,7 +64,7 @@ export default async function HomePage() {
           <EmptyState
             icon={<GraduationCap className="h-5 w-5" />}
             title={enrollments.length ? "เรียนจบทุกคอร์สที่ลงทะเบียนแล้ว" : "ยังไม่ได้ลงทะเบียนเรียน"}
-            description="เลือกหลักสูตรที่สนใจจากคลังหลักสูตร เรียนฟรีทุกคอร์ส"
+            description="เลือกหลักสูตรที่สนใจจากคลังหลักสูตร"
             action={
               <Link href="/courses" className={buttonClass("default")}>
                 เลือกหลักสูตร
@@ -79,8 +79,8 @@ export default async function HomePage() {
                 className="group flex animate-slide-up flex-col overflow-hidden transition-shadow [animation-fill-mode:both] hover:shadow-md sm:flex-row"
                 style={{ animationDelay: `${i * 60}ms` }}
               >
-                <Link href={`/courses/${e.slug}`} className="sm:w-56 sm:shrink-0">
-                  <CourseCover videoId={e.cover_video_id} title={e.title} className="h-full" />
+                <Link href={`/courses/${e.slug}`} className="relative block overflow-hidden sm:w-56 sm:shrink-0">
+                  <CourseCover videoId={e.cover_video_id} title={e.title} className="sm:absolute sm:inset-0 sm:aspect-auto" />
                 </Link>
                 <div className="flex flex-1 flex-col gap-3 p-4">
                   <div>
@@ -139,7 +139,7 @@ export default async function HomePage() {
 }
 
 const STEPS = [
-  { title: "ลงทะเบียน", description: "เลือกหลักสูตร เรียนฟรี" },
+  { title: "ลงทะเบียน", description: "เลือกและลงทะเบียนหลักสูตร" },
   { title: "ดูวิดีโอ", description: "ระบบนับเวลาเรียนจริง" },
   { title: "ทำแบบทดสอบ", description: "สุ่มข้อและจับเวลา" },
   { title: "รับใบรับรอง", description: "ตรวจสอบได้ด้วย QR" },
@@ -159,10 +159,10 @@ function Landing({ courses }: { courses: Awaited<ReturnType<typeof listPublished
         <div aria-hidden className="pointer-events-none absolute -bottom-28 left-1/3 h-72 w-72 rounded-full bg-primary/5 blur-3xl" />
         <div className="relative max-w-2xl">
           <Badge variant="outline" className="mb-4 gap-1.5 bg-background">
-            <span className="h-1.5 w-1.5 rounded-full bg-success" /> Open-access LMS · เรียนฟรี
+            <span className="h-1.5 w-1.5 rounded-full bg-success" /> ระบบจัดการการเรียนรู้และใบรับรอง
           </Badge>
           <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-            เรียนรู้ทักษะใหม่
+            เรียนรู้จากหลักสูตร
             <br />
             <span className="text-muted-foreground">ได้ใบรับรองที่เชื่อถือได้จริง</span>
           </h1>
@@ -171,7 +171,7 @@ function Landing({ courses }: { courses: Awaited<ReturnType<typeof listPublished
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/register" className={buttonClass("default", "lg")}>
-              เริ่มเรียนฟรี <ArrowRight className="h-4 w-4" />
+              สมัครสมาชิก <ArrowRight className="h-4 w-4" />
             </Link>
             <Link href="/courses" className={buttonClass("outline", "lg")}>
               ดูคลังหลักสูตร
@@ -195,7 +195,7 @@ function Landing({ courses }: { courses: Awaited<ReturnType<typeof listPublished
           หลักสูตรล่าสุด
         </SectionTitle>
         {courses.length === 0 ? (
-          <EmptyState icon={<Library className="h-5 w-5" />} title="ยังไม่มีหลักสูตรที่เผยแพร่" description="กลับมาใหม่เร็ว ๆ นี้" />
+          <EmptyState icon={<Library className="h-5 w-5" />} title="ยังไม่มีหลักสูตรที่เผยแพร่" description="ยังไม่มีรายการหลักสูตรให้แสดง" />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {courses.slice(0, 8).map((c, i) => (

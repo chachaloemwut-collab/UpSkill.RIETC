@@ -23,13 +23,20 @@
 │   ├── web/                       Next.js — UI + API
 │   │   └── src/
 │   │       ├── app/               หน้าเว็บ + api/**/route.ts (บาง ๆ: validate → เรียก service)
-│   │       │   ├── (auth)/        login, register, forgot/reset password, verify-email
-│   │       │   ├── courses/[slug] รายละเอียด, lessons/[id] (player), quiz, certificate
-│   │       │   ├── instructor/    รายการหลักสูตร + editor
-│   │       │   ├── admin/         ระงับ/รับรองหลักสูตร, เพิกถอนใบรับรอง, ผู้ใช้, cheat flags
-│   │       │   ├── me/            บัญชี, ชื่อจริง, รหัสผ่าน, ผูก Google
-│   │       │   └── verify/[code]  หน้าตรวจสอบสาธารณะ
-│   │       ├── components/        UI (client components)
+│   │       │   ├── (auth)/        layout แบ่งครึ่งจอ: login, register, forgot/reset password, verify-email
+│   │       │   └── (lms)/         layout แบบ LMS (sidebar + top bar ตาม role) ครอบทุกหน้าด้านล่าง
+│   │       │       ├── page.tsx         แดชบอร์ดผู้เรียน (ล็อกอิน) / landing (guest)
+│   │       │       ├── courses/         คลังหลักสูตร (ค้นหา/กรอง) · [slug] รายละเอียด, lessons/[id] (player), quiz, certificate
+│   │       │       ├── my-courses/      คอร์สของฉัน + ความคืบหน้า
+│   │       │       ├── certificates/    ใบรับรองของฉัน
+│   │       │       ├── instructor/      แดชบอร์ดผู้สอน + editor (tabs: บทเรียน/ข้อสอบ/ตั้งค่า)
+│   │       │       ├── admin/           สถิติ + tabs: หลักสูตร, cheat flags, ผู้ใช้, เพิกถอนใบรับรอง
+│   │       │       ├── me/              ตั้งค่าบัญชี, ชื่อจริง, รหัสผ่าน, ผูก Google
+│   │       │       └── verify/          ฟอร์มกรอกรหัส + [code] หน้าตรวจสอบสาธารณะ
+│   │       ├── components/
+│   │       │   ├── ui/            design system VEC UI (vendored จาก vec-day01, MIT) — ดูหมายเหตุด้านล่าง
+│   │       │   ├── shell/         LmsShell: เมนูตาม role, ค้นหา, ธีม, เมนูผู้ใช้
+│   │       │   └── …              course/, learning/, instructor/, admin/, auth/, account/
 │   │       ├── server/            server-only services (ห้าม import จาก client)
 │   │       │   ├── http.ts        route() wrapper: origin/auth/role/zod/rate-limit/error
 │   │       │   ├── auth/          session, google, auth.service
@@ -53,6 +60,21 @@
 
 **กฎ dependency:** `apps/* → packages/infra → packages/core` และ `apps/* → packages/db` — `core` ห้าม import อะไรที่ทำ IO
 Client component import จาก `@upskill/core/heartbeat`, `/user-agent`, `/youtube` เท่านั้น (entry หลักมี `node:crypto`)
+
+## UI design system (`apps/web/src/components/ui`)
+
+คัดลอกมาจาก theme **vec-day01** (MIT) ทุกไฟล์มี `"use client"` และ import ผ่าน `@/components/ui`
+- **ไม่ได้นำมา:** `map-explorer` (maplibre), `rich-text` (tiptap), `chat`, `id-card` เพราะ LMS ยังไม่ได้ใช้และต้องเพิ่ม dependency ขนาดใหญ่
+- **สิ่งที่แก้จากต้นฉบับ** (ถ้าดึงเวอร์ชันใหม่จาก theme ต้องแก้ซ้ำ):
+  - `theme.tsx` อ่านค่าธีมด้วย `useSyncExternalStore` (SSR-safe) และใช้ script ใน `<head>` (`theme-script.ts`, มี CSP nonce) เพื่อไม่ให้จอกระพริบตอนโหลด
+  - `toast.tsx` สร้าง portal หลัง mount เท่านั้น
+  - `app-shell.tsx` เมนูรองรับ `href` (เป็น `next/link`) และอ่านสถานะยุบ sidebar หลัง hydrate
+  - `button.tsx` ใช้ `type="button"` เป็นค่าเริ่มต้น และแยก class ไปไว้ใน `button-styles.ts` เพื่อให้ server component ใช้ `buttonClass()` กับ `<Link>` ได้
+  - เพิ่ม `!` ตรงจุดที่ `noUncheckedIndexedAccess` ฟ้อง
+- `apps/web` ปิด `exactOptionalPropertyTypes` (โค้ดต้นฉบับเขียนโดยไม่ได้เปิด flag นี้) ส่วน `packages/*` ยังเปิดอยู่
+- ESLint ปิดเฉพาะกฎ react-hooks เชิง performance/สไตล์ในโฟลเดอร์นี้ กฎด้านความปลอดภัยยังเปิดอยู่ทุกไฟล์
+- ฟอนต์ Inter + Noto Sans Thai มาจาก `next/font` ซึ่งดาวน์โหลดตอน build แล้ว serve จาก origin เราเอง: ตอนใช้งานจริงไม่มี request ไป Google และ `font-src 'self'` ยังเหมือนเดิม
+- ภาพปกหลักสูตรคือ thumbnail ของ YouTube ผ่าน `/_next/image` (server ไปดึงจาก `i.ytimg.com`) ทำให้ browser ไม่ต้องติดต่อ Google เอง
 
 ## Flow: การเรียน 1 บท
 

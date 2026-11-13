@@ -32,6 +32,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // The theme script sets class/data-theme/--radius on <html> before React hydrates
     <html lang="th" className={`${inter.variable} ${notoThai.variable}`} suppressHydrationWarning>
       <head>
+        {/* Static constant (no user input), nonce-allowed by the CSP: applies the saved theme before first paint */}
+        {/* eslint-disable-next-line react/no-danger */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-dvh font-sans">
