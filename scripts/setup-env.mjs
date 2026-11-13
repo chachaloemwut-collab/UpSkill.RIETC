@@ -15,10 +15,11 @@ if (!existsSync(envPath)) {
   const env = readFileSync(new URL(".env.example", root), "utf8")
     .replace(/^CERT_SIGNING_ACTIVE_KID=.*$/m, `CERT_SIGNING_ACTIVE_KID=${kid}`)
     .replace(/^CERT_SIGNING_PRIVATE_KEY=.*$/m, `CERT_SIGNING_PRIVATE_KEY=${priv}`)
-    .replace(/^CERT_PUBLIC_KEYS=.*$/m, `CERT_PUBLIC_KEYS='${JSON.stringify({ [kid]: pub })}'`);
+    .replace(/^CERT_PUBLIC_KEYS=.*$/m, `CERT_PUBLIC_KEYS='${JSON.stringify({ [kid]: pub })}'`)
+    .replace(/^SETTINGS_ENCRYPTION_KEY=.*$/m, `SETTINGS_ENCRYPTION_KEY=${randomBytes(32).toString("base64url")}`);
   writeFileSync(envPath, env, { mode: 0o600 });
   chmodSync(envPath, 0o600);
-  console.log("created .env.local (with a new certificate signing key)");
+  console.log("created .env.local (with a new certificate signing key and settings encryption key)");
 } else {
   console.log(".env.local already exists: left unchanged");
 }
