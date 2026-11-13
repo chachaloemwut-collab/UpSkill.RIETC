@@ -96,7 +96,6 @@ export async function updateEmailSettings(adminId: string, input: EmailSettingsI
     action: "system.email_settings_updated",
     userId: adminId,
     entityType: "email_provider_settings",
-    entityId: "1",
     ip: meta.ip,
     details: { enabled: input.enabled, senderEmail: values.sender_email, smtpHost: values.smtp_host, smtpPort: values.smtp_port, smtpSecurity: values.smtp_security, usernameConfigured: Boolean(username), passwordChanged: Boolean(input.smtpPassword) },
   });
@@ -125,7 +124,7 @@ export async function testEmailSettings(adminId: string, recipient: string, meta
     errorMessage = error instanceof Error ? error.message.slice(0, 500) : "email test failed";
   }
   await db.updateTable("email_provider_settings").set({ last_tested_at: new Date(), last_test_status: status, last_test_error: errorMessage }).where("id", "=", 1).execute();
-  await audit(db, { action: "system.email_settings_tested", userId: adminId, entityType: "email_provider_settings", entityId: "1", ip: meta.ip, details: { status, recipient } });
+  await audit(db, { action: "system.email_settings_tested", userId: adminId, entityType: "email_provider_settings", ip: meta.ip, details: { status, recipient } });
   if (status === "failed") throw new HttpError(422, "EMAIL_TEST_FAILED");
 }
 
