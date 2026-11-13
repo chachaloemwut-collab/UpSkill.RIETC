@@ -10,6 +10,24 @@ import pg from "pg";
 const url = process.env.DATABASE_MIGRATION_URL;
 if (!url) throw new Error("DATABASE_MIGRATION_URL is required");
 
+/**
+ * Single-role hosting (one DB user that owns the schema and is also used by the app, no permission to create
+ * roles): the GRANT/REVOKE statements for the least-privilege roles cannot run there. With this flag they are
+ * skipped; everything else (tables, triggers, constraints) runs unchanged and the checksum still covers the
+ * original file, so the same migrations stay valid for both setups.
+ */
+const skipRoleGrants = process.env.MIGRATION_SKIP_ROLE_GRANTS === "1";
+const ROLE_GRANT = /^[ \t]*(?:GRANT|REVOKE)\b[^;]*?\b(?:upskill_app|upskill_readonly)\b[^;]*;/gim;
+function forThisDatabase(sql: string): { sql: string; skipped: number } {
+  if (!skipRoleGrants) return { sql, skipped: 0 };
+  let skipped = 0;
+  const out = sql.replace(ROLE_GRANT, (m) => {
+    skipped++;
+    return `-- [skipped: single-role hosting] ${m.replace(/\s+/g, " ").slice(0, 80)}…`;
+  });
+  return { sql: out, skipped };
+}
+
 const dir = fileURLToPath(new URL("../migrations/", import.meta.url));
 const client = new pg.Client({ connectionString: url });
 await client.connect();
@@ -33,12 +51,13 @@ try {
       if (prev !== checksum) throw new Error(`Migration ${file} was modified after being applied`);
       continue;
     }
+    const run = forThisDatabase(sql);
     await client.query("BEGIN");
     try {
-      await client.query(sql);
+      await client.query(run.sql);
       await client.query("INSERT INTO schema_migrations (name, checksum) VALUES ($1, $2)", [file, checksum]);
       await client.query("COMMIT");
-      console.log(`applied ${file}`);
+      console.log(`applied ${file}${run.skipped ? ` (skipped ${run.skipped} role grant statements)` : ""}`);
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;

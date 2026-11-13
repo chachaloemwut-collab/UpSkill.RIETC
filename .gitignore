@@ -135,7 +135,7 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-# --- UpSkill ---
+# --- UpskillReskill.RIETC ---
 .env*
 !.env.example
 .next/
@@ -144,3 +144,9 @@ next-env.d.ts
 apps/worker/var/
 .DS_Store
 /var/
+
+# Deploy secrets (server .env, SFTP login) — never commit
+deploy/*/secrets/
+# Local notes with credentials — never commit
+env.rtf
+*.rtf

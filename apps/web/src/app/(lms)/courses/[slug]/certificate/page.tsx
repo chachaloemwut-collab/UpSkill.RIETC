@@ -37,7 +37,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ sl
             <ChevronRight className="h-3.5 w-3.5" /> ใบรับรอง
           </span>
         }
-        title="ใบรับรองการสำเร็จหลักสูตร"
+        title={data.course.credential_name_th}
         description={data.course.title}
       />
       {cert ? (

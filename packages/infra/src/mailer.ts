@@ -1,49 +1,129 @@
-// Email is sent only by the worker (keeps SMTP latency/failures out of web requests).
-// The web app enqueues a job on the "email" queue with one of these templates.
+// Email is sent only by the worker. Every job originates from the database outbox.
 import nodemailer from "nodemailer";
 
-export type EmailJob =
+export type EmailCategory = "security" | "transactional" | "course_update" | "learning_reminder" | "system";
+
+type EmailJobData =
   | { template: "verify-email"; to: string; link: string }
   | { template: "reset-password"; to: string; link: string }
   | { template: "password-changed"; to: string }
-  | { template: "video-broken"; to: string; courseTitle: string; lessonTitle: string; manageLink: string };
+  | { template: "account-status-changed"; to: string; statusLabel: string }
+  | { template: "enrollment-confirmed"; to: string; courseTitle: string; courseLink: string; enrolledAt: string }
+  | { template: "course-assigned"; to: string; courseTitle: string; courseLink: string; assignedBy: string; dueAt?: string; note?: string }
+  | { template: "assignment-cancelled"; to: string; courseTitle: string }
+  | { template: "enrollment-cancelled"; to: string; courseTitle: string }
+  | { template: "course-suspended"; to: string; courseTitle: string }
+  | { template: "ready-for-quiz"; to: string; courseTitle: string; quizLink: string }
+  | { template: "assessment-passed"; to: string; courseTitle: string; score: string; certificateLink: string; legalNameRequired: boolean }
+  | { template: "assessment-not-passed"; to: string; courseTitle: string; score: string; passingScore: string; canRetry: boolean; quizLink: string }
+  | { template: "credential-requested"; to: string; documentName: string; courseTitle: string; code: string }
+  | { template: "credential-ready"; to: string; documentName: string; courseTitle: string; code: string; downloadLink: string; verifyLink: string }
+  | { template: "credential-revoked"; to: string; documentName: string; courseTitle: string; code: string; reason: string; verifyLink: string }
+  | { template: "assignment-due-reminder"; to: string; courseTitle: string; courseLink: string; dueAt: string }
+  | { template: "weekly-summary"; to: string; inProgress: number; completed: number; dashboardLink: string }
+  | { template: "video-broken"; to: string; courseTitle: string; lessonTitle: string; manageLink: string }
+  | { template: "course-status-changed"; to: string; courseTitle: string; statusLabel: string; manageLink: string }
+  | { template: "system-alert"; to: string; title: string; details: string; manageLink?: string };
 
-const esc = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+export type EmailJob = EmailJobData & { locale?: "th" | "en" };
 
-export function renderEmail(job: EmailJob): { subject: string; text: string; html: string } {
+export type EmailTemplate = EmailJob["template"];
+
+const SECURITY = new Set<EmailTemplate>(["verify-email", "reset-password", "password-changed", "account-status-changed"]);
+const COURSE_UPDATE = new Set<EmailTemplate>(["course-suspended", "course-status-changed"]);
+const REMINDER = new Set<EmailTemplate>(["assignment-due-reminder", "weekly-summary"]);
+const SYSTEM = new Set<EmailTemplate>(["video-broken", "system-alert"]);
+
+export function emailCategory(template: EmailTemplate): EmailCategory {
+  if (SECURITY.has(template)) return "security";
+  if (COURSE_UPDATE.has(template)) return "course_update";
+  if (REMINDER.has(template)) return "learning_reminder";
+  if (SYSTEM.has(template)) return "system";
+  return "transactional";
+}
+
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+const action = (link: string, label: string) => `<p><a href="${esc(link)}">${esc(label)}</a></p>`;
+const optionalText = (label: string, value?: string) => (value ? `\n${label}: ${value}` : "");
+const optionalHtml = (label: string, value?: string) => (value ? `<p>${esc(label)}: ${esc(value)}</p>` : "");
+
+function renderEmailEn(job: EmailJob): { subject: string; text: string; html: string } {
+  const result = (subject: string, text: string, link?: string, label = "Open") => ({ subject, text: `${text}${link ? `\n${link}` : ""}`, html: `<p>${esc(text)}</p>${link ? action(link, label) : ""}` });
   switch (job.template) {
-    case "verify-email":
-      return {
-        subject: "ยืนยันอีเมลของคุณ",
-        text: `กดลิงก์เพื่อยืนยันอีเมล (หมดอายุใน 24 ชั่วโมง):\n${job.link}\n\nหากคุณไม่ได้สมัคร ไม่ต้องทำอะไร`,
-        html: `<p>กดลิงก์เพื่อยืนยันอีเมล (หมดอายุใน 24 ชั่วโมง)</p><p><a href="${esc(job.link)}">ยืนยันอีเมล</a></p><p>หากคุณไม่ได้สมัคร ไม่ต้องทำอะไร</p>`,
-      };
-    case "reset-password":
-      return {
-        subject: "ตั้งรหัสผ่านใหม่",
-        text: `กดลิงก์เพื่อตั้งรหัสผ่านใหม่ (หมดอายุใน 15 นาที):\n${job.link}\n\nหากคุณไม่ได้ขอ ไม่ต้องทำอะไร รหัสผ่านเดิมยังใช้ได้`,
-        html: `<p>กดลิงก์เพื่อตั้งรหัสผ่านใหม่ (หมดอายุใน 15 นาที)</p><p><a href="${esc(job.link)}">ตั้งรหัสผ่านใหม่</a></p><p>หากคุณไม่ได้ขอ ไม่ต้องทำอะไร</p>`,
-      };
-    case "password-changed":
-      return {
-        subject: "รหัสผ่านของคุณถูกเปลี่ยนแล้ว",
-        text: "รหัสผ่านของบัญชีคุณเพิ่งถูกเปลี่ยน และทุกอุปกรณ์ถูกออกจากระบบแล้ว หากไม่ใช่คุณ กรุณาติดต่อผู้ดูแลระบบทันที",
-        html: "<p>รหัสผ่านของบัญชีคุณเพิ่งถูกเปลี่ยน และทุกอุปกรณ์ถูกออกจากระบบแล้ว</p><p>หากไม่ใช่คุณ กรุณาติดต่อผู้ดูแลระบบทันที</p>",
-      };
-    case "video-broken":
-      return {
-        subject: `วิดีโอในหลักสูตร "${job.courseTitle}" ใช้งานไม่ได้`,
-        text: `บทเรียน "${job.lessonTitle}" เล่นไม่ได้ (ถูกลบ/ตั้งเป็นส่วนตัว/ปิดการฝัง) กรุณาเปลี่ยนลิงก์: ${job.manageLink}`,
-        html: `<p>บทเรียน <b>${esc(job.lessonTitle)}</b> ในหลักสูตร <b>${esc(job.courseTitle)}</b> เล่นไม่ได้</p><p><a href="${esc(job.manageLink)}">แก้ไขบทเรียน</a></p>`,
-      };
+    case "verify-email": return result("Verify your email", "Use this link within 24 hours to verify your email. If you did not register, no action is required.", job.link, "Verify email");
+    case "reset-password": return result("Set a new password", "Use this link within 15 minutes to set a new password. If you did not request this, your current password remains valid.", job.link, "Set password");
+    case "password-changed": return result("Your password was changed", "Your account password was changed and other devices were signed out. Contact an administrator if this was not you.");
+    case "account-status-changed": return result("Account status changed", `Current account status: ${job.statusLabel}`);
+    case "enrollment-confirmed": return result(`Course enrollment recorded: ${job.courseTitle}`, `Enrollment was recorded on ${job.enrolledAt}.`, job.courseLink, "Open course");
+    case "course-assigned": return result(`Course assigned: ${job.courseTitle}`, `Assigned by ${job.assignedBy}.${job.dueAt ? ` Due: ${job.dueAt}.` : ""}${job.note ? ` Note: ${job.note}` : ""}`, job.courseLink, "Open course");
+    case "assignment-cancelled": return result(`Course assignment cancelled: ${job.courseTitle}`, "This course assignment was cancelled.");
+    case "enrollment-cancelled": return result(`Enrollment cancelled: ${job.courseTitle}`, "This course enrollment was cancelled.");
+    case "course-suspended": return result(`Course suspended: ${job.courseTitle}`, "This course is currently unavailable.");
+    case "ready-for-quiz": return result(`Ready for assessment: ${job.courseTitle}`, "All lessons are complete.", job.quizLink, "Open assessment");
+    case "assessment-passed": return result(`Assessment passed: ${job.courseTitle}`, `Score: ${job.score}%.${job.legalNameRequired ? " Confirm your legal name before requesting the document." : ""}`, job.certificateLink, "Continue");
+    case "assessment-not-passed": return result(`Assessment result: ${job.courseTitle}`, `Score: ${job.score}%. Passing score: ${job.passingScore}%.${job.canRetry ? " You may try again." : " No further attempt is available at this time."}`, job.canRetry ? job.quizLink : undefined, "Try again");
+    case "credential-requested": return result(`${job.documentName} is being prepared`, `${job.courseTitle} · ${job.code}`);
+    case "credential-ready": return result(`${job.documentName} is ready: ${job.courseTitle}`, `Document code: ${job.code}. Verification: ${job.verifyLink}`, job.downloadLink, "Download document");
+    case "credential-revoked": return result(`${job.documentName} revoked: ${job.code}`, `Course: ${job.courseTitle}. Reason: ${job.reason}.`, job.verifyLink, "Verify status");
+    case "assignment-due-reminder": return result(`Course deadline: ${job.courseTitle}`, `Due: ${job.dueAt}`, job.courseLink, "Open course");
+    case "weekly-summary": return result("Learning status summary", `In progress: ${job.inProgress}. Completed: ${job.completed}.`, job.dashboardLink, "View status");
+    case "video-broken": return result(`Course video unavailable: ${job.courseTitle}`, `Lesson: ${job.lessonTitle}`, job.manageLink, "Manage lesson");
+    case "course-status-changed": return result(`Course status changed: ${job.courseTitle}`, `Current status: ${job.statusLabel}`, job.manageLink, "Manage course");
+    case "system-alert": return result(`System alert: ${job.title}`, job.details, job.manageLink, "Open administration");
   }
 }
 
-export function createMailer(smtpUrl: string, from: string) {
+export function renderEmail(job: EmailJob): { subject: string; text: string; html: string } {
+  if (job.locale === "en") return renderEmailEn(job);
+  switch (job.template) {
+    case "verify-email":
+      return { subject: "ยืนยันอีเมลของคุณ", text: `กดลิงก์เพื่อยืนยันอีเมล (หมดอายุใน 24 ชั่วโมง):\n${job.link}\n\nหากคุณไม่ได้สมัคร ไม่ต้องดำเนินการ`, html: `<p>กดลิงก์เพื่อยืนยันอีเมล (หมดอายุใน 24 ชั่วโมง)</p>${action(job.link, "ยืนยันอีเมล")}<p>หากคุณไม่ได้สมัคร ไม่ต้องดำเนินการ</p>` };
+    case "reset-password":
+      return { subject: "ตั้งรหัสผ่านใหม่", text: `กดลิงก์เพื่อตั้งรหัสผ่านใหม่ (หมดอายุใน 15 นาที):\n${job.link}\n\nหากคุณไม่ได้ขอ รหัสผ่านเดิมยังใช้ได้`, html: `<p>กดลิงก์เพื่อตั้งรหัสผ่านใหม่ (หมดอายุใน 15 นาที)</p>${action(job.link, "ตั้งรหัสผ่านใหม่")}<p>หากคุณไม่ได้ขอ รหัสผ่านเดิมยังใช้ได้</p>` };
+    case "password-changed":
+      return { subject: "รหัสผ่านของคุณถูกเปลี่ยนแล้ว", text: "รหัสผ่านของบัญชีถูกเปลี่ยนและอุปกรณ์อื่นถูกออกจากระบบแล้ว หากไม่ใช่คุณ กรุณาติดต่อผู้ดูแลระบบ", html: "<p>รหัสผ่านของบัญชีถูกเปลี่ยนและอุปกรณ์อื่นถูกออกจากระบบแล้ว</p><p>หากไม่ใช่คุณ กรุณาติดต่อผู้ดูแลระบบ</p>" };
+    case "account-status-changed":
+      return { subject: "สถานะบัญชีถูกเปลี่ยน", text: `สถานะบัญชีปัจจุบัน: ${job.statusLabel}`, html: `<p>สถานะบัญชีปัจจุบัน: <b>${esc(job.statusLabel)}</b></p>` };
+    case "enrollment-confirmed":
+      return { subject: `ลงทะเบียนหลักสูตรแล้ว: ${job.courseTitle}`, text: `ระบบบันทึกการลงทะเบียนหลักสูตร "${job.courseTitle}" เมื่อ ${job.enrolledAt}\n${job.courseLink}`, html: `<p>ระบบบันทึกการลงทะเบียนหลักสูตร <b>${esc(job.courseTitle)}</b></p><p>วันที่ลงทะเบียน: ${esc(job.enrolledAt)}</p>${action(job.courseLink, "เปิดหลักสูตร")}` };
+    case "course-assigned":
+      return { subject: `ได้รับมอบหมายหลักสูตร: ${job.courseTitle}`, text: `คุณได้รับมอบหมายหลักสูตร "${job.courseTitle}" โดย ${job.assignedBy}${optionalText("กำหนดเวลา", job.dueAt)}${optionalText("หมายเหตุ", job.note)}\n${job.courseLink}`, html: `<p>คุณได้รับมอบหมายหลักสูตร <b>${esc(job.courseTitle)}</b></p><p>ผู้มอบหมาย: ${esc(job.assignedBy)}</p>${optionalHtml("กำหนดเวลา", job.dueAt)}${optionalHtml("หมายเหตุ", job.note)}${action(job.courseLink, "เปิดหลักสูตร")}` };
+    case "assignment-cancelled":
+      return { subject: `ยกเลิกการมอบหมายหลักสูตร: ${job.courseTitle}`, text: `การมอบหมายหลักสูตร "${job.courseTitle}" ถูกยกเลิก`, html: `<p>การมอบหมายหลักสูตร <b>${esc(job.courseTitle)}</b> ถูกยกเลิก</p>` };
+    case "enrollment-cancelled":
+      return { subject: `ยกเลิกการลงทะเบียน: ${job.courseTitle}`, text: `การลงทะเบียนหลักสูตร "${job.courseTitle}" ถูกยกเลิก`, html: `<p>การลงทะเบียนหลักสูตร <b>${esc(job.courseTitle)}</b> ถูกยกเลิก</p>` };
+    case "course-suspended":
+      return { subject: `หลักสูตรถูกระงับ: ${job.courseTitle}`, text: `หลักสูตร "${job.courseTitle}" ถูกระงับและไม่สามารถเข้าเรียนได้ในขณะนี้`, html: `<p>หลักสูตร <b>${esc(job.courseTitle)}</b> ถูกระงับและไม่สามารถเข้าเรียนได้ในขณะนี้</p>` };
+    case "ready-for-quiz":
+      return { subject: `พร้อมทำแบบทดสอบ: ${job.courseTitle}`, text: `คุณเรียนครบทุกบทของหลักสูตร "${job.courseTitle}" แล้ว\n${job.quizLink}`, html: `<p>คุณเรียนครบทุกบทของหลักสูตร <b>${esc(job.courseTitle)}</b> แล้ว</p>${action(job.quizLink, "ทำแบบทดสอบ")}` };
+    case "assessment-passed":
+      return { subject: `ผ่านการประเมิน: ${job.courseTitle}`, text: `ผลการประเมินหลักสูตร "${job.courseTitle}": ผ่าน (${job.score}%)\n${job.legalNameRequired ? "กรุณายืนยันชื่อก่อนขอเอกสารรับรอง\n" : ""}${job.certificateLink}`, html: `<p>ผลการประเมินหลักสูตร <b>${esc(job.courseTitle)}</b>: ผ่าน (${esc(job.score)}%)</p>${job.legalNameRequired ? "<p>กรุณายืนยันชื่อก่อนขอเอกสารรับรอง</p>" : ""}${action(job.certificateLink, "ดำเนินการต่อ")}` };
+    case "assessment-not-passed":
+      return { subject: `ผลการประเมิน: ${job.courseTitle}`, text: `คะแนน ${job.score}% เกณฑ์ผ่าน ${job.passingScore}%\n${job.canRetry ? `สามารถทำใหม่ได้ที่ ${job.quizLink}` : "ไม่สามารถทำใหม่ได้ในขณะนี้"}`, html: `<p>คะแนน ${esc(job.score)}% เกณฑ์ผ่าน ${esc(job.passingScore)}%</p>${job.canRetry ? action(job.quizLink, "ทำแบบทดสอบอีกครั้ง") : "<p>ไม่สามารถทำใหม่ได้ในขณะนี้</p>"}` };
+    case "credential-requested":
+      return { subject: `${job.documentName}อยู่ระหว่างจัดทำ`, text: `${job.documentName}สำหรับหลักสูตร "${job.courseTitle}" รหัส ${job.code} อยู่ระหว่างจัดทำ`, html: `<p>${esc(job.documentName)}สำหรับหลักสูตร <b>${esc(job.courseTitle)}</b> รหัส <b>${esc(job.code)}</b> อยู่ระหว่างจัดทำ</p>` };
+    case "credential-ready":
+      return { subject: `${job.documentName}พร้อมดาวน์โหลด: ${job.courseTitle}`, text: `${job.documentName}รหัส ${job.code} พร้อมดาวน์โหลด\nดาวน์โหลด: ${job.downloadLink}\nตรวจสอบ: ${job.verifyLink}`, html: `<p>${esc(job.documentName)}รหัส <b>${esc(job.code)}</b> พร้อมดาวน์โหลด</p>${action(job.downloadLink, "ดาวน์โหลดเอกสาร")}${action(job.verifyLink, "ตรวจสอบสถานะ")}` };
+    case "credential-revoked":
+      return { subject: `${job.documentName}ถูกเพิกถอน: ${job.code}`, text: `${job.documentName}สำหรับหลักสูตร "${job.courseTitle}" รหัส ${job.code} ถูกเพิกถอน\nเหตุผล: ${job.reason}\n${job.verifyLink}`, html: `<p>${esc(job.documentName)}สำหรับหลักสูตร <b>${esc(job.courseTitle)}</b> รหัส <b>${esc(job.code)}</b> ถูกเพิกถอน</p><p>เหตุผล: ${esc(job.reason)}</p>${action(job.verifyLink, "ตรวจสอบสถานะ")}` };
+    case "assignment-due-reminder":
+      return { subject: `แจ้งกำหนดเวลาหลักสูตร: ${job.courseTitle}`, text: `กำหนดเวลา ${job.dueAt}\n${job.courseLink}`, html: `<p>หลักสูตร <b>${esc(job.courseTitle)}</b></p><p>กำหนดเวลา: ${esc(job.dueAt)}</p>${action(job.courseLink, "เปิดหลักสูตร")}` };
+    case "weekly-summary":
+      return { subject: "สรุปสถานะการเรียน", text: `กำลังเรียน ${job.inProgress} หลักสูตร เรียนจบ ${job.completed} หลักสูตร\n${job.dashboardLink}`, html: `<p>กำลังเรียน ${job.inProgress} หลักสูตร · เรียนจบ ${job.completed} หลักสูตร</p>${action(job.dashboardLink, "ดูสถานะการเรียน")}` };
+    case "video-broken":
+      return { subject: `วิดีโอในหลักสูตร "${job.courseTitle}" ใช้งานไม่ได้`, text: `บทเรียน "${job.lessonTitle}" เล่นไม่ได้ กรุณาตรวจสอบ: ${job.manageLink}`, html: `<p>บทเรียน <b>${esc(job.lessonTitle)}</b> ในหลักสูตร <b>${esc(job.courseTitle)}</b> เล่นไม่ได้</p>${action(job.manageLink, "แก้ไขบทเรียน")}` };
+    case "course-status-changed":
+      return { subject: `สถานะหลักสูตรถูกเปลี่ยน: ${job.courseTitle}`, text: `สถานะปัจจุบัน: ${job.statusLabel}\n${job.manageLink}`, html: `<p>หลักสูตร <b>${esc(job.courseTitle)}</b></p><p>สถานะปัจจุบัน: ${esc(job.statusLabel)}</p>${action(job.manageLink, "จัดการหลักสูตร")}` };
+    case "system-alert":
+      return { subject: `แจ้งเตือนระบบ: ${job.title}`, text: `${job.details}${job.manageLink ? `\n${job.manageLink}` : ""}`, html: `<p><b>${esc(job.title)}</b></p><p>${esc(job.details)}</p>${job.manageLink ? action(job.manageLink, "เปิดหน้าจัดการ") : ""}` };
+  }
+}
+
+export function createMailer(smtpUrl: string, from: string, replyTo?: string | null) {
   const transport = nodemailer.createTransport(smtpUrl);
-  return async (job: EmailJob) => {
-    const m = renderEmail(job);
-    await transport.sendMail({ from, to: job.to, subject: m.subject, text: m.text, html: m.html });
+  return async (job: EmailJob): Promise<{ messageId: string | null }> => {
+    const message = renderEmail(job);
+    const result = await transport.sendMail({ from, ...(replyTo ? { replyTo } : {}), to: job.to, subject: message.subject, text: message.text, html: message.html });
+    return { messageId: typeof result.messageId === "string" ? result.messageId : null };
   };
 }

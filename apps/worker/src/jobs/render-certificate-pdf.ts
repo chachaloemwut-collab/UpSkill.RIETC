@@ -13,6 +13,7 @@ import type { Database } from "@upskill/db";
 import type { Env } from "@upskill/infra/env";
 import { logger } from "@upskill/infra/logger";
 import { saveCertificatePdf } from "@upskill/infra/storage";
+import { addWorkerEmail } from "./process-email-outbox.ts";
 
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -53,8 +54,8 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
     .qr { position: absolute; right: 16mm; bottom: 14mm; width: 38mm; text-align: center; font-size: 7.5pt; color: #57534e; }
     .qr img { width: 100%; display: block; }
   </style></head><body><div class="page"><div class="frame">
-    <div class="kicker">Certificate of Completion</div>
-    <h1>ประกาศนียบัตร</h1>
+    <div class="kicker">${esc(c.document_type_snapshot)}</div>
+    <h1>${esc(c.document_name_snapshot)}</h1>
     <div>ขอมอบให้แก่</div>
     <div class="name">${esc(c.recipient_name_snapshot)}</div>
     <div>ได้สำเร็จการศึกษาหลักสูตร</div>
@@ -63,6 +64,7 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
       ผู้สอน ${esc(c.instructor_name_snapshot)}<br>
       เวลาเรียนสะสมจริง ${esc(formatStudyDurationTh(c.total_actual_study_sec))} · คะแนนสอบ ${esc(Number(c.quiz_score_snapshot).toFixed(2))}%<br>
       ออกให้เมื่อ ${esc(issued)} · <span class="badge">${c.is_verified_course_snapshot ? "Verified Course" : "Community Course"}</span>
+      ${c.expires_at ? `<br>ใช้ได้ถึง ${esc(new Date(c.expires_at).toLocaleDateString("th-TH", { dateStyle: "long", timeZone: "Asia/Bangkok" }))}` : ""}
     </div>
     <div class="qr"><img src="${qr}" alt=""><div>สแกนเพื่อตรวจสอบ</div><div>${esc(c.certificate_code)}</div></div>
   </div></div></body></html>`;
@@ -75,6 +77,23 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
     await page.setContent(html, { waitUntil: "load" });
     const pdf = await page.pdf({ format: "A4", landscape: true, printBackground: true });
     await saveCertificatePdf(env.CERT_STORAGE_DIR, c.certificate_code, pdf);
+    const owner = await db.selectFrom("users").select("email").where("id", "=", c.user_id).executeTakeFirstOrThrow();
+    await db.transaction().execute(async (trx) => {
+      await trx.updateTable("certificates").set({ pdf_ready_at: new Date(), pdf_failed_at: null, pdf_last_error: null }).where("id", "=", c.id).execute();
+      await addWorkerEmail(
+        trx,
+        {
+          template: "credential-ready",
+          to: owner.email,
+          documentName: c.document_name_snapshot,
+          courseTitle: c.course_title_snapshot,
+          code: c.certificate_code,
+          downloadLink: `${env.APP_ORIGIN}/api/certificates/${encodeURIComponent(c.certificate_code)}/download`,
+          verifyLink: verifyUrl,
+        },
+        { userId: c.user_id, deduplicationKey: `credential-ready:${c.id}` },
+      );
+    });
     logger.info({ code: c.certificate_code }, "certificate pdf rendered");
   } finally {
     await browser.close();

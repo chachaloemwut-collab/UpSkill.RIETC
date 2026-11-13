@@ -23,12 +23,15 @@ RUN pnpm --filter @upskill/web build
 FROM node:24-alpine AS runtime
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
-# Run as an unprivileged user; the app never needs to write to its own files
-RUN addgroup -S app && adduser -S -G app app
+# Run as an unprivileged user. Fixed uid/gid 10001 = same as the worker image, so both can share the
+# certificates volume. Writable paths: the image-optimizer cache and the certificates mount point only.
+RUN addgroup -S -g 10001 app && adduser -S -u 10001 -G app app
 COPY --from=build /repo/apps/web/.next/standalone ./
 COPY --from=build /repo/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /repo/apps/web/public ./apps/web/public
+RUN mkdir -p apps/web/.next/cache /data/certificates && chown app:app apps/web/.next/cache /data/certificates
 USER app
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:3000/api/user/me >/dev/null || exit 1
+# /login renders without a session (no DB write); PORT is set at runtime (compose overrides it)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD wget -qO- "http://127.0.0.1:${PORT}/login" >/dev/null || exit 1
 CMD ["node", "apps/web/server.js"]

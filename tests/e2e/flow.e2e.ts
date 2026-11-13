@@ -112,6 +112,19 @@ describe("authorization", () => {
     const r = await instructor.req(`/api/instructor/courses/${other.json.id}`, { method: "PATCH", body: { title: "hijacked" } });
     expect(r.status).toBe(404);
   });
+
+  it("does not let another admin demote or suspend the protected system owner", async () => {
+    const r = await admin.req("/api/admin/users", {
+      method: "PATCH",
+      body: { email: "system-owner@internal.invalid", status: "banned", role: "member" },
+    });
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe("SYSTEM_OWNER_PROTECTED");
+    const owner = await withDb((db) =>
+      db.query("select username, role, status, is_system_owner from users where is_system_owner = true"),
+    );
+    expect(owner.rows[0]).toMatchObject({ username: "superadmin", role: "admin", status: "active", is_system_owner: true });
+  });
 });
 
 describe("instructor builds and publishes a course", () => {

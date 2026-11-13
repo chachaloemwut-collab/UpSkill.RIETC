@@ -14,8 +14,7 @@
  */
 import { createPrivateKey, createPublicKey, randomBytes, sign, verify } from "node:crypto";
 
-export interface CertificatePayload {
-  v: 1;
+interface CertificatePayloadBase {
   code: string;
   enrollmentId: string;
   userId: string;
@@ -30,6 +29,16 @@ export interface CertificatePayload {
   /** ISO-8601 UTC, millisecond precision. Store the same value in certificates.issued_at */
   issuedAt: string;
 }
+
+export interface CertificatePayloadV1 extends CertificatePayloadBase { v: 1 }
+export interface CertificatePayloadV2 extends CertificatePayloadBase {
+  v: 2;
+  documentName: string;
+  documentType: string;
+  expiresAt: string | null;
+}
+export type CertificatePayload = CertificatePayloadV1 | CertificatePayloadV2;
+export type CertificateRecord = Omit<CertificatePayloadV1, "v"> & Partial<Pick<CertificatePayloadV2, "documentName" | "documentType" | "expiresAt">>;
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -92,7 +101,7 @@ export type VerifyResult =
 export function verifyCertificate(
   signed: SignedCertificate,
   publicKeys: Readonly<Record<string, string>>,
-  record: Omit<CertificatePayload, "v">,
+  record: CertificateRecord,
 ): VerifyResult {
   const pub = publicKeys[signed.keyId];
   if (!pub) return { ok: false, reason: "UNKNOWN_KEY" };
@@ -111,8 +120,16 @@ export function verifyCertificate(
   } catch {
     return { ok: false, reason: "MALFORMED" };
   }
-  if (payload.v !== 1) return { ok: false, reason: "MALFORMED" };
-  if (canonicalJson({ ...record, v: 1 }) !== signed.signedPayload) return { ok: false, reason: "RECORD_MISMATCH" };
+  if (payload.v !== 1 && payload.v !== 2) return { ok: false, reason: "MALFORMED" };
+  const base = {
+    code: record.code, enrollmentId: record.enrollmentId, userId: record.userId, courseId: record.courseId,
+    recipientName: record.recipientName, courseTitle: record.courseTitle, instructorName: record.instructorName,
+    totalStudySec: record.totalStudySec, quizScore: record.quizScore, verifiedCourse: record.verifiedCourse, issuedAt: record.issuedAt,
+  };
+  const expected = payload.v === 1
+    ? { ...base, v: 1 }
+    : { ...base, v: 2, documentName: record.documentName, documentType: record.documentType, expiresAt: record.expiresAt ?? null };
+  if (canonicalJson(expected) !== signed.signedPayload) return { ok: false, reason: "RECORD_MISMATCH" };
   return { ok: true, payload };
 }
 

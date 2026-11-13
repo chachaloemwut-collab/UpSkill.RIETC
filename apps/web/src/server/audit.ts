@@ -11,10 +11,14 @@ export type AuditAction =
   | "user.legal_name_locked"
   | "course.published"
   | "course.suspended"
+  | "course.assigned"
+  | "course.assignment_cancelled"
   | "certificate.issued"
   | "certificate.revoked"
   | "learning.session_superseded"
-  | "learning.cheat_flag";
+  | "learning.cheat_flag"
+  | "system.email_settings_updated"
+  | "system.email_settings_tested";
 
 /** The app role can INSERT only (UPDATE/DELETE are blocked by both grant and trigger) */
 export async function audit(

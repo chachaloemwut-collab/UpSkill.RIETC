@@ -1,11 +1,10 @@
 import "server-only";
 import { Queue } from "bullmq";
-import type { EmailJob } from "@upskill/infra/mailer";
 import { ctx } from "./context";
 
 // Heavy or slow work (PDF rendering, YouTube API, SMTP) runs in apps/worker, not in the web request path
 const queues = new Map<string, Queue>();
-function queue(name: "certificate-pdf" | "video-recheck" | "email"): Queue {
+function queue(name: "certificate-pdf" | "video-recheck"): Queue {
   let q = queues.get(name);
   if (!q) {
     q = new Queue(name, { connection: ctx().redis });
@@ -27,11 +26,3 @@ export async function enqueueVideoRecheck(lessonId: string) {
   await queue("video-recheck").add("report", { lessonId }, { jobId: `vr-${lessonId}`, removeOnComplete: true, delay: 30_000 });
 }
 
-export async function enqueueEmail(job: EmailJob) {
-  await queue("email").add(job.template, job, {
-    attempts: 5,
-    backoff: { type: "exponential", delay: 10_000 },
-    removeOnComplete: true,
-    removeOnFail: 100,
-  });
-}

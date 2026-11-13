@@ -1,10 +1,12 @@
-# UpSkill.RIETC
+# UpskillReskill.RIETC
 
 LMS แบบเปิดที่ใช้วิดีโอ YouTube เป็นสื่อการสอน — **Minimalist Features, Maximum Integrity**
 ระบบกันโกงเวลาเรียนฝั่ง server + ใบรับรองดิจิทัล (Ed25519) ที่ตรวจสอบได้ผ่าน QR Code
 
 - สถาปัตยกรรม: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - ความปลอดภัย และจุดที่ต่างจาก SRS: [docs/SECURITY.md](docs/SECURITY.md)
+- นำขึ้น Hosting มะลิ (Jasmine) ผ่าน SFTP: [docs/DEPLOY.md](docs/DEPLOY.md)
+- สถานะฟังก์ชันและงานที่ยังไม่พร้อม production: [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)
 
 ## เริ่มต้นพัฒนา
 

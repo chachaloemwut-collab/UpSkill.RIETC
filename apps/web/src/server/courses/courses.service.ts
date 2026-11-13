@@ -2,6 +2,7 @@
 import "server-only";
 import { sql } from "@upskill/db";
 import { ctx } from "../context";
+import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import type { CurrentUser } from "../auth/session";
 
@@ -36,6 +37,7 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
       "c.id", "c.slug", "c.title", "c.description", "c.visibility", "c.instructor_id", "c.is_verified_course",
       "c.min_watch_percentage", "c.passing_quiz_score", "c.is_sequential_locked", "c.total_duration_sec",
       "c.max_quiz_attempts_per_day", "c.quiz_time_limit_sec",
+      "c.credential_enabled", "c.credential_name_th", "c.credential_name_en",
       sql<string>`coalesce(u.legal_full_name_th, u.legal_full_name_en, split_part(u.email, '@', 1))`.as("instructor_name"),
     ])
     .where("c.slug", "=", slug)
@@ -99,17 +101,27 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
 }
 
 export async function enroll(user: CurrentUser, courseId: string): Promise<void> {
-  const { db } = ctx();
-  const course = await db.selectFrom("courses").select(["visibility", "instructor_id"]).where("id", "=", courseId).executeTakeFirst();
+  const { db, env } = ctx();
+  const course = await db.selectFrom("courses").select(["visibility", "instructor_id", "title", "slug"]).where("id", "=", courseId).executeTakeFirst();
   if (!course || (course.visibility !== "published" && course.visibility !== "unlisted")) throw new HttpError(404, "NOT_FOUND");
   // Anti-farming: an instructor can't earn a certificate from their own course
   if (course.instructor_id === user.id) throw new HttpError(403, "CANNOT_ENROLL_OWN_COURSE");
 
-  await db
-    .insertInto("enrollments")
-    .values({ user_id: user.id, course_id: courseId })
-    .onConflict((oc) => oc.columns(["user_id", "course_id"]).doNothing())
-    .execute();
+  await db.transaction().execute(async (trx) => {
+    const now = new Date();
+    const enrollment = await trx
+      .insertInto("enrollments")
+      .values({ user_id: user.id, course_id: courseId, enrolled_at: now })
+      .onConflict((oc) => oc.columns(["user_id", "course_id"]).doNothing())
+      .returning("id")
+      .executeTakeFirst();
+    if (!enrollment) return;
+    await addEmailToOutbox(
+      trx,
+      { template: "enrollment-confirmed", to: user.email, courseTitle: course.title, courseLink: `${env.APP_ORIGIN}/courses/${course.slug}`, enrolledAt: now.toISOString() },
+      { userId: user.id, deduplicationKey: `enrollment-confirmed:${enrollment.id}` },
+    );
+  });
 }
 
 export async function myEnrollments(userId: string) {
@@ -160,4 +172,16 @@ export async function learnerOverview(userId: string) {
       studySec: enrollments.reduce((n, e) => n + e.study_sec, 0),
     },
   };
+}
+
+/** Public numbers for the landing page (published content only). */
+export async function publicStats() {
+  return ctx()
+    .db.selectNoFrom([
+      sql<number>`(select count(*)::int from courses where visibility = 'published')`.as("courses"),
+      sql<number>`(select count(*)::int from lessons l join courses c on c.id = l.course_id where c.visibility = 'published')`.as("lessons"),
+      sql<number>`(select coalesce(sum(total_duration_sec), 0)::int from courses where visibility = 'published')`.as("durationSec"),
+      sql<number>`(select count(*)::int from certificates where revoked_at is null)`.as("certificates"),
+    ])
+    .executeTakeFirstOrThrow();
 }

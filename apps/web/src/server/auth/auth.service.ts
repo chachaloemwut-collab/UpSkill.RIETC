@@ -7,12 +7,12 @@
  */
 import "server-only";
 import { decideGoogleSignIn, generateToken, hashToken, normalizeName, type GoogleClaims } from "@upskill/core";
-import { PG, pgErrorCode } from "@upskill/db";
+import { PG, pgErrorCode, type Database, type Tx } from "@upskill/db";
 import { hashPassword, validatePasswordPolicy, verifyPassword } from "@upskill/infra/password";
 import { ctx } from "../context";
+import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import { audit } from "../audit";
-import { enqueueEmail } from "../queue";
 import { createSession, revokeAllSessions } from "./session";
 
 const VERIFY_TTL_MS = 24 * 3600_000;
@@ -26,14 +26,19 @@ function assertPassword(pw: string) {
   if (problem) throw new HttpError(400, "WEAK_PASSWORD", problem);
 }
 
-async function sendVerification(userId: string, email: string) {
-  const { db, env } = ctx();
+async function addVerificationEmail(db: Database | Tx, userId: string, email: string) {
+  const { env } = ctx();
   const token = generateToken();
-  await db
+  const row = await db
     .insertInto("email_verification_tokens")
     .values({ user_id: userId, email, token_hash: hashToken(token), expires_at: new Date(Date.now() + VERIFY_TTL_MS) })
-    .execute();
-  await enqueueEmail({ template: "verify-email", to: email, link: `${env.APP_ORIGIN}/verify-email?token=${token}` });
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  await addEmailToOutbox(
+    db,
+    { template: "verify-email", to: email, link: `${env.APP_ORIGIN}/verify-email?token=${token}` },
+    { userId, deduplicationKey: `verify-email:${row.id}` },
+  );
 }
 
 export async function register(input: { email: string; password: string }): Promise<void> {
@@ -44,18 +49,20 @@ export async function register(input: { email: string; password: string }): Prom
   const existing = await db.selectFrom("users").select(["id", "email_verified_at"]).where("email", "=", email).executeTakeFirst();
   if (existing) {
     // Re-send only to unverified accounts; the response is identical either way
-    if (!existing.email_verified_at) await sendVerification(existing.id, email);
+    if (!existing.email_verified_at) await db.transaction().execute((trx) => addVerificationEmail(trx, existing.id, email));
     return;
   }
 
   const passwordHash = await hashPassword(input.password);
   try {
-    const user = await db
-      .insertInto("users")
-      .values({ email, password_hash: passwordHash, password_updated_at: new Date() })
-      .returning("id")
-      .executeTakeFirstOrThrow();
-    await sendVerification(user.id, email);
+    await db.transaction().execute(async (trx) => {
+      const user = await trx
+        .insertInto("users")
+        .values({ email, password_hash: passwordHash, password_updated_at: new Date() })
+        .returning("id")
+        .executeTakeFirstOrThrow();
+      await addVerificationEmail(trx, user.id, email);
+    });
   } catch (err) {
     if (pgErrorCode(err) === PG.UNIQUE_VIOLATION) return; // concurrent register: same generic response
     throw err;
@@ -66,7 +73,7 @@ export async function resendVerification(emailRaw: string): Promise<void> {
   const { db } = ctx();
   const email = emailRaw.trim().toLowerCase();
   const user = await db.selectFrom("users").select(["id", "email_verified_at"]).where("email", "=", email).executeTakeFirst();
-  if (user && !user.email_verified_at) await sendVerification(user.id, email);
+  if (user && !user.email_verified_at) await db.transaction().execute((trx) => addVerificationEmail(trx, user.id, email));
 }
 
 export async function verifyEmail(token: string): Promise<void> {
@@ -90,12 +97,12 @@ export async function verifyEmail(token: string): Promise<void> {
 
 export async function login(input: { email: string; password: string }, meta: Meta): Promise<void> {
   const { db } = ctx();
-  const email = input.email.trim().toLowerCase();
-  const user = await db
+  const identifier = input.email.trim().toLowerCase();
+  let query = db
     .selectFrom("users")
-    .select(["id", "password_hash", "status", "email_verified_at"])
-    .where("email", "=", email)
-    .executeTakeFirst();
+    .select(["id", "password_hash", "status", "email_verified_at", "is_system_owner"]);
+  query = identifier.includes("@") ? query.where("email", "=", identifier) : query.where("username", "=", identifier);
+  const user = await query.executeTakeFirst();
 
   const ok = await verifyPassword(user?.password_hash, input.password);
   if (!user || !ok) {
@@ -107,7 +114,13 @@ export async function login(input: { email: string; password: string }, meta: Me
   if (!user.email_verified_at) throw new HttpError(403, "EMAIL_NOT_VERIFIED");
 
   await createSession(user.id, meta);
-  await audit(db, { action: "auth.login", userId: user.id, ip: meta.ip, userAgent: meta.userAgent, details: { method: "password" } });
+  await audit(db, {
+    action: "auth.login",
+    userId: user.id,
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+    details: { method: user.is_system_owner ? "system_owner_password" : "password" },
+  });
 }
 
 export async function forgotPassword(emailRaw: string): Promise<void> {
@@ -117,12 +130,19 @@ export async function forgotPassword(emailRaw: string): Promise<void> {
   if (!user || user.status !== "active") return;
 
   // Spec: 32 random bytes; only the SHA-256 is stored
-  const token = generateToken();
-  await db
-    .insertInto("password_reset_tokens")
-    .values({ user_id: user.id, token_hash: hashToken(token), reset_method: "email_link", expires_at: new Date(Date.now() + RESET_EMAIL_TTL_MS) })
-    .execute();
-  await enqueueEmail({ template: "reset-password", to: email, link: `${env.APP_ORIGIN}/reset-password?token=${token}` });
+  await db.transaction().execute(async (trx) => {
+    const token = generateToken();
+    const reset = await trx
+      .insertInto("password_reset_tokens")
+      .values({ user_id: user.id, token_hash: hashToken(token), reset_method: "email_link", expires_at: new Date(Date.now() + RESET_EMAIL_TTL_MS) })
+      .returning("id")
+      .executeTakeFirstOrThrow();
+    await addEmailToOutbox(
+      trx,
+      { template: "reset-password", to: email, link: `${env.APP_ORIGIN}/reset-password?token=${token}` },
+      { userId: user.id, deduplicationKey: `reset-password:${reset.id}` },
+    );
+  });
 }
 
 export async function resetPassword(input: { token: string; newPassword: string }, meta: Meta): Promise<void> {
@@ -130,7 +150,7 @@ export async function resetPassword(input: { token: string; newPassword: string 
   const { db } = ctx();
   const passwordHash = await hashPassword(input.newPassword);
 
-  const { userId, email } = await db.transaction().execute(async (trx) => {
+  const { userId } = await db.transaction().execute(async (trx) => {
     const t = await trx
       .selectFrom("password_reset_tokens as t")
       .innerJoin("users as u", "u.id", "t.user_id")
@@ -154,12 +174,12 @@ export async function resetPassword(input: { token: string; newPassword: string 
       })
       .where("id", "=", t.user_id)
       .execute();
+    await addEmailToOutbox(trx, { template: "password-changed", to: t.email }, { userId: t.user_id, deduplicationKey: `password-changed:reset:${t.id}` });
     return { userId: t.user_id, email: t.email };
   });
 
   // Spec: kick every device out after a password change
   await revokeAllSessions(userId, "password_reset");
-  await enqueueEmail({ template: "password-changed", to: email });
   await audit(db, { action: "auth.password_reset", userId, ip: meta.ip, userAgent: meta.userAgent });
 }
 
@@ -182,13 +202,16 @@ export async function changePassword(
     throw new HttpError(403, "REAUTH_REQUIRED");
   }
 
-  await db
-    .updateTable("users")
-    .set({ password_hash: await hashPassword(input.newPassword), password_updated_at: new Date() })
-    .where("id", "=", user.id)
-    .execute();
+  const changedAt = new Date();
+  await db.transaction().execute(async (trx) => {
+    await trx
+      .updateTable("users")
+      .set({ password_hash: await hashPassword(input.newPassword), password_updated_at: changedAt })
+      .where("id", "=", user.id)
+      .execute();
+    await addEmailToOutbox(trx, { template: "password-changed", to: row.email }, { userId: user.id, deduplicationKey: `password-changed:settings:${user.id}:${changedAt.toISOString()}` });
+  });
   await revokeAllSessions(user.id, "password_changed", user.sessionId);
-  await enqueueEmail({ template: "password-changed", to: row.email });
   await audit(db, { action: "auth.password_reset", userId: user.id, ip: meta.ip, userAgent: meta.userAgent, details: { via: "settings" } });
 }
 

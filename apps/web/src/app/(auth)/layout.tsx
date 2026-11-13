@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Award, GraduationCap, PlayCircle, ShieldCheck } from "lucide-react";
-import { ThemeToggle } from "@/components/ui";
+import { ArrowLeft, Award, PlayCircle, ShieldCheck } from "lucide-react";
+import { BRAND_NAME, BrandLogo } from "@/components/brand/BrandLogo";
+import { ThemeToggle, buttonClass } from "@/components/ui";
 
 const POINTS = [
   { icon: PlayCircle, title: "เรียนจากวิดีโอคุณภาพ", text: "บทเรียนจาก YouTube จัดเป็นหลักสูตรอย่างเป็นระบบ" },
@@ -14,13 +15,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <aside className="relative hidden overflow-hidden bg-primary p-10 text-primary-foreground lg:flex lg:flex-col">
         <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary-foreground/10 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-primary-foreground/5 blur-3xl" />
-        <Link href="/" className="relative flex items-center gap-2 text-lg font-semibold">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-foreground text-primary">
-            <GraduationCap className="h-4 w-4" />
-          </span>
-          UpSkill
-        </Link>
         <div className="relative my-auto max-w-md">
+          <BrandLogo mode="unfold" tone="inverted" size="lg" className="mb-10" />
           <h2 className="text-3xl font-semibold leading-tight tracking-tight">เรียนรู้ทักษะใหม่ ได้ใบรับรองที่เชื่อถือได้</h2>
           <p className="mt-3 text-primary-foreground/70">Minimalist Features, Maximum Integrity</p>
           <ul className="mt-10 grid gap-6">
@@ -37,19 +33,20 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             ))}
           </ul>
         </div>
-        <p className="relative text-xs text-primary-foreground/50">© UpSkill.RIETC</p>
+        <p className="relative text-xs text-primary-foreground/50">© {BRAND_NAME}</p>
       </aside>
       <main className="flex flex-col px-4 py-6 sm:px-8">
-        <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-semibold lg:invisible">
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <GraduationCap className="h-4 w-4" />
-            </span>
-            UpSkill
+        <div className="flex items-center justify-between gap-2">
+          <Link href="/" className={buttonClass("ghost", "sm", "group -ml-2 text-muted-foreground hover:text-foreground")}>
+            <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-0.5" /> กลับหน้าแรก
           </Link>
           <ThemeToggle />
         </div>
-        <div className="mx-auto my-auto w-full max-w-sm animate-slide-up py-10">{children}</div>
+        <div className="mx-auto my-auto w-full max-w-sm animate-slide-up py-10">
+          {/* The brand panel is hidden below lg: show the logo above the form instead */}
+          <BrandLogo mode="unfold" className="mb-8 lg:hidden" />
+          {children}
+        </div>
       </main>
     </div>
   );

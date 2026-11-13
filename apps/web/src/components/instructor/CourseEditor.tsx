@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { VISIBILITY, formatDuration } from "@/lib/format";
 import {
-  Alert, AlertDialog, Badge, Button, Card, Checkbox, EmptyState, Field, Input, Progress, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, Tooltip,
+  Alert, AlertDialog, Badge, Button, Card, Checkbox, EmptyState, Field, Input, Progress, Select, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, Tooltip,
   buttonClass, useToast,
 } from "@/components/ui";
 
@@ -25,6 +25,14 @@ export interface EditorData {
     quiz_time_limit_sec: number;
     total_duration_sec: number;
     is_verified_course: boolean;
+    credential_enabled: boolean;
+    credential_type: string;
+    credential_name_th: string;
+    credential_name_en: string | null;
+    credential_template_key: string;
+    credential_validity_days: number | null;
+    credential_signer_name: string | null;
+    credential_signer_title: string | null;
   };
   lessons: Array<{ id: string; sequence_order: number; title: string; youtube_video_id: string; duration_sec: number; video_status: string }>;
   questions: Array<{ id: string; question_text: string; options: Array<{ id: string; text: string }>; correct_option_id: string }>;
@@ -160,6 +168,14 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
           max_quiz_attempts_per_day: Number(f.get("max_quiz_attempts_per_day")),
           quiz_time_limit_sec: Number(f.get("quiz_time_limit_min")) * 60,
           is_sequential_locked: f.get("is_sequential_locked") === "on",
+          credential_enabled: f.get("credential_enabled") === "on",
+          credential_type: f.get("credential_type"),
+          credential_name_th: f.get("credential_name_th"),
+          credential_name_en: String(f.get("credential_name_en") ?? "") || null,
+          credential_template_key: f.get("credential_template_key"),
+          credential_validity_days: f.get("credential_validity_days") ? Number(f.get("credential_validity_days")) : null,
+          credential_signer_name: String(f.get("credential_signer_name") ?? "") || null,
+          credential_signer_title: String(f.get("credential_signer_title") ?? "") || null,
         },
       },
       "บันทึกการตั้งค่าแล้ว",
@@ -189,6 +205,20 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
           </Field>
         </div>
         <Checkbox name="is_sequential_locked" defaultChecked={course.is_sequential_locked} label="บังคับเรียนตามลำดับบท" />
+        <div className="border-t pt-4">
+          <h3 className="font-semibold">เอกสารรับรอง</h3>
+          <p className="mt-1 text-xs text-muted-foreground">ชื่อและเงื่อนไขที่กำหนดจะถูกบันทึกเป็น snapshot เมื่อออกเอกสาร</p>
+        </div>
+        <Checkbox name="credential_enabled" defaultChecked={course.credential_enabled} label="ออกเอกสารรับรองเมื่อผ่านเกณฑ์" />
+        <div className="grid items-start gap-4 sm:grid-cols-2">
+          <Field label="ชื่อเอกสารภาษาไทย"><Input name="credential_name_th" required maxLength={120} defaultValue={course.credential_name_th} /></Field>
+          <Field label="ชื่อเอกสารภาษาอังกฤษ" hint="ไม่บังคับ"><Input name="credential_name_en" maxLength={120} defaultValue={course.credential_name_en ?? ""} /></Field>
+          <Field label="รหัสประเภท"><Input name="credential_type" required pattern="[a-z0-9_]+" maxLength={40} defaultValue={course.credential_type} /></Field>
+          <Field label="รูปแบบเอกสาร"><Select name="credential_template_key" defaultValue={course.credential_template_key}><option value="standard">standard</option></Select></Field>
+          <Field label="อายุเอกสาร (วัน)" hint="เว้นว่างหากไม่หมดอายุ"><Input name="credential_validity_days" type="number" min={1} max={36500} defaultValue={course.credential_validity_days ?? ""} /></Field>
+          <Field label="ชื่อผู้ลงนาม" hint="เว้นว่างเพื่อใช้ชื่อผู้สอน"><Input name="credential_signer_name" maxLength={255} defaultValue={course.credential_signer_name ?? ""} /></Field>
+          <Field label="ตำแหน่งผู้ลงนาม" hint="ไม่บังคับ"><Input name="credential_signer_title" maxLength={255} defaultValue={course.credential_signer_title ?? ""} /></Field>
+        </div>
         <Button type="submit" loading={a.busy} className="justify-self-start">
           บันทึกการตั้งค่า
         </Button>

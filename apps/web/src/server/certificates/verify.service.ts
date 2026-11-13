@@ -9,7 +9,7 @@ export type PublicVerification =
   | { status: "not_found" }
   | { status: "tampered" } // signature fails or DB doesn't match -> alert the security team
   | {
-      status: "valid" | "revoked";
+      status: "valid" | "revoked" | "expired";
       code: string;
       recipientName: string;
       courseTitle: string;
@@ -19,6 +19,9 @@ export type PublicVerification =
       quizScore: string;
       verifiedCourse: boolean;
       issuedAt: string;
+      documentName: string;
+      documentType: string;
+      expiresAt?: string;
       revokedAt?: string;
       revokedReason?: string;
     };
@@ -46,13 +49,17 @@ export async function verifyPublicCertificate(rawCode: string): Promise<PublicVe
       quizScore: Number(c.quiz_score_snapshot).toFixed(2),
       verifiedCourse: c.is_verified_course_snapshot,
       issuedAt: new Date(c.issued_at).toISOString(),
+      documentName: c.document_name_snapshot,
+      documentType: c.document_type_snapshot,
+      expiresAt: c.expires_at ? new Date(c.expires_at).toISOString() : null,
     },
   );
   if (!result.ok) return { status: "tampered" };
 
   const p = result.payload;
+  const expired = c.expires_at ? new Date(c.expires_at).getTime() <= Date.now() : false;
   return {
-    status: c.revoked_at ? "revoked" : "valid",
+    status: c.revoked_at ? "revoked" : expired ? "expired" : "valid",
     code: p.code,
     recipientName: p.recipientName,
     courseTitle: p.courseTitle,
@@ -62,6 +69,9 @@ export async function verifyPublicCertificate(rawCode: string): Promise<PublicVe
     quizScore: p.quizScore,
     verifiedCourse: p.verifiedCourse,
     issuedAt: p.issuedAt,
+    documentName: p.v === 2 ? p.documentName : c.document_name_snapshot,
+    documentType: p.v === 2 ? p.documentType : c.document_type_snapshot,
+    ...(c.expires_at ? { expiresAt: new Date(c.expires_at).toISOString() } : {}),
     ...(c.revoked_at ? { revokedAt: new Date(c.revoked_at).toISOString(), revokedReason: c.revoked_reason ?? "" } : {}),
   };
 }

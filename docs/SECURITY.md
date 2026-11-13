@@ -1,4 +1,4 @@
-# Security Design & Spec Deviations
+# UpskillReskill.RIETC — Security Design & Spec Deviations
 
 เอกสารนี้อธิบาย **จุดที่ scaffold นี้เปลี่ยนไปจาก SRS v1.0.0** และเหตุผลด้านความปลอดภัย
 ทีมควรรีวิวและอัปเดต SRS ให้ตรงกัน

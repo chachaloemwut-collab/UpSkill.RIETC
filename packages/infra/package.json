@@ -11,10 +11,12 @@
     "./youtube-client": "./src/youtube-client.ts",
     "./learning-lock": "./src/learning-lock.ts",
     "./mailer": "./src/mailer.ts",
+    "./secret-box": "./src/secret-box.ts",
     "./storage": "./src/storage.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@node-rs/argon2": "2.2.2",
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@types/node": "26.6.6",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "5.1.0"
   }
 }

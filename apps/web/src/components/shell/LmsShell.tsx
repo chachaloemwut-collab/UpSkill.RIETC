@@ -3,12 +3,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo, type ReactNode } from "react";
 import {
-  Award, BookOpen, GraduationCap, LayoutDashboard, Library, LogIn, Presentation, Search, Settings, ShieldAlert, ShieldCheck, UserPlus,
+  Award, BookOpen, LayoutDashboard, Library, LogIn, Presentation, Search, Settings, ShieldAlert, ShieldCheck, UserPlus, UsersRound,
 } from "lucide-react";
 import {
-  AppShell, Avatar, Badge, Button, DropdownMenu, InputGroup, LogoutIcon, ThemeCustomizer, ThemeToggle, buttonClass, useActionScene, useToast,
+  AppShell, Avatar, Button, DropdownMenu, InputGroup, LogoutIcon, ThemeCustomizer, ThemeToggle, buttonClass, useActionScene, useToast,
   type ShellNavGroup,
 } from "@/components/ui";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { api } from "@/lib/api";
 import { ROLE_LABEL } from "@/lib/format";
 
@@ -36,7 +37,7 @@ function buildNav(user: ShellUser | null): ShellNavGroup[] {
     },
   ];
   if (user && (user.role === "instructor" || user.role === "admin")) {
-    groups.push({ label: "ผู้สอน", items: [{ id: "/instructor", href: "/instructor", label: "จัดการหลักสูตร", icon: <Presentation /> }] });
+    groups.push({ label: "ผู้สอน", items: [{ id: "/instructor", href: "/instructor", label: "จัดการหลักสูตร", icon: <Presentation /> }, { id: "/assignments", href: "/assignments", label: "มอบหมายหลักสูตร", icon: <UsersRound /> }] });
   }
   if (user?.role === "admin") {
     groups.push({ label: "ผู้ดูแลระบบ", items: [{ id: "/admin", href: "/admin", label: "ภาพรวมระบบ", icon: <ShieldAlert /> }] });
@@ -63,7 +64,7 @@ export function LmsShell({ user, children }: { user: ShellUser | null; children:
   const [scene, runScene] = useActionScene();
   const nav = useMemo(() => buildNav(user), [user]);
   const active = activeId(nav, pathname);
-  const title = nav.flatMap((g) => g.items).find((i) => i.id === active)?.label ?? "UpSkill";
+  const title = nav.flatMap((g) => g.items).find((i) => i.id === active)?.label ?? "UpskillReskill.RIETC";
 
   const signOut = useCallback(async () => {
     const done = api("/api/auth/logout", { method: "POST" });
@@ -74,26 +75,15 @@ export function LmsShell({ user, children }: { user: ShellUser | null; children:
     toast({ title: "ออกจากระบบแล้ว", variant: "success" });
   }, [runScene, router, toast]);
 
-  const brand = (
-    <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-        <GraduationCap className="h-4 w-4" />
-      </span>
-      UpSkill
-      <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">LMS</Badge>
-    </Link>
-  );
+  // URSkill unfolds into the full name once the shell appears
+  const brand = <BrandLogo mode="unfold" />;
 
   return (
     <>
       {scene}
       <AppShell
         brand={brand}
-        brandIcon={
-          <Link href="/" aria-label="UpSkill" className="mx-auto flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <GraduationCap className="h-4 w-4" />
-          </Link>
-        }
+        brandIcon={<BrandLogo mode="mark" className="mx-auto" />}
         nav={nav}
         active={active}
         header={<TopBar title={title} user={user} onSignOut={signOut} />}
@@ -141,12 +131,8 @@ function TopBar({ title, user, onSignOut }: { title: string; user: ShellUser | n
   const router = useRouter();
   return (
     <>
-      <Link href="/" aria-label="UpSkill หน้าแรก" className="flex items-center gap-2 font-semibold md:hidden">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <GraduationCap className="h-4 w-4" />
-        </span>
-        <span className="sm:hidden">UpSkill</span>
-      </Link>
+      {/* Phones: compact "URSkill" (no room for the full name beside the actions); unfolds on hover/focus */}
+      <BrandLogo mode="hover" className="md:hidden" />
       <p className="hidden truncate text-sm font-medium sm:block">{title}</p>
       <div className="flex-1" />
       <form

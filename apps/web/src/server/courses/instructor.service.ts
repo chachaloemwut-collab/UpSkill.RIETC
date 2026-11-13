@@ -8,6 +8,7 @@ import { extractYouTubeVideoId, type VideoValidation } from "@upskill/core";
 import { sql, type Tx } from "@upskill/db";
 import { fetchVideos } from "@upskill/infra/youtube-client";
 import { ctx } from "../context";
+import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import { audit } from "../audit";
 import type { CurrentUser } from "../auth/session";
@@ -104,6 +105,14 @@ export async function updateCourse(
     is_sequential_locked: boolean;
     max_quiz_attempts_per_day: number;
     quiz_time_limit_sec: number;
+    credential_enabled: boolean;
+    credential_type: string;
+    credential_name_th: string;
+    credential_name_en: string | null;
+    credential_template_key: string;
+    credential_validity_days: number | null;
+    credential_signer_name: string | null;
+    credential_signer_title: string | null;
   }>,
 ) {
   await loadOwnedCourse(user, courseId);
@@ -245,7 +254,7 @@ export async function removeQuestion(user: CurrentUser, courseId: string, questi
 export async function setVisibility(user: CurrentUser, courseId: string, visibility: "draft" | "published" | "unlisted", meta: { ip: string }) {
   const c = await loadOwnedCourse(user, courseId);
   if (c.visibility === "suspended" && user.role !== "admin") throw new HttpError(403, "COURSE_SUSPENDED", "หลักสูตรถูกระงับโดยผู้ดูแลระบบ");
-  const { db } = ctx();
+  const { db, env } = ctx();
 
   if (visibility !== "draft") {
     const stats = await db
@@ -266,11 +275,20 @@ export async function setVisibility(user: CurrentUser, courseId: string, visibil
     if (problems.length) throw new HttpError(422, "PUBLISH_REQUIREMENTS_NOT_MET", problems.join(" · "));
   }
 
-  await db
-    .updateTable("courses")
-    .set({ visibility, ...(visibility === "published" ? { published_at: sql<Date>`coalesce(published_at, now())` } : {}) })
-    .where("id", "=", courseId)
-    .execute();
+  const changedAt = new Date();
+  const statusLabels = { draft: "ฉบับร่าง", published: "เผยแพร่", unlisted: "ไม่แสดงในคลังหลักสูตร" } as const;
+  await db.transaction().execute(async (trx) => {
+    await trx
+      .updateTable("courses")
+      .set({ visibility, ...(visibility === "published" ? { published_at: sql<Date>`coalesce(published_at, now())` } : {}) })
+      .where("id", "=", courseId)
+      .execute();
+    await addEmailToOutbox(
+      trx,
+      { template: "course-status-changed", to: user.email, courseTitle: c.title, statusLabel: statusLabels[visibility], manageLink: `${env.APP_ORIGIN}/instructor/courses/${courseId}` },
+      { userId: user.id, deduplicationKey: `course-status:${courseId}:${visibility}:${changedAt.toISOString()}` },
+    );
+  });
   if (visibility === "published") await audit(db, { action: "course.published", userId: user.id, entityType: "course", entityId: courseId, ip: meta.ip });
 }
 

@@ -44,6 +44,13 @@ describe("certificate", () => {
     expect(verifyCertificate(signed, { k1: pub }, record)).toMatchObject({ ok: true });
   });
 
+  it("round-trips a v2 credential with document metadata and expiry", () => {
+    const v2 = { ...payload, v: 2 as const, documentName: "ใบรับรอง", documentType: "completion", expiresAt: "2027-11-13T03:00:00.123Z" };
+    const { v: _version, ...v2Record } = v2;
+    const signed = signCertificate(v2, "k1", priv);
+    expect(verifyCertificate(signed, { k1: pub }, v2Record)).toMatchObject({ ok: true, payload: { v: 2, documentType: "completion" } });
+  });
+
   it("detects a DB row edited after issuance", () => {
     const signed = signCertificate(payload, "k1", priv);
     expect(verifyCertificate(signed, { k1: pub }, { ...record, totalStudySec: 99999 })).toEqual({

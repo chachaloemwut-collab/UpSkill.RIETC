@@ -13,6 +13,7 @@ import {
 } from "@upskill/core";
 import { sql } from "@upskill/db";
 import { ctx } from "../context";
+import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 
 const SUBMIT_GRACE_MS = 30_000; // network latency allowance after the deadline
@@ -21,7 +22,8 @@ async function loadEnrollment(userId: string, courseId: string) {
   const e = await ctx()
     .db.selectFrom("enrollments as e")
     .innerJoin("courses as c", "c.id", "e.course_id")
-    .select(["e.id", "e.status", "c.passing_quiz_score", "c.max_quiz_attempts_per_day", "c.quiz_time_limit_sec", "c.visibility"])
+    .innerJoin("users as u", "u.id", "e.user_id")
+    .select(["e.id", "e.status", "c.passing_quiz_score", "c.max_quiz_attempts_per_day", "c.quiz_time_limit_sec", "c.visibility", "c.title", "c.slug", "u.email", "u.legal_name_locked_at"])
     .where("e.user_id", "=", userId)
     .where("e.course_id", "=", courseId)
     .executeTakeFirst();
@@ -93,7 +95,7 @@ export async function startQuiz(userId: string, courseId: string) {
 }
 
 export async function submitQuiz(userId: string, courseId: string, attemptId: string, answers: Record<string, string>) {
-  const { db } = ctx();
+  const { db, env } = ctx();
   const e = await loadEnrollment(userId, courseId);
 
   return db.transaction().execute(async (trx) => {
@@ -119,6 +121,40 @@ export async function submitQuiz(userId: string, courseId: string, attemptId: st
       .execute();
     if (passed) {
       await trx.updateTable("enrollments").set({ status: "completed", completed_at: new Date() }).where("id", "=", e.id).where("status", "=", "in_progress").execute();
+    }
+    const attempts = await trx
+      .selectFrom("quiz_attempts")
+      .select(sql<number>`count(*)::int`.as("n"))
+      .where("enrollment_id", "=", e.id)
+      .where("started_at", ">", sql<Date>`now() - interval '24 hours'`)
+      .executeTakeFirstOrThrow();
+    if (passed) {
+      await addEmailToOutbox(
+        trx,
+        {
+          template: "assessment-passed",
+          to: e.email,
+          courseTitle: e.title,
+          score: scorePercentage.toFixed(2),
+          certificateLink: `${env.APP_ORIGIN}/courses/${e.slug}/certificate`,
+          legalNameRequired: e.legal_name_locked_at === null,
+        },
+        { userId, deduplicationKey: `assessment-passed:${a.id}` },
+      );
+    } else {
+      await addEmailToOutbox(
+        trx,
+        {
+          template: "assessment-not-passed",
+          to: e.email,
+          courseTitle: e.title,
+          score: scorePercentage.toFixed(2),
+          passingScore: String(e.passing_quiz_score),
+          canRetry: attempts.n < e.max_quiz_attempts_per_day,
+          quizLink: `${env.APP_ORIGIN}/courses/${e.slug}/quiz`,
+        },
+        { userId, deduplicationKey: `assessment-not-passed:${a.id}` },
+      );
     }
     return { scorePercentage, passed, late, passingScore: e.passing_quiz_score };
   });

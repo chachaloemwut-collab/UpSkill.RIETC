@@ -25,6 +25,11 @@ const schema = z
     GOOGLE_REDIRECT_URI: optional(z.url()),
     YOUTUBE_API_KEY: optional(z.string().min(20)),
 
+    // A username-only account reserved for the real system owner. The password is
+    // used only to bootstrap the account and is stored in PostgreSQL as Argon2id.
+    SYSTEM_OWNER_USERNAME: z.string().regex(/^[a-z][a-z0-9._-]{2,31}$/).default("superadmin"),
+    SYSTEM_OWNER_PASSWORD: optional(z.string().min(12).max(256)),
+
     CERT_SIGNING_ACTIVE_KID: z.string().min(3),
     CERT_SIGNING_PRIVATE_KEY: b64u(32),
     CERT_PUBLIC_KEYS: z.string().transform((s, ctx) => {
@@ -40,6 +45,8 @@ const schema = z
 
     SMTP_URL: z.string().startsWith("smtp"),
     MAIL_FROM: z.string().min(3),
+    EMAIL_WEBHOOK_SECRET: optional(z.string().min(16)),
+    SETTINGS_ENCRYPTION_KEY: b64u(32),
   })
   .superRefine((env, ctx) => {
     if (!env.CERT_PUBLIC_KEYS[env.CERT_SIGNING_ACTIVE_KID]) {

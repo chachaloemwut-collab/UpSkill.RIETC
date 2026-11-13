@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { CheckCircle2, KeyRound, Link2, Lock, Mail, UserRound } from "lucide-react";
+import { Bell, CheckCircle2, KeyRound, Link2, Lock, Mail, UserRound } from "lucide-react";
 import { Alert, Avatar, Badge, Card, buttonClass } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ChangePasswordForm } from "@/components/account/ChangePasswordForm";
+import { EmailPreferencesForm } from "@/components/account/EmailPreferencesForm";
 import { LockLegalNameForm } from "@/components/course/CertificatePanel";
 import { ROLE_LABEL, formatDateTh } from "@/lib/format";
 import { ctx } from "@/server/context";
 import { isGoogleEnabled } from "@/server/auth/google";
 import { getViewer } from "@/server/viewer";
+import { emailPreferenceSummary } from "@/server/email/outbox.service";
 
 export const metadata: Metadata = { title: "ตั้งค่าบัญชี" };
 
@@ -19,10 +21,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const { db } = ctx();
   const me = await db
     .selectFrom("users")
-    .select(["email", "role", "legal_full_name_th", "legal_full_name_en", "legal_name_locked_at", "password_hash", "email_verified_at", "created_at"])
+    .select(["email", "username", "is_system_owner", "role", "legal_full_name_th", "legal_full_name_en", "legal_name_locked_at", "password_hash", "email_verified_at", "created_at"])
     .where("id", "=", viewer.id)
     .executeTakeFirstOrThrow();
   const google = await db.selectFrom("user_oauth_accounts").select(["provider_email"]).where("user_id", "=", viewer.id).where("provider", "=", "google").executeTakeFirst();
+  const emailPreferences = await emailPreferenceSummary(viewer.id);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -39,10 +42,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           <div className="min-w-0 flex-1">
             <p className="truncate text-lg font-semibold">{viewer.name}</p>
             <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground">
-              <Mail className="h-3.5 w-3.5" /> {me.email}
+              <Mail className="h-3.5 w-3.5" /> {me.username ?? me.email}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge variant="secondary">{ROLE_LABEL[me.role] ?? me.role}</Badge>
+              {me.is_system_owner && <Badge variant="success">เจ้าของระบบ</Badge>}
               {me.email_verified_at && (
                 <Badge variant="success">
                   <CheckCircle2 className="h-3 w-3" /> ยืนยันอีเมลแล้ว
@@ -84,6 +88,12 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             <ChangePasswordForm hasPassword={!!me.password_hash} />
           </Card>
         </Section>
+
+        {!me.is_system_owner && (
+          <Section icon={<Bell className="h-4 w-4" />} title="การแจ้งเตือนทางอีเมล" description="กำหนดการแจ้งเตือนเสริมที่ต้องการรับ">
+            <EmailPreferencesForm defaults={emailPreferences} />
+          </Section>
+        )}
 
         {isGoogleEnabled() && (
           <Section icon={<Link2 className="h-4 w-4" />} title="บัญชีที่เชื่อมต่อ" description="ใช้เข้าสู่ระบบ และยืนยันตัวตนเมื่อลืมรหัสผ่าน">

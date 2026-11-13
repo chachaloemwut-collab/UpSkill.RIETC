@@ -98,8 +98,8 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
             <MailCheck className="h-4 w-4" /> ส่งลิงก์ยืนยันอีเมลอีกครั้ง
           </Button>
         )}
-        <Field label="อีเมล">
-          <Input name="email" type="email" autoComplete="email" placeholder="you@example.com" required className="h-10" />
+        <Field label="อีเมลหรือชื่อผู้ใช้">
+          <Input name="email" type="text" autoComplete="username" placeholder="you@example.com" required className="h-10" />
         </Field>
         <div className="grid gap-1.5">
           <div className="flex items-center justify-between">

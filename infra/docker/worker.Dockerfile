@@ -20,7 +20,9 @@ RUN cd apps/worker && ./node_modules/.bin/playwright install --with-deps --only-
 FROM deps AS runtime
 COPY packages packages
 COPY apps/worker apps/worker
-RUN useradd --system --create-home app && mkdir -p /data/certificates && chown app /data/certificates
+# uid/gid 10001 = same as the web image (shared certificates volume)
+RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app --create-home app \
+    && mkdir -p /data/certificates && chown app:app /data/certificates
 ENV NODE_ENV=production CERT_STORAGE_DIR=/data/certificates
 USER app
 WORKDIR /repo/apps/worker

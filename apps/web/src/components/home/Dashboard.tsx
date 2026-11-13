@@ -1,18 +1,17 @@
 import Link from "next/link";
-import { ArrowRight, Award, BadgeCheck, BookOpen, CheckCircle2, Clock, GraduationCap, Library, PlayCircle, Presentation, ShieldCheck, Sparkles } from "lucide-react";
-import { Badge, Card, EmptyState, Progress, Stepper, buttonClass } from "@/components/ui";
+import { ArrowRight, Award, BookOpen, CheckCircle2, Clock, GraduationCap, Library, PlayCircle, Presentation } from "lucide-react";
+import { Card, EmptyState, Progress, buttonClass } from "@/components/ui";
 import { PageHeader, SectionTitle } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
 import { CourseCard, CourseCover } from "@/components/course/CourseCard";
 import { listPublishedCourses, learnerOverview } from "@/server/courses/courses.service";
-import { getViewer } from "@/server/viewer";
+import type { getViewer } from "@/server/viewer";
 
-export const dynamic = "force-dynamic";
+type Viewer = NonNullable<Awaited<ReturnType<typeof getViewer>>>;
 
-export default async function HomePage() {
-  const viewer = await getViewer();
+/** Signed-in home: stats, continue learning, suggestions. Rendered by app/page.tsx inside the LMS shell. */
+export async function Dashboard({ viewer }: { viewer: Viewer }) {
   const courses = await listPublishedCourses();
-  if (!viewer) return <Landing courses={courses} />;
 
   const { enrollments, stats } = await learnerOverview(viewer.id);
   const inProgress = enrollments.filter((e) => e.status === "in_progress");
@@ -134,88 +133,6 @@ export default async function HomePage() {
           </div>
         </section>
       )}
-    </>
-  );
-}
-
-const STEPS = [
-  { title: "ลงทะเบียน", description: "เลือกและลงทะเบียนหลักสูตร" },
-  { title: "ดูวิดีโอ", description: "ระบบนับเวลาเรียนจริง" },
-  { title: "ทำแบบทดสอบ", description: "สุ่มข้อและจับเวลา" },
-  { title: "รับใบรับรอง", description: "ตรวจสอบได้ด้วย QR" },
-];
-
-const FEATURES = [
-  { icon: ShieldCheck, title: "กันโกงเวลาเรียน", text: "ตรวจสอบทุกช่วงที่ดูฝั่งเซิร์ฟเวอร์ กรอข้าม เร่งความเร็ว หรือเปิดหลายแท็บจะไม่ถูกนับ" },
-  { icon: BadgeCheck, title: "ใบรับรองลงนามดิจิทัล", text: "ใบรับรองทุกใบลงนามด้วย Ed25519 ใครก็ตรวจสอบความถูกต้องได้ผ่าน QR Code" },
-  { icon: Sparkles, title: "เรียนได้ทุกอุปกรณ์", text: "ออกแบบให้ใช้บนมือถือก่อน วิดีโอติดด้านบนจอขณะเลื่อนดูรายละเอียดบทเรียน" },
-];
-
-function Landing({ courses }: { courses: Awaited<ReturnType<typeof listPublishedCourses>> }) {
-  return (
-    <>
-      <section className="relative overflow-hidden rounded-xl border bg-card px-6 py-12 sm:px-10 sm:py-16">
-        <div aria-hidden className="pointer-events-none absolute -right-20 -top-28 h-80 w-80 rounded-full bg-primary/10 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-28 left-1/3 h-72 w-72 rounded-full bg-primary/5 blur-3xl" />
-        <div className="relative max-w-2xl">
-          <Badge variant="outline" className="mb-4 gap-1.5 bg-background">
-            <span className="h-1.5 w-1.5 rounded-full bg-success" /> ระบบจัดการการเรียนรู้และใบรับรอง
-          </Badge>
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-            เรียนรู้จากหลักสูตร
-            <br />
-            <span className="text-muted-foreground">ได้ใบรับรองที่เชื่อถือได้จริง</span>
-          </h1>
-          <p className="mt-4 max-w-xl text-muted-foreground">
-            หลักสูตรจากวิดีโอ YouTube ที่ระบบนับเวลาเรียนจริง สอบผ่านแล้วรับใบรับรองดิจิทัลที่ใครก็ตรวจสอบได้
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/register" className={buttonClass("default", "lg")}>
-              สมัครสมาชิก <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link href="/courses" className={buttonClass("outline", "lg")}>
-              ดูคลังหลักสูตร
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <Card className="mt-6 p-6">
-        <Stepper steps={STEPS} current={STEPS.length} />
-      </Card>
-
-      <section className="mt-10">
-        <SectionTitle
-          action={
-            <Link href="/courses" className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
-              ดูทั้งหมด <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          }
-        >
-          หลักสูตรล่าสุด
-        </SectionTitle>
-        {courses.length === 0 ? (
-          <EmptyState icon={<Library className="h-5 w-5" />} title="ยังไม่มีหลักสูตรที่เผยแพร่" description="ยังไม่มีรายการหลักสูตรให้แสดง" />
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {courses.slice(0, 8).map((c, i) => (
-              <CourseCard key={c.id} course={c} index={i} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-10 grid gap-4 md:grid-cols-3">
-        {FEATURES.map((f) => (
-          <Card key={f.title} className="p-6">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <f.icon className="h-5 w-5" />
-            </span>
-            <h3 className="mt-4 font-semibold">{f.title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{f.text}</p>
-          </Card>
-        ))}
-      </section>
     </>
   );
 }

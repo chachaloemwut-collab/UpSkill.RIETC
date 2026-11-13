@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Award, BadgeCheck, Ban, BookOpen, Flag, GraduationCap, ShieldAlert, UserCog, Users } from "lucide-react";
+import { Award, BadgeCheck, Ban, BookOpen, Flag, GraduationCap, Mail, ShieldAlert, UserCog, Users } from "lucide-react";
 import { Badge, Card, EmptyState, Table, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
-import { CourseAdminControls, RevokeCertificateForm, UserAdminForm } from "@/components/admin/AdminActions";
+import { CourseAdminControls, EmailSettingsForm, RemoveSuppressionButton, RetryEmailButton, RevokeCertificateForm, TestEmailSettingsForm, UserAdminForm } from "@/components/admin/AdminActions";
 import { VISIBILITY, formatDateTimeTh } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { adminOverview } from "@/server/admin/admin.service";
+import { getEmailSettingsView } from "@/server/admin/email-settings.service";
 
 export const metadata: Metadata = { title: "ผู้ดูแลระบบ", robots: { index: false } };
 
@@ -17,7 +18,7 @@ const REASONS: Record<string, string> = { POSITION_JUMP: "กรอข้าม 
 export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") redirect("/");
-  const { courses, flags, topFlagged, stats } = await adminOverview();
+  const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings] = await Promise.all([adminOverview(), getEmailSettingsView()]);
 
   return (
     <>
@@ -37,6 +38,7 @@ export default async function AdminPage() {
           <TabsTrigger value="flags">พฤติกรรมผิดปกติ</TabsTrigger>
           <TabsTrigger value="users">ผู้ใช้</TabsTrigger>
           <TabsTrigger value="certs">ใบรับรอง</TabsTrigger>
+          <TabsTrigger value="email">อีเมล ({stats.emailPending}/{stats.emailFailed})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="courses" className="mt-4">
@@ -155,6 +157,22 @@ export default async function AdminPage() {
               </div>
             </div>
             <RevokeCertificateForm />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="email" className="mt-4 grid gap-6">
+          <Card>
+            <div className="flex items-center gap-3 border-b px-5 py-4"><Mail className="h-5 w-5" /><div><h3 className="font-semibold">ตั้งค่าอีเมลระบบ</h3><p className="text-xs text-muted-foreground">ผู้ส่ง การตอบกลับ และการเชื่อมต่อ SMTP · รหัสผ่านจะถูกเข้ารหัสก่อนจัดเก็บ</p></div></div>
+            <EmailSettingsForm defaults={emailSettings} />
+            <TestEmailSettingsForm lastStatus={emailSettings.lastTestStatus} lastError={emailSettings.lastTestError} />
+          </Card>
+          <Card>
+            <div className="flex items-center gap-3 border-b px-5 py-4"><Mail className="h-5 w-5" /><div><h3 className="font-semibold">ประวัติการส่งอีเมล</h3><p className="text-xs text-muted-foreground">รอส่ง {stats.emailPending} · ล้มเหลว {stats.emailFailed}</p></div></div>
+            <Table><thead><tr><th>สร้างเมื่อ</th><th>ผู้รับ</th><th>ประเภท</th><th>สถานะ</th><th>ครั้ง</th><th /></tr></thead><tbody>{emails.map((email) => <tr key={email.id}><td>{formatDateTimeTh(email.created_at)}</td><td>{email.recipient_email}</td><td>{email.template_key}</td><td><Badge variant={email.status === "sent" ? "success" : email.status === "failed" ? "destructive" : email.status === "suppressed" ? "warning" : "secondary"}>{email.status}</Badge></td><td>{email.attempt_count}</td><td className="text-right">{(email.status === "failed" || email.status === "suppressed") && <RetryEmailButton id={email.id} />}</td></tr>)}</tbody></Table>
+          </Card>
+          <Card>
+            <div className="border-b px-5 py-4"><h3 className="font-semibold">อีเมลที่ถูกระงับ</h3><p className="text-xs text-muted-foreground">เกิดจาก hard bounce, complaint หรือการระงับโดยผู้ดูแล</p></div>
+            {suppressions.length ? <Table><thead><tr><th>อีเมล</th><th>เหตุผล</th><th>เมื่อ</th><th /></tr></thead><tbody>{suppressions.map((item) => <tr key={item.email}><td>{item.email}</td><td>{item.reason}</td><td>{formatDateTimeTh(item.created_at)}</td><td className="text-right"><RemoveSuppressionButton email={item.email} /></td></tr>)}</tbody></Table> : <p className="p-5 text-sm text-muted-foreground">ไม่มีอีเมลที่ถูกระงับ</p>}
           </Card>
         </TabsContent>
       </Tabs>

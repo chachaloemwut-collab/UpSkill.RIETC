@@ -4,7 +4,7 @@ import pg from "pg";
 import type { DB } from "./generated.ts";
 
 export { sql } from "kysely";
-export type { DB };
+export type { DB, JsonValue } from "./generated.ts";
 export type Database = Kysely<DB>;
 export type Tx = Transaction<DB>;
 

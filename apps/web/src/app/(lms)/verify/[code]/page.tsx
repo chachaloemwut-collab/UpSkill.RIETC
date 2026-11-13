@@ -9,7 +9,7 @@ import { ctx } from "@/server/context";
 import { verifyPublicCertificate } from "@/server/certificates/verify.service";
 
 // The page contains a person's name -> keep it out of search engines (PDPA: minimize exposure)
-export const metadata: Metadata = { title: "ผลการตรวจสอบใบรับรอง", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "ผลการตรวจสอบเอกสารรับรอง", robots: { index: false, follow: false } };
 
 export default async function VerifyPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
@@ -28,8 +28,10 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
     );
 
   const valid = r.status === "valid";
+  const expired = r.status === "expired";
   const rows = [
     { icon: UserRound, label: "ผู้สำเร็จการศึกษา", value: <span className="font-semibold">{r.recipientName}</span> },
+    { icon: BadgeCheck, label: "เอกสาร", value: `${r.documentName} (${r.documentType})` },
     { icon: GraduationCap, label: "หลักสูตร", value: r.courseTitle },
     { icon: UserRound, label: "ผู้สอน", value: r.instructorName },
     { icon: Clock, label: "เวลาเรียนสะสมจริง", value: r.studyDurationText },
@@ -40,19 +42,20 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
       value: r.verifiedCourse ? <Badge variant="success">Verified Course</Badge> : <Badge variant="secondary">Community Course</Badge>,
     },
     { icon: Clock, label: "ออกเมื่อ", value: formatDateTh(r.issuedAt, "long") },
+    ...(r.expiresAt ? [{ icon: Clock, label: "ใช้ได้ถึง", value: formatDateTh(r.expiresAt, "long") }] : []),
     { icon: Hash, label: "รหัส", value: <span className="font-mono">{r.code}</span> },
   ];
 
   return (
     <div className="mx-auto max-w-2xl pt-2 sm:pt-6">
       <Card className="overflow-hidden">
-        <div className={valid ? "flex items-center gap-4 bg-success/10 p-6 text-success" : "flex items-center gap-4 bg-destructive/10 p-6 text-destructive"}>
+        <div className={valid ? "flex items-center gap-4 bg-success/10 p-6 text-success" : expired ? "flex items-center gap-4 bg-warning/10 p-6 text-warning" : "flex items-center gap-4 bg-destructive/10 p-6 text-destructive"}>
           <span className="flex h-14 w-14 shrink-0 animate-spring-in items-center justify-center rounded-full bg-background shadow-sm">
             {valid ? <ShieldCheck className="h-7 w-7" /> : <ShieldAlert className="h-7 w-7" />}
           </span>
           <div>
-            <p className="text-lg font-semibold">{valid ? "ใบรับรองถูกต้องและเป็นของจริง" : "ใบรับรองนี้ถูกเพิกถอนแล้ว"}</p>
-            <p className="text-sm opacity-80">{valid ? "ลายเซ็นดิจิทัลตรงกับข้อมูลในระบบ (Verified)" : `เหตุผล: ${r.revokedReason}`}</p>
+            <p className="text-lg font-semibold">{valid ? `${r.documentName}ผ่านการตรวจสอบ` : expired ? `${r.documentName}หมดอายุแล้ว` : `${r.documentName}ถูกเพิกถอนแล้ว`}</p>
+            <p className="text-sm opacity-80">{valid ? "ลายเซ็นดิจิทัลตรงกับข้อมูลในระบบ" : expired ? `หมดอายุเมื่อ ${formatDateTh(r.expiresAt!, "long")}` : `เหตุผล: ${r.revokedReason}`}</p>
           </div>
         </div>
         <dl className="divide-y">

@@ -11,6 +11,14 @@ const Body = z.strictObject({
   is_sequential_locked: z.boolean().optional(),
   max_quiz_attempts_per_day: z.int().min(1).max(20).optional(),
   quiz_time_limit_sec: z.int().min(60).max(14_400).optional(),
+  credential_enabled: z.boolean().optional(),
+  credential_type: z.string().regex(/^[a-z0-9_]+$/).max(40).optional(),
+  credential_name_th: z.string().trim().min(1).max(120).optional(),
+  credential_name_en: z.string().trim().max(120).nullable().optional(),
+  credential_template_key: z.enum(["standard"]).optional(),
+  credential_validity_days: z.int().min(1).max(36_500).nullable().optional(),
+  credential_signer_name: z.string().trim().max(255).nullable().optional(),
+  credential_signer_title: z.string().trim().max(255).nullable().optional(),
 });
 
 export const PATCH = route<typeof Body, { id: string }>({ auth: "required", roles: ["instructor", "admin"], body: Body }, async ({ params, body, user }) => {

@@ -13,6 +13,7 @@ import { sql } from "@upskill/db";
 import { evaluateHeartbeat, hashToken } from "@upskill/core";
 import { assertActiveLearningSession } from "@upskill/infra/learning-lock";
 import { ctx } from "../context";
+import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import { audit } from "../audit";
 
@@ -24,7 +25,7 @@ export async function processHeartbeat(input: {
   positionSec: number;
   ip: string;
 }) {
-  const { db, redis } = ctx();
+  const { db, redis, env } = ctx();
   const tokenHash = hashToken(input.streamToken);
 
   const session = await db
@@ -116,6 +117,29 @@ export async function processHeartbeat(input: {
         })
         .execute();
       await audit(trx, { action: "learning.cheat_flag", userId: input.userId, entityType: "lesson", entityId: input.lessonId, ip: input.ip, details: { reason: outcome.flag } });
+    }
+
+    if (outcome.completedNow) {
+      const progress = await trx
+        .selectFrom("enrollments as e")
+        .innerJoin("courses as c", "c.id", "e.course_id")
+        .innerJoin("users as u", "u.id", "e.user_id")
+        .select([
+          "c.title",
+          "c.slug",
+          "u.email",
+          sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("total"),
+          sql<number>`(select count(*)::int from lesson_progress p join lessons l on l.id = p.lesson_id where p.enrollment_id = e.id and l.course_id = c.id and p.is_completed)`.as("done"),
+        ])
+        .where("e.id", "=", session.enrollment_id)
+        .executeTakeFirstOrThrow();
+      if (progress.total > 0 && progress.done === progress.total) {
+        await addEmailToOutbox(
+          trx,
+          { template: "ready-for-quiz", to: progress.email, courseTitle: progress.title, quizLink: `${env.APP_ORIGIN}/courses/${progress.slug}/quiz` },
+          { userId: input.userId, deduplicationKey: `ready-for-quiz:${session.enrollment_id}` },
+        );
+      }
     }
 
     return {

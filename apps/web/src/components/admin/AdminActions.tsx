@@ -1,9 +1,107 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Ban, BadgeCheck, MoreHorizontal, RotateCcw } from "lucide-react";
+import { Ban, BadgeCheck, MoreHorizontal, RotateCcw, Save, Send } from "lucide-react";
 import { api } from "@/lib/api";
-import { AlertDialog, Button, DropdownMenu, Field, Input, Select, Textarea, useToast } from "@/components/ui";
+import { Alert, AlertDialog, Button, Checkbox, DropdownMenu, Field, Input, PasswordInput, Select, Textarea, useToast } from "@/components/ui";
+
+type EmailSettingsDefaults = {
+  enabled: boolean;
+  senderName: string;
+  senderEmail: string;
+  replyToEmail: string | null;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecurity: "none" | "starttls" | "tls";
+  smtpUsername: string;
+  passwordConfigured: boolean;
+  source: "environment" | "database";
+  version: number;
+  lastTestedAt: string | null;
+  lastTestStatus: string | null;
+  lastTestError: string | null;
+};
+
+export function EmailSettingsForm({ defaults }: { defaults: EmailSettingsDefaults }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setBusy(true);
+    const result = await api("/api/admin/email/settings", {
+      method: "PATCH",
+      body: {
+        enabled: f.get("enabled") === "on",
+        senderName: f.get("senderName"),
+        senderEmail: f.get("senderEmail"),
+        replyToEmail: f.get("replyToEmail"),
+        smtpHost: f.get("smtpHost"),
+        smtpPort: Number(f.get("smtpPort")),
+        smtpSecurity: f.get("smtpSecurity"),
+        smtpUsername: f.get("smtpUsername"),
+        ...(f.get("smtpPassword") ? { smtpPassword: f.get("smtpPassword") } : {}),
+      },
+    });
+    setBusy(false);
+    if (result.ok) {
+      toast({ title: "บันทึกการตั้งค่าอีเมลแล้ว", description: "ระบบส่งอีเมลจะใช้ค่าใหม่โดยไม่ต้องรีสตาร์ต", variant: "success" });
+      e.currentTarget.reset();
+      router.refresh();
+    } else toast({ title: "บันทึกไม่สำเร็จ", description: result.message, variant: "destructive" });
+  }
+  return (
+    <form onSubmit={onSubmit} className="grid gap-5 p-5">
+      {defaults.source === "environment" && <Alert variant="default" title="กำลังใช้ค่าจากเซิร์ฟเวอร์">เมื่อบันทึก แบบฟอร์มนี้จะเป็นค่าหลักของระบบ</Alert>}
+      <Checkbox name="enabled" defaultChecked={defaults.enabled} label="เปิดการส่งอีเมลจากระบบ" />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="ชื่อผู้ส่ง"><Input name="senderName" defaultValue={defaults.senderName} required maxLength={255} /></Field>
+        <Field label="อีเมลผู้ส่ง"><Input name="senderEmail" type="email" defaultValue={defaults.senderEmail} required /></Field>
+        <Field label="อีเมลสำหรับตอบกลับ" hint="เว้นว่างเพื่อให้ตอบกลับไปยังอีเมลผู้ส่ง"><Input name="replyToEmail" type="email" defaultValue={defaults.replyToEmail ?? ""} /></Field>
+      </div>
+      <div className="border-t pt-5">
+        <h4 className="mb-4 text-sm font-semibold">การเชื่อมต่อ SMTP</h4>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Field label="SMTP host"><Input name="smtpHost" defaultValue={defaults.smtpHost} required placeholder="smtp.example.com" /></Field>
+          <Field label="พอร์ต"><Input name="smtpPort" type="number" min={1} max={65535} defaultValue={defaults.smtpPort} required /></Field>
+          <Field label="ความปลอดภัย"><Select name="smtpSecurity" defaultValue={defaults.smtpSecurity}><option value="starttls">STARTTLS</option><option value="tls">TLS/SSL</option><option value="none">ไม่มีการเข้ารหัส</option></Select></Field>
+          <Field label="ชื่อผู้ใช้ SMTP"><Input name="smtpUsername" autoComplete="off" defaultValue={defaults.smtpUsername} /></Field>
+          <Field label="รหัสผ่าน SMTP" hint={defaults.passwordConfigured ? "มีรหัสผ่านอยู่แล้ว เว้นว่างเพื่อใช้ค่าเดิม" : "จำเป็นเมื่อกำหนดชื่อผู้ใช้ SMTP"}>
+            <PasswordInput name="smtpPassword" autoComplete="new-password" placeholder={defaults.passwordConfigured ? "••••••••••••" : ""} />
+          </Field>
+        </div>
+      </div>
+      <Button type="submit" loading={busy} className="justify-self-start"><Save className="h-4 w-4" /> บันทึกการตั้งค่า</Button>
+    </form>
+  );
+}
+
+export function TestEmailSettingsForm({ lastStatus, lastError }: { lastStatus: string | null; lastError: string | null }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setBusy(true);
+    const result = await api("/api/admin/email/settings/test", { body: { recipient: f.get("recipient") } });
+    setBusy(false);
+    if (result.ok) toast({ title: "ส่งอีเมลทดสอบแล้ว", variant: "success" });
+    else toast({ title: "ทดสอบไม่สำเร็จ", description: result.message, variant: "destructive" });
+    router.refresh();
+  }
+  return (
+    <div className="grid gap-3 border-t p-5">
+      {lastStatus === "success" && <Alert variant="success" title="การทดสอบครั้งล่าสุดสำเร็จ" />}
+      {lastStatus === "failed" && <Alert variant="destructive" title="การทดสอบครั้งล่าสุดไม่สำเร็จ">{lastError ?? "ตรวจสอบค่าการเชื่อมต่อ"}</Alert>}
+      <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1"><Field label="ส่งอีเมลทดสอบไปที่"><Input name="recipient" type="email" required placeholder="admin@example.com" /></Field></div>
+        <Button type="submit" variant="outline" loading={busy}><Send className="h-4 w-4" /> ทดสอบส่ง</Button>
+      </form>
+    </div>
+  );
+}
 
 export function CourseAdminControls({ courseId, title, visibility, verified }: { courseId: string; title: string; visibility: string; verified: boolean }) {
   const router = useRouter();
@@ -139,4 +237,30 @@ export function UserAdminForm() {
       </Button>
     </form>
   );
+}
+
+export function RetryEmailButton({ id }: { id: string }) {
+  const toast = useToast();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return <Button size="sm" variant="ghost" loading={busy} onClick={async () => {
+    setBusy(true);
+    const result = await api(`/api/admin/email/${id}/retry`, { method: "POST" });
+    setBusy(false);
+    if (result.ok) { toast({ title: "นำอีเมลกลับเข้าคิวแล้ว", variant: "success" }); router.refresh(); }
+    else toast({ title: "นำกลับเข้าคิวไม่สำเร็จ", description: result.message, variant: "destructive" });
+  }}><RotateCcw className="h-4 w-4" /> ส่งใหม่</Button>;
+}
+
+export function RemoveSuppressionButton({ email }: { email: string }) {
+  const toast = useToast();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return <Button size="sm" variant="ghost" loading={busy} onClick={async () => {
+    setBusy(true);
+    const result = await api("/api/admin/email/suppressions", { method: "DELETE", body: { email } });
+    setBusy(false);
+    if (result.ok) { toast({ title: "ยกเลิกการระงับอีเมลแล้ว", variant: "success" }); router.refresh(); }
+    else toast({ title: "ทำรายการไม่สำเร็จ", description: result.message, variant: "destructive" });
+  }}><RotateCcw className="h-4 w-4" /> ยกเลิกการระงับ</Button>;
 }

@@ -11,7 +11,8 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 const notoThai = Noto_Sans_Thai({ subsets: ["thai"], weight: ["400", "500", "600", "700"], variable: "--font-noto-thai", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "UpSkill — เรียนออนไลน์พร้อมใบรับรอง", template: "%s · UpSkill" },
+  title: { default: "UpskillReskill.RIETC — เรียนออนไลน์พร้อมใบรับรอง", template: "%s · UpskillReskill.RIETC" },
+  applicationName: "UpskillReskill.RIETC",
   description: "เรียนออนไลน์จาก YouTube บันทึกเวลาเรียนจริง และรับใบรับรองที่ตรวจสอบได้",
   icons: { icon: "/favicon.svg" },
 };

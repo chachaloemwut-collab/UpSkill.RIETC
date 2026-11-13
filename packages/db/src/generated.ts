@@ -53,11 +53,18 @@ export interface Certificates {
   certificate_code: string;
   course_id: string;
   course_title_snapshot: string;
+  document_name_snapshot: Generated<string>;
+  document_type_snapshot: Generated<string>;
   enrollment_id: string;
+  expires_at: Timestamp | null;
   id: Generated<string>;
   instructor_name_snapshot: string;
   is_verified_course_snapshot: boolean;
   issued_at: Timestamp;
+  payload_version: Generated<number>;
+  pdf_failed_at: Timestamp | null;
+  pdf_last_error: string | null;
+  pdf_ready_at: Timestamp | null;
   quiz_score_snapshot: Numeric;
   recipient_name_snapshot: string;
   revoked_at: Timestamp | null;
@@ -69,8 +76,37 @@ export interface Certificates {
   user_id: string;
 }
 
+export interface CourseAssignmentRecipients {
+  assigned_at: Generated<Timestamp>;
+  assignment_id: string;
+  cancelled_at: Timestamp | null;
+  enrollment_id: string;
+  user_id: string;
+}
+
+export interface CourseAssignments {
+  assigned_by: string;
+  cancelled_at: Timestamp | null;
+  course_id: string;
+  created_at: Generated<Timestamp>;
+  due_at: Timestamp | null;
+  id: Generated<string>;
+  note: string | null;
+  status: Generated<string>;
+  target_group_id: string | null;
+  target_user_id: string | null;
+}
+
 export interface Courses {
   created_at: Generated<Timestamp>;
+  credential_enabled: Generated<boolean>;
+  credential_name_en: string | null;
+  credential_name_th: Generated<string>;
+  credential_signer_name: string | null;
+  credential_signer_title: string | null;
+  credential_template_key: Generated<string>;
+  credential_type: Generated<string>;
+  credential_validity_days: number | null;
   description: string | null;
   id: Generated<string>;
   instructor_id: string;
@@ -87,6 +123,75 @@ export interface Courses {
   total_duration_sec: Generated<number>;
   updated_at: Generated<Timestamp>;
   visibility: Generated<string>;
+}
+
+export interface EmailDeliveryEvents {
+  event_type: string;
+  id: Generated<Int8>;
+  occurred_at: Timestamp;
+  outbox_id: string | null;
+  payload: Generated<Json>;
+  provider_event_id: string | null;
+  provider_message_id: string | null;
+  received_at: Generated<Timestamp>;
+  recipient_email: string | null;
+}
+
+export interface EmailOutbox {
+  attempt_count: Generated<number>;
+  category: Generated<string>;
+  claimed_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  deduplication_key: string;
+  failed_at: Timestamp | null;
+  id: Generated<string>;
+  last_error_code: string | null;
+  last_error_message: string | null;
+  next_attempt_at: Generated<Timestamp>;
+  payload: Json;
+  provider_message_id: string | null;
+  recipient_email: string;
+  sent_at: Timestamp | null;
+  status: Generated<string>;
+  template_key: string;
+  template_version: Generated<number>;
+  user_id: string | null;
+}
+
+export interface EmailPreferences {
+  course_updates_enabled: Generated<boolean>;
+  learning_reminders_enabled: Generated<boolean>;
+  preferred_locale: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+  weekly_summary_enabled: Generated<boolean>;
+}
+
+export interface EmailProviderSettings {
+  created_at: Generated<Timestamp>;
+  enabled: Generated<boolean>;
+  id: Generated<number>;
+  last_test_error: string | null;
+  last_test_status: string | null;
+  last_tested_at: Timestamp | null;
+  reply_to_email: string | null;
+  sender_email: string;
+  sender_name: string;
+  smtp_host: string;
+  smtp_password_encrypted: string | null;
+  smtp_port: number;
+  smtp_security: string;
+  smtp_username: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+  version: Generated<number>;
+}
+
+export interface EmailSuppressions {
+  created_at: Generated<Timestamp>;
+  email: string;
+  provider_event_id: string | null;
+  reason: string;
 }
 
 export interface EmailVerificationTokens {
@@ -106,6 +211,21 @@ export interface Enrollments {
   id: Generated<string>;
   status: Generated<string>;
   user_id: string;
+}
+
+export interface LearningGroupMembers {
+  added_at: Generated<Timestamp>;
+  group_id: string;
+  user_id: string;
+}
+
+export interface LearningGroups {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  description: string | null;
+  id: Generated<string>;
+  name: string;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface LearningSessions {
@@ -198,6 +318,7 @@ export interface Users {
   email: string;
   email_verified_at: Timestamp | null;
   id: Generated<string>;
+  is_system_owner: Generated<boolean>;
   legal_full_name_en: string | null;
   legal_full_name_th: string | null;
   legal_name_locked_at: Timestamp | null;
@@ -206,6 +327,7 @@ export interface Users {
   role: Generated<string>;
   status: Generated<string>;
   updated_at: Generated<Timestamp>;
+  username: string | null;
 }
 
 export interface UserSessions {
@@ -235,9 +357,18 @@ export interface DB {
   anticheat_events: AnticheatEvents;
   audit_logs: AuditLogs;
   certificates: Certificates;
+  course_assignment_recipients: CourseAssignmentRecipients;
+  course_assignments: CourseAssignments;
   courses: Courses;
+  email_delivery_events: EmailDeliveryEvents;
+  email_outbox: EmailOutbox;
+  email_preferences: EmailPreferences;
+  email_provider_settings: EmailProviderSettings;
+  email_suppressions: EmailSuppressions;
   email_verification_tokens: EmailVerificationTokens;
   enrollments: Enrollments;
+  learning_group_members: LearningGroupMembers;
+  learning_groups: LearningGroups;
   learning_sessions: LearningSessions;
   lesson_progress: LessonProgress;
   lessons: Lessons;

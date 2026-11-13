@@ -35,7 +35,7 @@ export default async function CoursePage({ params }: Props) {
     ...(course.is_sequential_locked ? [{ icon: ListOrdered, text: "เรียนตามลำดับบท", sub: "บทถัดไปจะเปิดเมื่อเรียนบทก่อนหน้าครบ" }] : []),
     { icon: Target, text: `สอบผ่านอย่างน้อย ${course.passing_quiz_score}%`, sub: `สอบได้ ${course.max_quiz_attempts_per_day} ครั้งต่อวัน` },
     { icon: Timer, text: `เวลาทำแบบทดสอบ ${Math.round(course.quiz_time_limit_sec / 60)} นาที`, sub: "ข้อสอบและตัวเลือกสุ่มลำดับทุกครั้ง" },
-    { icon: Award, text: "รับใบรับรองดิจิทัล", sub: "ตรวจสอบความถูกต้องได้ผ่าน QR Code" },
+    ...(course.credential_enabled ? [{ icon: Award, text: course.credential_name_th, sub: "ตรวจสอบสถานะได้ผ่าน QR Code" }] : []),
   ];
 
   return (
@@ -129,9 +129,9 @@ export default async function CoursePage({ params }: Props) {
               ) : enrollment?.status === "completed" ? (
                 <>
                   <Alert variant="success" title="คุณเรียนจบและสอบผ่านหลักสูตรนี้แล้ว" />
-                  <Link href={`/courses/${course.slug}/certificate`} className={buttonClass("default", "lg", "w-full")}>
-                    <Award className="h-4 w-4" /> {certificate ? "ดูใบรับรอง" : "รับใบรับรอง"}
-                  </Link>
+                  {course.credential_enabled && <Link href={`/courses/${course.slug}/certificate`} className={buttonClass("default", "lg", "w-full")}>
+                    <Award className="h-4 w-4" /> {certificate ? `ดู${course.credential_name_th}` : `รับ${course.credential_name_th}`}
+                  </Link>}
                 </>
               ) : allLessonsCompleted ? (
                 <Link href={`/courses/${course.slug}/quiz`} className={buttonClass("default", "lg", "w-full")}>
@@ -153,7 +153,7 @@ export default async function CoursePage({ params }: Props) {
                   <Clock className="h-4 w-4" /> เนื้อหารวม {formatDuration(course.total_duration_sec)}
                 </li>
                 <li className="flex items-center gap-2">
-                  <Award className="h-4 w-4" /> ใบรับรองเมื่อเรียนจบ
+                  <Award className="h-4 w-4" /> {course.credential_enabled ? `${course.credential_name_th}เมื่อผ่านเกณฑ์` : "ไม่มีเอกสารรับรองสำหรับหลักสูตรนี้"}
                 </li>
                 {lessons.some((l) => l.broken) && (
                   <li className="flex items-center gap-2 text-warning">
