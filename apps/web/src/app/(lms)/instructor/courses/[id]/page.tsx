@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
-import { PageTitle } from "@/components/ui";
+import Link from "next/link";
+import { ChevronRight, ExternalLink } from "lucide-react";
+import { Badge, buttonClass } from "@/components/ui";
+import { PageHeader } from "@/components/common/PageHeader";
+import { VISIBILITY } from "@/lib/format";
 import { CourseEditor, type EditorData } from "@/components/instructor/CourseEditor";
 import { ctx } from "@/server/context";
 import { HttpError } from "@/server/http";
@@ -32,10 +36,31 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
     publishRules: PUBLISH_RULES,
   };
 
+  const vis = VISIBILITY[data.course.visibility];
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <PageTitle>{data.course.title}</PageTitle>
+    <>
+      <PageHeader
+        eyebrow={
+          <span className="flex items-center gap-1.5">
+            <Link href="/instructor" className="transition-colors hover:text-foreground">
+              จัดการหลักสูตร
+            </Link>
+            <ChevronRight className="h-3.5 w-3.5" /> แก้ไข
+          </span>
+        }
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            {data.course.title}
+            <Badge variant={vis?.variant ?? "secondary"}>{vis?.label ?? data.course.visibility}</Badge>
+          </span>
+        }
+        description="จัดการบทเรียน ข้อสอบ และเกณฑ์การผ่าน"
+      >
+        <Link href={`/courses/${data.course.slug}`} className={buttonClass("outline")}>
+          <ExternalLink className="h-4 w-4" /> ดูหน้าหลักสูตร
+        </Link>
+      </PageHeader>
       <CourseEditor data={editor} />
-    </main>
+    </>
   );
 }

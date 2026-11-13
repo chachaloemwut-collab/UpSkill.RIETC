@@ -1,76 +1,103 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { Ban, BadgeCheck, MoreHorizontal, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
-import { Alert, Button, Field, Input } from "@/components/ui";
+import { AlertDialog, Button, DropdownMenu, Field, Input, Select, Textarea, useToast } from "@/components/ui";
 
-function useMsg() {
-  const [msg, setMsg] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  return { msg, setMsg, banner: msg && <Alert tone={msg.tone}>{msg.text}</Alert> };
-}
-
-export function CourseAdminControls({ courseId, visibility, verified }: { courseId: string; visibility: string; verified: boolean }) {
+export function CourseAdminControls({ courseId, title, visibility, verified }: { courseId: string; title: string; visibility: string; verified: boolean }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const patch = async (body: Record<string, unknown>) => {
-    setBusy(true);
+  const toast = useToast();
+  const [confirmSuspend, setConfirmSuspend] = useState(false);
+  const patch = async (body: Record<string, unknown>, done: string) => {
     const r = await api(`/api/admin/courses/${courseId}`, { method: "PATCH", body });
-    setBusy(false);
-    if (r.ok) router.refresh();
-    else alert(r.message);
+    if (r.ok) {
+      toast({ title: done, variant: "success" });
+      router.refresh();
+    } else toast({ title: "ทำรายการไม่สำเร็จ", description: r.message, variant: "destructive" });
   };
   return (
-    <div className="flex flex-wrap gap-2">
-      <Button variant="secondary" className="px-2 py-1 text-xs" disabled={busy} onClick={() => patch({ is_verified_course: !verified })}>
-        {verified ? "ยกเลิก Verified" : "รับรอง (Verified)"}
-      </Button>
-      {visibility === "suspended" ? (
-        <Button variant="secondary" className="px-2 py-1 text-xs" disabled={busy} onClick={() => patch({ visibility: "draft" })}>
-          ยกเลิกการระงับ
-        </Button>
-      ) : (
-        <Button variant="danger" className="px-2 py-1 text-xs" disabled={busy} onClick={() => confirm("ระงับหลักสูตรนี้?") && patch({ visibility: "suspended" })}>
-          ระงับ
-        </Button>
-      )}
-    </div>
+    <>
+      <DropdownMenu
+        align="end"
+        trigger={
+          <Button variant="ghost" size="icon" aria-label={`จัดการ ${title}`}>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        }
+        items={[
+          {
+            label: verified ? "ยกเลิก Verified" : "รับรองเป็น Verified",
+            icon: <BadgeCheck className="h-4 w-4" />,
+            onSelect: () => void patch({ is_verified_course: !verified }, verified ? "ยกเลิก Verified แล้ว" : "รับรองหลักสูตรแล้ว"),
+          },
+          { label: "", separator: true },
+          visibility === "suspended"
+            ? { label: "ยกเลิกการระงับ (กลับเป็นฉบับร่าง)", icon: <RotateCcw className="h-4 w-4" />, onSelect: () => void patch({ visibility: "draft" }, "ยกเลิกการระงับแล้ว") }
+            : { label: "ระงับหลักสูตร", icon: <Ban className="h-4 w-4" />, destructive: true, onSelect: () => setConfirmSuspend(true) },
+        ]}
+      />
+      <AlertDialog
+        open={confirmSuspend}
+        onOpenChange={setConfirmSuspend}
+        title="ระงับหลักสูตรนี้?"
+        description={`“${title}” จะถูกซ่อนจากผู้เรียนทุกคนจนกว่าจะยกเลิกการระงับ`}
+        confirmLabel="ระงับ"
+        cancelLabel="ยกเลิก"
+        destructive
+        onConfirm={() => void patch({ visibility: "suspended" }, "ระงับหลักสูตรแล้ว")}
+      />
+    </>
   );
 }
 
 export function RevokeCertificateForm() {
-  const m = useMsg();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+  const [pending, setPending] = useState<{ code: string; reason: string; form: HTMLFormElement } | null>(null);
+
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const form = e.currentTarget;
-    const f = new FormData(form);
-    if (!confirm("เพิกถอนใบรับรองนี้? (ย้อนกลับไม่ได้)")) return;
+    const f = new FormData(e.currentTarget);
+    setPending({ code: String(f.get("code")).trim(), reason: String(f.get("reason")), form: e.currentTarget });
+  }
+  async function revoke() {
+    if (!pending) return;
     setBusy(true);
-    const r = await api(`/api/admin/certificates/${encodeURIComponent(String(f.get("code")))}/revoke`, { body: { reason: f.get("reason") } });
+    const r = await api(`/api/admin/certificates/${encodeURIComponent(pending.code)}/revoke`, { body: { reason: pending.reason } });
     setBusy(false);
     if (r.ok) {
-      form.reset();
-      m.setMsg({ tone: "success", text: "เพิกถอนแล้ว" });
-    } else m.setMsg({ tone: "error", text: r.message });
+      pending.form.reset();
+      toast({ title: "เพิกถอนใบรับรองแล้ว", description: pending.code, variant: "success" });
+    } else toast({ title: "เพิกถอนไม่สำเร็จ", description: r.message, variant: "destructive" });
   }
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      {m.banner}
+    <form onSubmit={onSubmit} className="grid gap-4">
       <Field label="รหัสใบรับรอง">
-        <Input name="code" required placeholder="CERT-2026-XXXX-XXXX-XXXX" />
+        <Input name="code" required placeholder="CERT-2026-XXXX-XXXX-XXXX" className="font-mono" />
       </Field>
-      <Field label="เหตุผล (แสดงบนหน้าตรวจสอบสาธารณะ)">
-        <Input name="reason" required minLength={5} maxLength={1000} />
+      <Field label="เหตุผล" hint="แสดงบนหน้าตรวจสอบสาธารณะ">
+        <Textarea name="reason" required minLength={5} maxLength={1000} rows={3} />
       </Field>
-      <Button type="submit" variant="danger" disabled={busy}>
-        เพิกถอน
+      <Button type="submit" variant="destructive" loading={busy} className="justify-self-start">
+        <Ban className="h-4 w-4" /> เพิกถอน
       </Button>
+      <AlertDialog
+        open={!!pending}
+        onOpenChange={(v) => !v && setPending(null)}
+        title="เพิกถอนใบรับรอง?"
+        description={`${pending?.code ?? ""} — การเพิกถอนย้อนกลับไม่ได้`}
+        confirmLabel="เพิกถอน"
+        cancelLabel="ยกเลิก"
+        destructive
+        onConfirm={() => void revoke()}
+      />
     </form>
   );
 }
 
 export function UserAdminForm() {
-  const m = useMsg();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -81,34 +108,33 @@ export function UserAdminForm() {
       body: { email: f.get("email"), ...(f.get("role") ? { role: f.get("role") } : {}), ...(f.get("status") ? { status: f.get("status") } : {}) },
     });
     setBusy(false);
-    m.setMsg(r.ok ? { tone: "success", text: "อัปเดตผู้ใช้แล้ว (ผู้ใช้ถูกออกจากระบบทุกอุปกรณ์)" } : { tone: "error", text: r.message });
+    if (r.ok) toast({ title: "อัปเดตผู้ใช้แล้ว", description: "ผู้ใช้ถูกออกจากระบบทุกอุปกรณ์", variant: "success" });
+    else toast({ title: "อัปเดตไม่สำเร็จ", description: r.message, variant: "destructive" });
   }
-  const select = "w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5";
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      {m.banner}
+    <form onSubmit={onSubmit} className="grid gap-4">
       <Field label="อีเมลผู้ใช้">
-        <Input name="email" type="email" required />
+        <Input name="email" type="email" required placeholder="user@example.com" />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="บทบาท">
-          <select name="role" className={select} defaultValue="">
-            <option value="">(ไม่เปลี่ยน)</option>
-            <option value="member">member</option>
-            <option value="instructor">instructor</option>
-            <option value="admin">admin</option>
-          </select>
+          <Select name="role" defaultValue="">
+            <option value="">ไม่เปลี่ยน</option>
+            <option value="member">ผู้เรียน (member)</option>
+            <option value="instructor">ผู้สอน (instructor)</option>
+            <option value="admin">ผู้ดูแลระบบ (admin)</option>
+          </Select>
         </Field>
         <Field label="สถานะ">
-          <select name="status" className={select} defaultValue="">
-            <option value="">(ไม่เปลี่ยน)</option>
-            <option value="active">active</option>
-            <option value="suspended">suspended</option>
-            <option value="banned">banned</option>
-          </select>
+          <Select name="status" defaultValue="">
+            <option value="">ไม่เปลี่ยน</option>
+            <option value="active">ใช้งาน (active)</option>
+            <option value="suspended">ระงับชั่วคราว (suspended)</option>
+            <option value="banned">แบน (banned)</option>
+          </Select>
         </Field>
       </div>
-      <Button type="submit" disabled={busy}>
+      <Button type="submit" loading={busy} className="justify-self-start">
         บันทึก
       </Button>
     </form>

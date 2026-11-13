@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Alert, PageTitle } from "@/components/ui";
+import { ChevronRight } from "lucide-react";
+import { Alert, buttonClass } from "@/components/ui";
+import { PageHeader } from "@/components/common/PageHeader";
 import { QuizRunner } from "@/components/course/QuizRunner";
 import { getCurrentUser } from "@/server/auth/session";
 import { getCourseForViewer } from "@/server/courses/courses.service";
@@ -17,22 +19,41 @@ export default async function QuizPage({ params }: { params: Promise<{ slug: str
   if (!data.enrollment) redirect(`/courses/${slug}`);
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <PageTitle sub={`เกณฑ์ผ่าน ${data.course.passing_quiz_score}% · เวลา ${Math.round(data.course.quiz_time_limit_sec / 60)} นาที`}>
-        แบบทดสอบ: {data.course.title}
-      </PageTitle>
+    <div className="mx-auto max-w-3xl">
+      <PageHeader
+        eyebrow={
+          <span className="flex items-center gap-1.5">
+            <Link href={`/courses/${slug}`} className="truncate transition-colors hover:text-foreground">
+              {data.course.title}
+            </Link>
+            <ChevronRight className="h-3.5 w-3.5" /> แบบทดสอบ
+          </span>
+        }
+        title="แบบทดสอบท้ายหลักสูตร"
+        description="ตอบคำถามให้ได้คะแนนตามเกณฑ์เพื่อรับใบรับรอง"
+      />
       {data.enrollment.status === "completed" ? (
-        <Alert tone="success">
-          คุณสอบผ่านแล้ว{" "}
-          <Link href={`/courses/${slug}/certificate`} className="underline">
+        <div className="grid gap-4">
+          <Alert variant="success" title="คุณสอบผ่านหลักสูตรนี้แล้ว" />
+          <Link href={`/courses/${slug}/certificate`} className={buttonClass("default", "lg", "justify-self-start")}>
             ไปหน้าใบรับรอง
           </Link>
-        </Alert>
+        </div>
       ) : !data.allLessonsCompleted ? (
-        <Alert tone="warning">กรุณาเรียนให้ครบทุกบทก่อนทำแบบทดสอบ</Alert>
+        <div className="grid gap-4">
+          <Alert variant="warning" title="ยังทำแบบทดสอบไม่ได้">กรุณาเรียนให้ครบทุกบทก่อนทำแบบทดสอบ</Alert>
+          <Link href={`/courses/${slug}`} className={buttonClass("outline", "md", "justify-self-start")}>
+            กลับไปหน้าหลักสูตร
+          </Link>
+        </div>
       ) : (
-        <QuizRunner courseId={data.course.id} slug={slug} />
+        <QuizRunner
+          courseId={data.course.id}
+          slug={slug}
+          passingScore={data.course.passing_quiz_score}
+          timeLimitMin={Math.round(data.course.quiz_time_limit_sec / 60)}
+        />
       )}
-    </main>
+    </div>
   );
 }

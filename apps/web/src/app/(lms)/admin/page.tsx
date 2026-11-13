@@ -1,81 +1,163 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Card, PageTitle } from "@/components/ui";
+import { Award, BadgeCheck, Ban, BookOpen, Flag, GraduationCap, ShieldAlert, UserCog, Users } from "lucide-react";
+import { Badge, Card, EmptyState, Table, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
+import { PageHeader } from "@/components/common/PageHeader";
+import { StatCard } from "@/components/common/StatCard";
 import { CourseAdminControls, RevokeCertificateForm, UserAdminForm } from "@/components/admin/AdminActions";
+import { VISIBILITY, formatDateTimeTh } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { adminOverview } from "@/server/admin/admin.service";
 
 export const metadata: Metadata = { title: "ผู้ดูแลระบบ", robots: { index: false } };
 
-const REASONS: Record<string, string> = { POSITION_JUMP: "กรอข้าม/เร่งความเร็ว", POSITION_OUT_OF_RANGE: "ตำแหน่งเกินความยาวคลิป" };
+const REASONS: Record<string, string> = { POSITION_JUMP: "กรอข้าม / เร่งความเร็ว", POSITION_OUT_OF_RANGE: "ตำแหน่งเกินความยาวคลิป" };
 
 export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") redirect("/");
-  const { courses, flags, topFlagged } = await adminOverview();
+  const { courses, flags, topFlagged, stats } = await adminOverview();
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
-      <PageTitle>ผู้ดูแลระบบ</PageTitle>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <h2 className="mb-3 font-semibold">จัดการผู้ใช้</h2>
-          <UserAdminForm />
-        </Card>
-        <Card>
-          <h2 className="mb-3 font-semibold">เพิกถอนใบรับรอง</h2>
-          <RevokeCertificateForm />
-        </Card>
+    <>
+      <PageHeader title="ภาพรวมระบบ" description="ดูแลหลักสูตร ผู้ใช้ ใบรับรอง และพฤติกรรมผิดปกติ" />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard index={0} label="ผู้ใช้ทั้งหมด" value={stats.users} unit="คน" icon={<Users />} />
+        <StatCard index={1} label="หลักสูตรที่เผยแพร่" value={stats.publishedCourses} unit="หลักสูตร" icon={<BookOpen />} />
+        <StatCard index={2} label="การลงทะเบียน" value={stats.enrollments} unit="ครั้ง" icon={<GraduationCap />} />
+        <StatCard index={3} label="ใบรับรองที่ใช้งานได้" value={stats.certificates} unit="ใบ" icon={<Award />} />
+        <StatCard index={4} label="พฤติกรรมผิดปกติ (7 วัน)" value={stats.flags7d} unit="ครั้ง" icon={<Flag />} />
       </div>
 
-      <Card flush>
-        <h2 className="border-b border-stone-100 px-5 py-3 font-semibold">หลักสูตรทั้งหมด</h2>
-        <ul className="divide-y divide-stone-100">
-          {courses.map((c) => (
-            <li key={c.id} className="flex flex-wrap items-center gap-2 px-5 py-3 text-sm">
-              <Link href={`/courses/${c.slug}`} className="mr-auto hover:underline">
-                {c.title}
-              </Link>
-              <span className="text-xs text-stone-500">{c.instructor_email}</span>
-              <Badge tone={c.visibility === "suspended" ? "red" : c.visibility === "published" ? "green" : "gray"}>{c.visibility}</Badge>
-              {c.is_verified_course && <Badge tone="green">Verified</Badge>}
-              <CourseAdminControls courseId={c.id} visibility={c.visibility} verified={c.is_verified_course} />
-            </li>
-          ))}
-        </ul>
-      </Card>
+      <Tabs defaultValue="courses" className="mt-8">
+        <TabsList className="max-w-full overflow-x-auto">
+          <TabsTrigger value="courses">หลักสูตร ({courses.length})</TabsTrigger>
+          <TabsTrigger value="flags">พฤติกรรมผิดปกติ</TabsTrigger>
+          <TabsTrigger value="users">ผู้ใช้</TabsTrigger>
+          <TabsTrigger value="certs">ใบรับรอง</TabsTrigger>
+        </TabsList>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <Card flush>
-          <h2 className="border-b border-stone-100 px-5 py-3 font-semibold">พฤติกรรมผิดปกติล่าสุด</h2>
-          {flags.length === 0 ? (
-            <p className="px-5 py-4 text-sm text-stone-600">ไม่พบ</p>
+        <TabsContent value="courses" className="mt-4">
+          {courses.length === 0 ? (
+            <EmptyState icon={<BookOpen className="h-5 w-5" />} title="ยังไม่มีหลักสูตร" />
           ) : (
-            <ul className="divide-y divide-stone-100 text-sm">
-              {flags.map((f) => (
-                <li key={String(f.id)} className="flex flex-wrap gap-x-3 px-5 py-2">
-                  <span className="text-stone-500">{new Date(f.created_at).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}</span>
-                  <span>{f.email}</span>
-                  <Badge tone="amber">{REASONS[f.reason] ?? f.reason}</Badge>
-                  <span className="text-stone-600">{f.lesson_title}</span>
-                </li>
-              ))}
-            </ul>
+            <Table className="[&_td]:py-2">
+              <thead>
+                <tr>
+                  <th>หลักสูตร</th>
+                  <th>ผู้สอน</th>
+                  <th>สถานะ</th>
+                  <th className="w-12" />
+                </tr>
+              </thead>
+              <tbody>
+                {courses.map((c) => {
+                  const vis = VISIBILITY[c.visibility];
+                  return (
+                    <tr key={c.id}>
+                      <td>
+                        <Link href={`/courses/${c.slug}`} className="inline-flex max-w-sm items-center gap-1.5 font-medium hover:underline">
+                          <span className="truncate">{c.title}</span>
+                          {c.is_verified_course && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-success" aria-label="Verified" />}
+                        </Link>
+                      </td>
+                      <td className="text-muted-foreground">{c.instructor_email}</td>
+                      <td>
+                        <Badge variant={vis?.variant ?? "secondary"}>{vis?.label ?? c.visibility}</Badge>
+                      </td>
+                      <td className="text-right">
+                        <CourseAdminControls courseId={c.id} title={c.title} visibility={c.visibility} verified={c.is_verified_course} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
           )}
-        </Card>
-        <Card>
-          <h2 className="mb-3 font-semibold">ผู้ใช้ที่ถูก flag บ่อย (30 วัน)</h2>
-          <ul className="space-y-1 text-sm">
-            {topFlagged.map((u) => (
-              <li key={u.id} className="flex justify-between">
-                <span className="truncate">{u.email}</span>
-                <span className="font-medium">{u.n}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
-    </main>
+        </TabsContent>
+
+        <TabsContent value="flags" className="mt-4">
+          <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
+            {flags.length === 0 ? (
+              <EmptyState icon={<ShieldAlert className="h-5 w-5" />} title="ไม่พบพฤติกรรมผิดปกติ" description="ระบบจะบันทึกเมื่อพบการกรอข้ามหรือเร่งความเร็ววิดีโอ" />
+            ) : (
+              <Table>
+                <thead>
+                  <tr>
+                    <th>เวลา</th>
+                    <th>ผู้ใช้</th>
+                    <th>ประเภท</th>
+                    <th>บทเรียน</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {flags.map((f) => (
+                    <tr key={String(f.id)}>
+                      <td className="text-muted-foreground">{formatDateTimeTh(f.created_at)}</td>
+                      <td>{f.email}</td>
+                      <td>
+                        <Badge variant="warning">{REASONS[f.reason] ?? f.reason}</Badge>
+                      </td>
+                      <td className="max-w-xs truncate text-muted-foreground">{f.lesson_title}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+            <Card className="self-start p-5">
+              <h3 className="font-semibold">ผู้ใช้ที่ถูก flag บ่อย</h3>
+              <p className="mb-4 text-xs text-muted-foreground">30 วันล่าสุด</p>
+              {topFlagged.length === 0 ? (
+                <p className="text-sm text-muted-foreground">ไม่มีข้อมูล</p>
+              ) : (
+                <ol className="grid gap-2.5">
+                  {topFlagged.map((u, i) => (
+                    <li key={u.id} className="flex items-center gap-3 text-sm">
+                      <span className="w-4 text-xs tabular-nums text-muted-foreground">{i + 1}</span>
+                      <span className="min-w-0 flex-1 truncate">{u.email}</span>
+                      <Badge variant={u.n >= 10 ? "destructive" : "secondary"} className="tabular-nums">
+                        {u.n}
+                      </Badge>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="users" className="mt-4">
+          <Card className="max-w-xl p-6">
+            <div className="mb-5 flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <UserCog className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="font-semibold">เปลี่ยนบทบาทหรือสถานะผู้ใช้</h3>
+                <p className="text-sm text-muted-foreground">ทุกการเปลี่ยนแปลงจะบันทึกใน audit log และผู้ใช้จะถูกออกจากระบบ</p>
+              </div>
+            </div>
+            <UserAdminForm />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="certs" className="mt-4">
+          <Card className="max-w-xl p-6">
+            <div className="mb-5 flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                <Ban className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="font-semibold">เพิกถอนใบรับรอง</h3>
+                <p className="text-sm text-muted-foreground">ใช้เมื่อพบการทุจริต หน้าตรวจสอบสาธารณะจะแสดงสถานะถูกเพิกถอนพร้อมเหตุผล</p>
+              </div>
+            </div>
+            <RevokeCertificateForm />
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </>
   );
 }
