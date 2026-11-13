@@ -61,10 +61,10 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
     const f = new FormData(e.currentTarget);
     s.setBusy(true);
     setError(null);
-    const r = await api("/api/auth/login", { body: { email: f.get("email"), password: f.get("password") } });
+    const r = await api<{ redirectTo: string }>("/api/auth/login", { body: { email: f.get("email"), password: f.get("password") } });
     if (r.ok) {
-      await runScene({ icon: <LoginIcon play={1} />, title: "เข้าสู่ระบบสำเร็จ", subtitle: "กำลังพาไปยังแดชบอร์ด" }, 1100);
-      router.push("/");
+      await runScene({ icon: <LoginIcon play={1} />, title: "เข้าสู่ระบบสำเร็จ", subtitle: r.data.redirectTo === "/admin" ? "กำลังพาไปยังระบบจัดการ" : "กำลังพาไปยังแดชบอร์ด" }, 1100);
+      router.replace(r.data.redirectTo);
       router.refresh();
       return;
     }

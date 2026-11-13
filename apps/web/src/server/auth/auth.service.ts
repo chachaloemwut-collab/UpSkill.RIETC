@@ -95,7 +95,7 @@ export async function verifyEmail(token: string): Promise<void> {
   });
 }
 
-export async function login(input: { email: string; password: string }, meta: Meta): Promise<void> {
+export async function login(input: { email: string; password: string }, meta: Meta): Promise<{ redirectTo: string }> {
   const { db } = ctx();
   const identifier = input.email.trim().toLowerCase();
   let query = db
@@ -111,7 +111,8 @@ export async function login(input: { email: string; password: string }, meta: Me
   }
   // Only reveal these after the password was proven correct
   if (user.status !== "active") throw new HttpError(403, "ACCOUNT_DISABLED");
-  if (!user.email_verified_at) throw new HttpError(403, "EMAIL_NOT_VERIFIED");
+  // The protected owner account is username-only and never depends on an email workflow.
+  if (!user.is_system_owner && !user.email_verified_at) throw new HttpError(403, "EMAIL_NOT_VERIFIED");
 
   await createSession(user.id, meta);
   await audit(db, {
@@ -121,6 +122,7 @@ export async function login(input: { email: string; password: string }, meta: Me
     userAgent: meta.userAgent,
     details: { method: user.is_system_owner ? "system_owner_password" : "password" },
   });
+  return { redirectTo: user.is_system_owner ? "/admin" : "/" };
 }
 
 export async function forgotPassword(emailRaw: string): Promise<void> {

@@ -7,7 +7,8 @@ import { getCurrentUser } from "@/server/auth/session";
 export const metadata: Metadata = { title: "เข้าสู่ระบบ" };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  if (await getCurrentUser()) redirect("/");
+  const current = await getCurrentUser();
+  if (current) redirect(current.isSystemOwner ? "/admin" : "/");
   const { error } = await searchParams;
   return (
     <>

@@ -21,7 +21,6 @@ export const POST = route<typeof Body>(
     ],
   },
   async ({ body, ip, userAgent }) => {
-    await login(body, { ip, userAgent });
-    return { ok: true };
+    return { ok: true, ...(await login(body, { ip, userAgent })) };
   },
 );

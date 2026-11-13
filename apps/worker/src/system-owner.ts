@@ -1,13 +1,13 @@
 import type { Database } from "@upskill/db";
 import type { Env } from "@upskill/infra/env";
-import { hashPassword } from "@upskill/infra/password";
+import { hashPassword, verifyPassword } from "@upskill/infra/password";
 import { logger } from "@upskill/infra/logger";
 
 const INTERNAL_OWNER_EMAIL = "system-owner@internal.invalid";
 
 /**
  * Creates the one protected owner account when its bootstrap password is set.
- * Existing owner passwords are never overwritten during a restart.
+ * The deployment secret is the source of truth for this username-only account.
  */
 export async function ensureSystemOwner(db: Database, env: Env): Promise<void> {
   if (!env.SYSTEM_OWNER_PASSWORD) {
@@ -15,9 +15,16 @@ export async function ensureSystemOwner(db: Database, env: Env): Promise<void> {
     return;
   }
 
-  const owner = await db.selectFrom("users").select(["id", "username", "is_system_owner"]).where("is_system_owner", "=", true).executeTakeFirst();
+  const owner = await db.selectFrom("users").select(["id", "username", "is_system_owner", "password_hash"]).where("is_system_owner", "=", true).executeTakeFirst();
   if (owner) {
     if (owner.username !== env.SYSTEM_OWNER_USERNAME) throw new Error("Configured system owner username does not match the protected account");
+    if (!(await verifyPassword(owner.password_hash, env.SYSTEM_OWNER_PASSWORD))) {
+      await db.transaction().execute(async (trx) => {
+        await trx.updateTable("users").set({ password_hash: await hashPassword(env.SYSTEM_OWNER_PASSWORD!), password_updated_at: new Date() }).where("id", "=", owner.id).execute();
+        await trx.updateTable("user_sessions").set({ revoked_at: new Date(), revoked_reason: "system_owner_secret_rotated" }).where("user_id", "=", owner.id).where("revoked_at", "is", null).execute();
+      });
+      logger.info("protected system owner password was synchronized from deployment secrets");
+    }
     return;
   }
 
