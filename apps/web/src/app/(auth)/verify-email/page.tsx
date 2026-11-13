@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { Alert, Card, PageTitle } from "@/components/ui";
-import { VerifyEmailButton } from "@/components/auth/AuthForms";
+import { Alert } from "@/components/ui";
+import { AuthHeading, VerifyEmailButton } from "@/components/auth/AuthForms";
 
 export const metadata: Metadata = { title: "ยืนยันอีเมล", referrer: "no-referrer", robots: { index: false } };
 
@@ -8,9 +8,13 @@ export const metadata: Metadata = { title: "ยืนยันอีเมล", 
 export default async function VerifyEmailPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
   const { token } = await searchParams;
   return (
-    <Card>
-      <PageTitle>ยืนยันอีเมล</PageTitle>
-      {token && /^[A-Za-z0-9_-]{40,64}$/.test(token) ? <VerifyEmailButton token={token} /> : <Alert tone="error">ลิงก์ไม่ถูกต้อง</Alert>}
-    </Card>
+    <>
+      <AuthHeading title="ยืนยันอีเมล" description="กดปุ่มด้านล่างเพื่อยืนยันว่าอีเมลนี้เป็นของคุณ" />
+      {token && /^[A-Za-z0-9_-]{40,64}$/.test(token) ? (
+        <VerifyEmailButton token={token} />
+      ) : (
+        <Alert variant="destructive" title="ลิงก์ไม่ถูกต้อง">ลิงก์อาจหมดอายุแล้ว ลองเข้าสู่ระบบเพื่อขอลิงก์ใหม่</Alert>
+      )}
+    </>
   );
 }

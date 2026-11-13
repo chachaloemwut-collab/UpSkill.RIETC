@@ -1,34 +1,39 @@
 "use client";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { LogIn } from "lucide-react";
 import { api } from "@/lib/api";
-import { Alert, Button } from "@/components/ui";
+import { Button, buttonClass, confettiFrom, useToast } from "@/components/ui";
 
 export function EnrollButton({ courseId, loggedIn }: { courseId: string; loggedIn: boolean }) {
   const router = useRouter();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   if (!loggedIn)
     return (
-      <a href="/login" className="inline-flex rounded-lg bg-green-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-800">
-        เข้าสู่ระบบเพื่อลงทะเบียนเรียน
-      </a>
+      <Link href="/login" className={buttonClass("default", "lg", "w-full")}>
+        <LogIn className="h-4 w-4" /> เข้าสู่ระบบเพื่อลงทะเบียนเรียน
+      </Link>
     );
   return (
-    <div className="space-y-2">
-      {error && <Alert tone="error">{error}</Alert>}
-      <Button
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true);
-          const r = await api(`/api/courses/${courseId}/enroll`, { method: "POST" });
-          setBusy(false);
-          if (r.ok) router.refresh();
-          else setError(r.message);
-        }}
-      >
-        ลงทะเบียนเรียน (ฟรี)
-      </Button>
-    </div>
+    <Button
+      size="lg"
+      className="w-full"
+      loading={busy}
+      onClick={async (e) => {
+        const el = e.currentTarget;
+        setBusy(true);
+        const r = await api(`/api/courses/${courseId}/enroll`, { method: "POST" });
+        setBusy(false);
+        if (r.ok) {
+          confettiFrom(el, { count: 60 });
+          toast({ title: "ลงทะเบียนเรียนแล้ว", description: "เริ่มเรียนบทแรกได้เลย", variant: "success" });
+          router.refresh();
+        } else toast({ title: "ลงทะเบียนไม่สำเร็จ", description: r.message, variant: "destructive" });
+      }}
+    >
+      ลงทะเบียนเรียน (ฟรี)
+    </Button>
   );
 }

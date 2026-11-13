@@ -1,0 +1,18 @@
+import type { Metadata } from "next";
+import { PageHeader } from "@/components/common/PageHeader";
+import { CourseCatalog } from "@/components/course/CourseCatalog";
+import { listPublishedCourses } from "@/server/courses/courses.service";
+
+export const metadata: Metadata = { title: "คลังหลักสูตร" };
+export const dynamic = "force-dynamic";
+
+export default async function CoursesPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const { q } = await searchParams;
+  const courses = await listPublishedCourses();
+  return (
+    <>
+      <PageHeader title="คลังหลักสูตร" description={`หลักสูตรที่เปิดให้เรียนฟรี ${courses.length.toLocaleString("th-TH")} หลักสูตร · ดูวิดีโอ ทำแบบทดสอบ รับใบรับรอง`} />
+      <CourseCatalog courses={courses} initialQuery={typeof q === "string" ? q.slice(0, 100) : ""} />
+    </>
+  );
+}

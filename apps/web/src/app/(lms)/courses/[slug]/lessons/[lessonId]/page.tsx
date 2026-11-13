@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Alert, Card } from "@/components/ui";
+import { ArrowLeft, ArrowRight, ChevronRight, Lock, TriangleAlert } from "lucide-react";
+import { Card, Progress, buttonClass } from "@/components/ui";
 import { LessonList } from "@/components/course/LessonList";
 import { LessonPlayer } from "@/components/learning/LessonPlayer";
+import { formatDuration } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { getCourseForViewer } from "@/server/courses/courses.service";
 
@@ -20,21 +22,19 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
   if (!data.enrollment) redirect(`/courses/${slug}`);
 
   const idx = data.lessons.indexOf(lesson);
+  const prevLesson = data.lessons[idx - 1];
   const nextLesson = data.lessons[idx + 1];
+  const done = data.lessons.filter((l) => l.completed).length;
+  const progress = Math.round((done / data.lessons.length) * 100);
 
   return (
-    // Mobile: the player is a direct child of <main> so it stays stuck to the top while the details
-    // and lesson list scroll underneath (spec 7.3). Desktop: two-column grid.
-    <main className="mx-auto max-w-6xl lg:grid lg:grid-cols-[1fr_360px] lg:gap-x-6 lg:px-4 lg:py-6">
-      <div className="sticky top-0 z-20 bg-black lg:static lg:col-start-1 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-stone-200">
+    <div className="lg:grid lg:grid-cols-[1fr_340px] lg:gap-6">
+      {/* Mobile: the player is sticky under the top bar while the details and lesson list scroll underneath (spec 7.3) */}
+      <div className="sticky top-14 z-20 -mx-4 -mt-4 bg-black sm:-mx-6 sm:-mt-6 lg:static lg:col-start-1 lg:m-0 lg:overflow-hidden lg:rounded-lg lg:border">
         {!lesson.unlocked ? (
-          <div className="bg-stone-50 p-4">
-            <Alert tone="warning">กรุณาเรียนบทก่อนหน้าให้ครบก่อน</Alert>
-          </div>
+          <LockedNotice icon={<Lock className="h-6 w-6" />} title="บทนี้ยังล็อกอยู่" text="กรุณาเรียนบทก่อนหน้าให้ครบก่อน" />
         ) : lesson.broken ? (
-          <div className="bg-stone-50 p-4">
-            <Alert tone="error">วิดีโอบทนี้ใช้งานไม่ได้ชั่วคราว ระบบแจ้งผู้สอนแล้ว</Alert>
-          </div>
+          <LockedNotice icon={<TriangleAlert className="h-6 w-6" />} title="วิดีโอบทนี้ใช้งานไม่ได้ชั่วคราว" text="ระบบแจ้งผู้สอนแล้ว" />
         ) : (
           <LessonPlayer
             lessonId={lesson.id}
@@ -46,31 +46,66 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
           />
         )}
       </div>
-      <div className="space-y-3 p-4 lg:col-start-1 lg:px-0">
-        <p className="text-sm text-stone-500">
-          <Link href={`/courses/${slug}`} className="underline">
+
+      <div className="grid gap-4 py-5 lg:col-start-1 lg:pb-0">
+        <nav aria-label="breadcrumb" className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Link href={`/courses/${slug}`} className="truncate transition-colors hover:text-foreground">
             {data.course.title}
-          </Link>{" "}
-          · บทที่ {lesson.order}
-        </p>
-        <h1 className="text-xl font-bold">{lesson.title}</h1>
-        {lesson.completed && nextLesson && (
-          <Link href={`/courses/${slug}/lessons/${nextLesson.id}`} className="inline-block rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white">
-            บทถัดไป: {nextLesson.title} →
           </Link>
-        )}
-        {lesson.completed && !nextLesson && data.allLessonsCompleted && (
-          <Link href={`/courses/${slug}/quiz`} className="inline-block rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white">
-            ทำแบบทดสอบท้ายหลักสูตร →
-          </Link>
-        )}
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+          <span className="shrink-0">บทที่ {lesson.order}</span>
+        </nav>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{lesson.title}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            ความยาว {formatDuration(lesson.durationSec)} · ต้องดูอย่างน้อย {data.course.min_watch_percentage}%
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {prevLesson && (
+            <Link href={`/courses/${slug}/lessons/${prevLesson.id}`} className={buttonClass("outline")}>
+              <ArrowLeft className="h-4 w-4" /> บทก่อนหน้า
+            </Link>
+          )}
+          {nextLesson && (lesson.completed || nextLesson.unlocked) && !nextLesson.broken && (
+            <Link href={`/courses/${slug}/lessons/${nextLesson.id}`} className={buttonClass(lesson.completed ? "default" : "outline")}>
+              บทถัดไป <ArrowRight className="h-4 w-4" />
+            </Link>
+          )}
+          {!nextLesson && data.allLessonsCompleted && (
+            <Link href={`/courses/${slug}/quiz`} className={buttonClass("default")}>
+              ทำแบบทดสอบท้ายหลักสูตร <ArrowRight className="h-4 w-4" />
+            </Link>
+          )}
+        </div>
       </div>
-      <aside className="px-4 pb-8 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:px-0 lg:pb-0">
-        <Card flush>
-          <h2 className="border-b border-stone-100 px-4 py-3 font-semibold">บทเรียนทั้งหมด</h2>
-          <LessonList slug={slug} lessons={data.lessons} enrolled activeId={lesson.id} />
+
+      <aside className="pb-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pb-0">
+        <Card className="lg:sticky lg:top-20">
+          <div className="grid gap-2 border-b px-4 py-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">บทเรียนทั้งหมด</h2>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {done}/{data.lessons.length} บท
+              </span>
+            </div>
+            <Progress value={progress} />
+          </div>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <LessonList slug={slug} lessons={data.lessons} enrolled activeId={lesson.id} />
+          </div>
         </Card>
       </aside>
-    </main>
+    </div>
+  );
+}
+
+function LockedNotice({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
+  return (
+    <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-muted p-6 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-background text-muted-foreground">{icon}</span>
+      <p className="font-medium">{title}</p>
+      <p className="text-sm text-muted-foreground">{text}</p>
+    </div>
   );
 }

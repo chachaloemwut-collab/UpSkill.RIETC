@@ -8,6 +8,9 @@
  */
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Maximize, Minimize } from "lucide-react";
+import { PlayPauseIcon, useToast } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { HEARTBEAT } from "@upskill/core/heartbeat";
 import { REPORTABLE_PLAYER_ERRORS } from "@upskill/core/youtube";
 import { loadYouTubeIframeApi, YT_STATE, type YTPlayer } from "./youtube-iframe-api";
@@ -54,7 +57,8 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
   const [status, setStatus] = useState<Status>(initiallyCompleted ? { kind: "completed" } : { kind: "idle" });
   const [position, setPosition] = useState(0);
   const [maxWatched, setMaxWatched] = useState(initialMaxWatchedSec);
-  const [toast, setToast] = useState<string | null>(null);
+  const toast = useToast();
+  const [playing, setPlaying] = useState(false);
   const [pseudoFullscreen, setPseudoFullscreen] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -127,13 +131,14 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
             setReady(true);
           },
           onStateChange: async (e) => {
+            setPlaying(e.data === YT_STATE.PLAYING);
             if (e.data === YT_STATE.PLAYING) {
               if (!tokenRef.current) {
                 try {
                   await startSession();
                 } catch {
                   e.target.pauseVideo();
-                  setToast("ไม่สามารถเริ่มบันทึกเวลาเรียนได้");
+                  toast({ title: "ไม่สามารถเริ่มบันทึกเวลาเรียนได้", description: "กรุณาลองใหม่อีกครั้ง", variant: "destructive" });
                   return;
                 }
               }
@@ -163,7 +168,7 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
       created?.destroy();
       playerRef.current = null;
     };
-  }, [videoId, lessonId, startSession, sendHeartbeat, minWatchPercentage]);
+  }, [videoId, lessonId, startSession, sendHeartbeat, minWatchPercentage, toast]);
 
   // Heartbeat every 10s while PLAYING + update the progress bar
   useEffect(() => {
@@ -193,8 +198,7 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
     const p = playerRef.current;
     if (!p) return;
     if (targetSec > maxWatchedRef.current + HEARTBEAT.POSITION_TOLERANCE_SEC) {
-      setToast("ไม่สามารถกรอข้ามเนื้อหาที่ยังไม่เคยรับชมได้");
-      setTimeout(() => setToast(null), 2500);
+      toast({ title: "ไม่สามารถกรอข้ามเนื้อหาที่ยังไม่เคยรับชมได้", description: "กรอย้อนกลับไปดูส่วนที่ดูแล้วได้ตามต้องการ" });
       return;
     }
     p.seekTo(targetSec, true);
@@ -217,23 +221,21 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
   };
 
   const pct = (s: number) => `${Math.min(100, (s / durationSec) * 100)}%`;
+  const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
   return (
     <div className="bg-black">
-      <div
-        ref={containerRef}
-        className={pseudoFullscreen ? "fixed inset-0 z-50 flex flex-col bg-black" : "relative"}
-      >
+      <div ref={containerRef} className={pseudoFullscreen ? "fixed inset-0 z-50 flex flex-col justify-center bg-black" : "relative"}>
         <div className="relative aspect-video w-full">
           <div ref={hostRef} className="absolute inset-0 h-full w-full" />
         </div>
 
-        <div className="flex items-center gap-3 bg-neutral-900 px-3 py-2 text-white">
+        <div className="flex items-center gap-3 bg-zinc-950 px-3 py-2 text-white">
           <button
             type="button"
             disabled={!ready}
-            aria-label={ready ? "เล่น/หยุด" : "กำลังโหลดวิดีโอ"}
-            className="rounded px-2 py-1 hover:bg-white/10 disabled:opacity-40"
+            aria-label={!ready ? "กำลังโหลดวิดีโอ" : playing ? "หยุดชั่วคราว" : "เล่น"}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-[background-color,scale] hover:bg-white/10 active:scale-90 disabled:opacity-40"
             onClick={() => {
               const p = playerRef.current;
               if (!p) return;
@@ -241,9 +243,10 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
               else p.playVideo();
             }}
           >
-            ⏯
+            <PlayPauseIcon playing={playing} className="h-5 w-5" />
           </button>
 
+          <span className="hidden w-12 shrink-0 text-right text-xs tabular-nums text-white/70 sm:block">{clock(position)}</span>
           <div
             role="slider"
             aria-label="ตำแหน่งวิดีโอ"
@@ -251,46 +254,61 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
             aria-valuemax={durationSec}
             aria-valuenow={Math.floor(position)}
             tabIndex={0}
-            className="relative h-2 flex-1 cursor-pointer rounded bg-white/20"
+            className="group relative h-1.5 flex-1 cursor-pointer rounded-full bg-white/20 transition-[height] hover:h-2.5"
             onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect();
               seek(((e.clientX - r.left) / r.width) * durationSec);
             }}
           >
-            <div className="absolute inset-y-0 left-0 rounded bg-green-500/60" style={{ width: pct(maxWatched) }} />
-            <div className="absolute inset-y-0 left-0 rounded bg-white" style={{ width: pct(position) }} />
+            {/* lighter band = how far you may seek (already watched) */}
+            <div className="absolute inset-y-0 left-0 rounded-full bg-white/35" style={{ width: pct(maxWatched) }} />
+            <div className="absolute inset-y-0 left-0 rounded-full bg-white" style={{ width: pct(position) }} />
           </div>
+          <span className="hidden w-12 shrink-0 text-xs tabular-nums text-white/70 sm:block">{clock(durationSec)}</span>
 
-          <button type="button" className="rounded px-2 py-1 hover:bg-white/10" onClick={toggleFullscreen} aria-label="เต็มจอ">
-            ⛶
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-[background-color,scale] hover:bg-white/10 active:scale-90"
+            onClick={toggleFullscreen}
+            aria-label="เต็มจอ"
+          >
+            {pseudoFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
       <StatusBar status={status} />
-      {toast && (
-        <div role="status" className="fixed inset-x-4 bottom-4 z-50 rounded-lg bg-neutral-900 px-4 py-3 text-center text-sm text-white">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }
 
+const STATUS_TONE = {
+  idle: "bg-muted-foreground/50",
+  recording: "bg-success",
+  paused: "bg-warning",
+  superseded: "bg-destructive",
+  offline: "bg-warning",
+  broken: "bg-destructive",
+  completed: "bg-success",
+} as const;
+
 function StatusBar({ status }: { status: Status }) {
-  const map: Record<Status["kind"], [string, string]> = {
-    idle: ["⚪", "กดเล่นเพื่อเริ่มบันทึกเวลาเรียน"],
-    recording: ["🟢", status.kind === "recording" ? `กำลังบันทึกเวลาเรียนปกติ (ดูแล้ว ${status.watchedPercent}% / เกณฑ์ผ่าน ${status.minPercent}%)` : ""],
-    paused: ["🟡", "หยุดเล่นชั่วคราว — กรุณากดเล่นต่อเพื่อเก็บเวลาเรียน"],
-    superseded: ["🔴", "ตรวจพบการเปิดเรียนในหน้าต่างอื่น — หน้าต่างนี้ถูกหยุดการนับเวลา"],
-    offline: ["🟠", "การเชื่อมต่อขาดหาย — ระบบจะบันทึกต่อเมื่อกลับมาออนไลน์"],
-    broken: ["🔴", "วิดีโอนี้ไม่พร้อมใช้งาน ระบบแจ้งผู้สอนแล้ว"],
-    completed: ["✅", "เรียนบทนี้ครบตามเกณฑ์แล้ว"],
+  const text: Record<Status["kind"], string> = {
+    idle: "กดเล่นเพื่อเริ่มบันทึกเวลาเรียน",
+    recording: status.kind === "recording" ? `กำลังบันทึกเวลาเรียน · ดูแล้ว ${status.watchedPercent}% (เกณฑ์ผ่าน ${status.minPercent}%)` : "",
+    paused: "หยุดเล่นชั่วคราว — กดเล่นต่อเพื่อเก็บเวลาเรียน",
+    superseded: "ตรวจพบการเปิดเรียนในหน้าต่างอื่น — หน้าต่างนี้หยุดนับเวลาแล้ว",
+    offline: "การเชื่อมต่อขาดหาย — ระบบจะบันทึกต่อเมื่อกลับมาออนไลน์",
+    broken: "วิดีโอนี้ไม่พร้อมใช้งาน ระบบแจ้งผู้สอนแล้ว",
+    completed: "เรียนบทนี้ครบตามเกณฑ์แล้ว",
   };
-  const [icon, text] = map[status.kind];
   return (
-    <p aria-live="polite" className="border-b bg-white px-3 py-2 text-sm text-neutral-700">
-      {icon} {text}
+    <p aria-live="polite" className="flex items-center gap-2.5 border-b bg-background px-4 py-2.5 text-sm text-foreground lg:border-b-0 lg:border-t">
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        {status.kind === "recording" && <span className="absolute inset-0 animate-ping rounded-full bg-success opacity-60" />}
+        <span className={cn("relative h-2.5 w-2.5 rounded-full", STATUS_TONE[status.kind])} />
+      </span>
+      {text[status.kind]}
     </p>
   );
 }

@@ -8,6 +8,7 @@
  *    the Origin check in http.ts instead.
  */
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { generateToken, hashToken } from "@upskill/core";
 import { isHttpsOrigin } from "@upskill/infra/env";
@@ -54,7 +55,8 @@ export async function createSession(userId: string, meta: { ip: string; userAgen
   });
 }
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+/** Memoized per server render: the layout, page and helpers share one session lookup. */
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const token = (await cookies()).get(cookieName())?.value;
   if (!token || token.length > 128) return null;
   const { db } = ctx();
@@ -86,7 +88,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     role: row.role as CurrentUser["role"],
     sessionCreatedAt: new Date(row.created_at),
   };
-}
+});
 
 /** Call on password change/reset, ban, or account takeover (spec 5.1 #2) */
 export async function revokeAllSessions(userId: string, reason: string, exceptSessionId?: string): Promise<void> {

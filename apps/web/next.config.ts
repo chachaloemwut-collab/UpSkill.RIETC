@@ -23,6 +23,8 @@ const config: NextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@upskill/core", "@upskill/infra", "@upskill/db"],
   serverExternalPackages: ["@node-rs/argon2", "pg"],
+  // Course covers are YouTube thumbnails, proxied through /_next/image so browsers never call Google for them
+  images: { remotePatterns: [{ protocol: "https", hostname: "i.ytimg.com", pathname: "/vi/**" }] },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
