@@ -9,7 +9,9 @@
     "./password": "./src/password.ts",
     "./logger": "./src/logger.ts",
     "./youtube-client": "./src/youtube-client.ts",
-    "./learning-lock": "./src/learning-lock.ts"
+    "./learning-lock": "./src/learning-lock.ts",
+    "./mailer": "./src/mailer.ts",
+    "./storage": "./src/storage.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -18,6 +20,7 @@
     "@node-rs/argon2": "2.2.2",
     "@upskill/core": "workspace:*",
     "ioredis": "6.0.0",
+    "nodemailer": "10.3.1",
     "pino": "10.4.0",
     "zod": "4.6.7"
   },

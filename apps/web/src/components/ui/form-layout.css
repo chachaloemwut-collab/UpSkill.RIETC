@@ -1,0 +1,68 @@
+/*
+ * Form layout — the few rules Tailwind utilities can't express cleanly: joined controls (which must beat each
+ * control's own rounded-md), floating labels (driven by :has / :placeholder-shown) and the save bar's spring.
+ * Colours come only from theme tokens, so dark mode and colour themes just work.
+ */
+
+/* ---------- Joined controls (FieldRow) ---------- */
+@layer components {
+  .fl-join { display: flex; align-items: stretch; min-width: 0; }
+  .fl-join > * { flex: 1 1 0%; min-width: 0; }
+  .fl-join > .fl-addon, .fl-join > [data-fl-fixed] { flex: none; }
+}
+/* Unlayered on purpose: these must override the controls' rounded-md / ring-offset utilities. */
+/* Depth 1 = the control itself; depth 2/3 = a control inside a wrapper (Select's own div, or a width div around it). */
+.fl-join > *,
+.fl-join > * > :is(input, select, textarea, button:not(.ss-clear)),
+.fl-join > * > * > :is(input, select, textarea, .vec-select) { border-radius: 0; --tw-ring-offset-width: 0px; }
+.fl-join > :first-child,
+.fl-join > :first-child > :is(input, select, textarea, button:not(.ss-clear)),
+.fl-join > :first-child > * > :is(input, select, textarea, .vec-select) { border-top-left-radius: var(--radius-md); border-bottom-left-radius: var(--radius-md); }
+.fl-join > :last-child,
+.fl-join > :last-child > :is(input, select, textarea, button:not(.ss-clear)),
+.fl-join > :last-child > * > :is(input, select, textarea, .vec-select) { border-top-right-radius: var(--radius-md); border-bottom-right-radius: var(--radius-md); }
+.fl-join > * + * { margin-left: -1px; }
+.fl-join > :focus-within, .fl-join > :focus-visible { position: relative; z-index: 1; }
+
+/* ---------- Compact density ---------- */
+.fl-dense .fl-field:not(.fl-float) .h-9 { height: 2rem; }
+.fl-dense .fl-field:not(.fl-float) :is(input, select, textarea, .vec-select) { font-size: 0.8125rem; }
+.fl-dense .fl-field:not(.fl-float) .w-9 { width: 2rem; }
+
+/* ---------- Floating labels ---------- */
+.fl-float { position: relative; }
+.fl-float > .fl-float-label {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.45rem;
+  z-index: 2;
+  max-width: calc((100% - 2.5rem) / 0.78);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  transform-origin: left top;
+  scale: 0.78;
+  translate: 0 0;
+  color: hsl(var(--muted-foreground));
+  transition: scale 450ms var(--ease-spring-snappy), translate 450ms var(--ease-spring-snappy), color 200ms;
+}
+.fl-float :is(input, select):not([type="checkbox"], [type="radio"]),
+.fl-float > * > button[aria-expanded] { height: 3.25rem; padding-top: 1.25rem; padding-bottom: 0.25rem; }
+.fl-float textarea { padding-top: 1.6rem; }
+/* Resting: an empty, unfocused text input shows its label where the placeholder would be. */
+.fl-float:has(input:placeholder-shown:not(:focus)) > .fl-float-label { scale: 1; translate: 0 0.55rem; }
+.fl-float input:not(:focus)::placeholder { color: transparent; }
+.fl-float:focus-within > .fl-float-label { color: hsl(var(--primary)); }
+.fl-float[data-invalid] > .fl-float-label { color: hsl(var(--destructive)); }
+
+/* ---------- Save bar ---------- */
+@keyframes fl-bar-in { from { opacity: 0; translate: 0 calc(100% + 1.25rem); scale: 0.94; } }
+@keyframes fl-bar-out { to { opacity: 0; translate: 0 calc(100% + 1.25rem); scale: 0.96; } }
+.fl-bar-in { animation: fl-bar-in 650ms var(--ease-spring-bouncy) both; }
+.fl-bar-out { animation: fl-bar-out 200ms ease-in forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-bar-in, .fl-bar-out { animation-duration: 1ms; }
+  .fl-float > .fl-float-label { transition: color 200ms; }
+}

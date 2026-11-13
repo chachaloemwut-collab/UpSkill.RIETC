@@ -10,10 +10,13 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { generateToken, hashToken } from "@upskill/core";
+import { isHttpsOrigin } from "@upskill/infra/env";
 import { ctx } from "../context";
 
-const IS_PROD = process.env.NODE_ENV === "production";
-export const SESSION_COOKIE = IS_PROD ? "__Host-sid" : "sid";
+/** __Host- requires Secure, so it is only used on https origins (plain http://localhost in dev gets "sid") */
+function cookieName(): string {
+  return isHttpsOrigin(ctx().env) ? "__Host-sid" : "sid";
+}
 const IDLE_MS = 7 * 24 * 3600_000;
 const ABSOLUTE_MS = 30 * 24 * 3600_000;
 const TOUCH_EVERY_MS = 5 * 60_000;
@@ -42,9 +45,9 @@ export async function createSession(userId: string, meta: { ip: string; userAgen
     })
     .execute();
 
-  (await cookies()).set(SESSION_COOKIE, token, {
+  (await cookies()).set(cookieName(), token, {
     httpOnly: true,
-    secure: IS_PROD,
+    secure: isHttpsOrigin(ctx().env),
     sameSite: "lax",
     path: "/",
     maxAge: ABSOLUTE_MS / 1000,
@@ -52,7 +55,7 @@ export async function createSession(userId: string, meta: { ip: string; userAgen
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(cookieName())?.value;
   if (!token || token.length > 128) return null;
   const { db } = ctx();
 
@@ -99,7 +102,7 @@ export async function revokeAllSessions(userId: string, reason: string, exceptSe
 
 export async function destroyCurrentSession(): Promise<void> {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+  const token = jar.get(cookieName())?.value;
   if (token) {
     await ctx()
       .db.updateTable("user_sessions")
@@ -107,5 +110,5 @@ export async function destroyCurrentSession(): Promise<void> {
       .where("token_hash", "=", hashToken(token))
       .execute();
   }
-  jar.delete(SESSION_COOKIE);
+  jar.delete(cookieName());
 }

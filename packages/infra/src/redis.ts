@@ -1,10 +1,10 @@
 import { Redis } from "ioredis";
 
-export function createRedis(url: string): Redis {
+/** BullMQ connections need maxRetriesPerRequest = null */
+export function createRedis(url: string, opts: { maxRetriesPerRequest?: number | null } = {}): Redis {
   return new Redis(url, {
-    maxRetriesPerRequest: 2,
+    maxRetriesPerRequest: opts.maxRetriesPerRequest === undefined ? 2 : opts.maxRetriesPerRequest,
     enableAutoPipelining: true,
-    lazyConnect: false,
   });
 }
 export type { Redis };

@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export function proxy(request: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
-  const isDev = process.env.NODE_ENV !== "production";
+  const isDev = process.env.NODE_ENV !== "production"; // Next dev server needs eval + websocket HMR
+  const isHttps = (process.env.APP_ORIGIN ?? "").startsWith("https://");
 
   const csp = [
     `default-src 'self'`,
@@ -18,7 +19,7 @@ export function proxy(request: NextRequest) {
     `object-src 'none'`,
     `base-uri 'self'`,
     `frame-ancestors 'none'`,
-    ...(isDev ? [] : ["upgrade-insecure-requests"]),
+    ...(isHttps ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
 
   const requestHeaders = new Headers(request.headers);

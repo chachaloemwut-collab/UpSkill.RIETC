@@ -1,0 +1,274 @@
+/**
+ * Instructor course management (spec 5.3). Every function starts with loadOwnedCourse():
+ * IDOR check `course.instructor_id === current_user.id` (admins may manage any course).
+ */
+import "server-only";
+import { randomBytes } from "node:crypto";
+import { extractYouTubeVideoId, type VideoValidation } from "@upskill/core";
+import { sql, type Tx } from "@upskill/db";
+import { fetchVideos } from "@upskill/infra/youtube-client";
+import { ctx } from "../context";
+import { HttpError } from "../http";
+import { audit } from "../audit";
+import type { CurrentUser } from "../auth/session";
+
+export const PUBLISH_RULES = { minTotalDurationSec: 600, minQuestions: 3 } as const;
+
+const YT_ERRORS: Record<Exclude<VideoValidation, { ok: true }>["reason"], string> = {
+  NOT_FOUND: "ไม่พบวิดีโอนี้บน YouTube",
+  NOT_EMBEDDABLE: "เจ้าของคลิปปิดการฝังวิดีโอ (embed) ไว้",
+  NOT_PUBLIC: "วิดีโอต้องเป็น Public หรือ Unlisted เท่านั้น",
+  LIVE_OR_UPCOMING: "ไม่รองรับไลฟ์สด",
+  AGE_RESTRICTED: "วิดีโอจำกัดอายุไม่สามารถฝังได้",
+  NOT_PROCESSED: "วิดีโอยังประมวลผลไม่เสร็จ",
+  BAD_DURATION: "อ่านความยาววิดีโอไม่ได้",
+};
+
+async function loadOwnedCourse(user: CurrentUser, courseId: string) {
+  const c = await ctx()
+    .db.selectFrom("courses")
+    .select(["id", "instructor_id", "visibility", "title"])
+    .where("id", "=", courseId)
+    .executeTakeFirst();
+  // 404 (not 403) so non-owners can't probe which course ids exist
+  if (!c || (c.instructor_id !== user.id && user.role !== "admin")) throw new HttpError(404, "NOT_FOUND");
+  return c;
+}
+
+function slugify(title: string): string {
+  const base = title
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  // Thai titles produce an empty ASCII slug: always add a random suffix for uniqueness
+  return `${base || "course"}-${randomBytes(3).toString("hex")}`;
+}
+
+export async function listMyCourses(user: CurrentUser) {
+  return ctx()
+    .db.selectFrom("courses as c")
+    .select([
+      "c.id", "c.slug", "c.title", "c.visibility", "c.total_duration_sec", "c.is_verified_course", "c.updated_at",
+      sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("lesson_count"),
+      sql<number>`(select count(*)::int from enrollments e where e.course_id = c.id)`.as("enrollment_count"),
+      sql<number>`(select count(*)::int from lessons l where l.course_id = c.id and l.video_status <> 'active')`.as("broken_count"),
+    ])
+    .where("c.instructor_id", "=", user.id)
+    .orderBy("c.updated_at", "desc")
+    .execute();
+}
+
+export async function getCourseForEditing(user: CurrentUser, courseId: string) {
+  await loadOwnedCourse(user, courseId);
+  const { db } = ctx();
+  const course = await db.selectFrom("courses").selectAll().where("id", "=", courseId).executeTakeFirstOrThrow();
+  const lessons = await db
+    .selectFrom("lessons")
+    .select(["id", "sequence_order", "title", "youtube_video_id", "duration_sec", "video_status"])
+    .where("course_id", "=", courseId)
+    .orderBy("sequence_order")
+    .execute();
+  // Includes the answer key: this view is for the course owner only
+  const questions = await db
+    .selectFrom("quiz_questions")
+    .select(["id", "question_text", "options", "correct_option_id"])
+    .where("course_id", "=", courseId)
+    .where("is_active", "=", true)
+    .orderBy("created_at")
+    .execute();
+  return { course, lessons, questions };
+}
+
+export async function createCourse(user: CurrentUser, input: { title: string; description?: string | undefined }) {
+  if (user.role !== "instructor" && user.role !== "admin") throw new HttpError(403, "FORBIDDEN");
+  const c = await ctx()
+    .db.insertInto("courses")
+    .values({ instructor_id: user.id, title: input.title.trim(), description: input.description?.trim() || null, slug: slugify(input.title) })
+    .returning(["id", "slug"])
+    .executeTakeFirstOrThrow();
+  return c;
+}
+
+export async function updateCourse(
+  user: CurrentUser,
+  courseId: string,
+  patch: Partial<{
+    title: string;
+    description: string | null;
+    min_watch_percentage: number;
+    passing_quiz_score: number;
+    is_sequential_locked: boolean;
+    max_quiz_attempts_per_day: number;
+    quiz_time_limit_sec: number;
+  }>,
+) {
+  await loadOwnedCourse(user, courseId);
+  if (Object.keys(patch).length === 0) return;
+  await ctx().db.updateTable("courses").set(patch).where("id", "=", courseId).execute();
+}
+
+async function lookupVideo(videoId: string, devDurationSec?: number): Promise<{ durationSec: number; title: string }> {
+  const { env } = ctx();
+  if (!env.YOUTUBE_API_KEY) {
+    // Development without a YouTube key: accept a manual duration. Never allowed in production (env requires the key).
+    if (env.APP_ENV !== "production" && devDurationSec) return { durationSec: devDurationSec, title: "" };
+    throw new HttpError(503, "YOUTUBE_NOT_CONFIGURED", "ยังไม่ได้ตั้งค่า YOUTUBE_API_KEY (dev: ระบุ dev_duration_sec)");
+  }
+  const result = (await fetchVideos(env.YOUTUBE_API_KEY, [videoId])).get(videoId);
+  if (!result?.ok) throw new HttpError(422, result?.reason ?? "NOT_FOUND", YT_ERRORS[result?.reason ?? "NOT_FOUND"]);
+  return { durationSec: result.durationSec, title: result.title };
+}
+
+async function recomputeDuration(trx: Tx, courseId: string) {
+  await trx
+    .updateTable("courses")
+    .set({ total_duration_sec: sql<number>`(select coalesce(sum(duration_sec), 0)::int from lessons where course_id = ${courseId})` })
+    .where("id", "=", courseId)
+    .execute();
+}
+
+export async function addLesson(user: CurrentUser, courseId: string, input: { url: string; title?: string | undefined; devDurationSec?: number | undefined }) {
+  await loadOwnedCourse(user, courseId);
+  const videoId = extractYouTubeVideoId(input.url);
+  if (!videoId) throw new HttpError(400, "INVALID_YOUTUBE_URL", "ลิงก์ YouTube ไม่ถูกต้อง");
+  const video = await lookupVideo(videoId, input.devDurationSec);
+  const title = (input.title?.trim() || video.title || "บทเรียน").slice(0, 255);
+
+  return ctx()
+    .db.transaction()
+    .execute(async (trx) => {
+      await trx.selectFrom("courses").select("id").where("id", "=", courseId).forUpdate().execute();
+      const next = await trx
+        .selectFrom("lessons")
+        .select(sql<number>`coalesce(max(sequence_order), 0)::int + 1`.as("n"))
+        .where("course_id", "=", courseId)
+        .executeTakeFirstOrThrow();
+      const lesson = await trx
+        .insertInto("lessons")
+        .values({ course_id: courseId, sequence_order: next.n, title, youtube_video_id: videoId, duration_sec: video.durationSec })
+        .returning(["id", "sequence_order", "duration_sec"])
+        .executeTakeFirstOrThrow();
+      await recomputeDuration(trx, courseId);
+      return lesson;
+    });
+}
+
+/** Fix a broken lesson by pointing it at a new video (spec 3.2 #2) */
+export async function replaceLessonVideo(user: CurrentUser, courseId: string, lessonId: string, input: { url: string; devDurationSec?: number | undefined }) {
+  await loadOwnedCourse(user, courseId);
+  const videoId = extractYouTubeVideoId(input.url);
+  if (!videoId) throw new HttpError(400, "INVALID_YOUTUBE_URL", "ลิงก์ YouTube ไม่ถูกต้อง");
+  const video = await lookupVideo(videoId, input.devDurationSec);
+
+  await ctx()
+    .db.transaction()
+    .execute(async (trx) => {
+      const res = await trx
+        .updateTable("lessons")
+        .set({ youtube_video_id: videoId, duration_sec: video.durationSec, video_status: "active", video_checked_at: new Date() })
+        .where("id", "=", lessonId)
+        .where("course_id", "=", courseId)
+        .executeTakeFirst();
+      if (Number(res.numUpdatedRows) === 0) throw new HttpError(404, "NOT_FOUND");
+      await trx
+        .updateTable("lesson_progress")
+        .set({ total_chunks_required: Math.ceil(video.durationSec / 10) })
+        .where("lesson_id", "=", lessonId)
+        .execute();
+      await trx.updateTable("video_reports").set({ resolved_at: new Date() }).where("lesson_id", "=", lessonId).where("resolved_at", "is", null).execute();
+      await recomputeDuration(trx, courseId);
+    });
+}
+
+export async function renameLesson(user: CurrentUser, courseId: string, lessonId: string, title: string) {
+  await loadOwnedCourse(user, courseId);
+  await ctx().db.updateTable("lessons").set({ title: title.trim() }).where("id", "=", lessonId).where("course_id", "=", courseId).execute();
+}
+
+export async function deleteLesson(user: CurrentUser, courseId: string, lessonId: string) {
+  const c = await loadOwnedCourse(user, courseId);
+  const { db } = ctx();
+  // Deleting a lesson after publishing would silently erase learners' progress
+  if (c.visibility !== "draft") {
+    const n = await db.selectFrom("enrollments").select(sql<number>`count(*)::int`.as("n")).where("course_id", "=", courseId).executeTakeFirstOrThrow();
+    if (n.n > 0) throw new HttpError(409, "COURSE_HAS_LEARNERS", "หลักสูตรมีผู้เรียนแล้ว ไม่สามารถลบบทเรียนได้ (เปลี่ยนวิดีโอแทนได้)");
+  }
+  await db.transaction().execute(async (trx) => {
+    const del = await trx.deleteFrom("lessons").where("id", "=", lessonId).where("course_id", "=", courseId).returning("sequence_order").executeTakeFirst();
+    if (!del) throw new HttpError(404, "NOT_FOUND");
+    await sql`SET CONSTRAINTS uq_lessons_order DEFERRED`.execute(trx);
+    await trx.updateTable("lessons").set({ sequence_order: sql<number>`sequence_order - 1` }).where("course_id", "=", courseId).where("sequence_order", ">", del.sequence_order).execute();
+    await recomputeDuration(trx, courseId);
+  });
+}
+
+export async function reorderLessons(user: CurrentUser, courseId: string, orderedIds: string[]) {
+  await loadOwnedCourse(user, courseId);
+  await ctx()
+    .db.transaction()
+    .execute(async (trx) => {
+      const existing = await trx.selectFrom("lessons").select("id").where("course_id", "=", courseId).forUpdate().execute();
+      const ids = new Set(existing.map((l) => l.id));
+      if (orderedIds.length !== ids.size || !orderedIds.every((id) => ids.has(id)) || new Set(orderedIds).size !== orderedIds.length) {
+        throw new HttpError(400, "ORDER_MISMATCH");
+      }
+      // Unique (course_id, sequence_order) is DEFERRABLE: swap freely, checked at commit
+      await sql`SET CONSTRAINTS uq_lessons_order DEFERRED`.execute(trx);
+      for (const [i, id] of orderedIds.entries()) {
+        await trx.updateTable("lessons").set({ sequence_order: i + 1 }).where("id", "=", id).execute();
+      }
+    });
+}
+
+export async function addQuestion(user: CurrentUser, courseId: string, input: { text: string; options: string[]; correctIndex: number }) {
+  await loadOwnedCourse(user, courseId);
+  if (input.correctIndex < 0 || input.correctIndex >= input.options.length) throw new HttpError(400, "BAD_CORRECT_INDEX");
+  const options = input.options.map((text, i) => ({ id: String.fromCharCode(97 + i), text: text.trim() }));
+  return ctx()
+    .db.insertInto("quiz_questions")
+    .values({ course_id: courseId, question_text: input.text.trim(), options: JSON.stringify(options), correct_option_id: options[input.correctIndex]!.id })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+}
+
+/** Soft delete: past attempts keep their snapshot */
+export async function removeQuestion(user: CurrentUser, courseId: string, questionId: string) {
+  await loadOwnedCourse(user, courseId);
+  await ctx().db.updateTable("quiz_questions").set({ is_active: false }).where("id", "=", questionId).where("course_id", "=", courseId).execute();
+}
+
+/** Spec 5.3 #2 anti-farming rules are checked here, before a course can be published */
+export async function setVisibility(user: CurrentUser, courseId: string, visibility: "draft" | "published" | "unlisted", meta: { ip: string }) {
+  const c = await loadOwnedCourse(user, courseId);
+  if (c.visibility === "suspended" && user.role !== "admin") throw new HttpError(403, "COURSE_SUSPENDED", "หลักสูตรถูกระงับโดยผู้ดูแลระบบ");
+  const { db } = ctx();
+
+  if (visibility !== "draft") {
+    const stats = await db
+      .selectFrom("courses as c")
+      .select([
+        "c.total_duration_sec",
+        sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("lessons"),
+        sql<number>`(select count(*)::int from lessons l where l.course_id = c.id and l.video_status <> 'active')`.as("broken"),
+        sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.is_active)`.as("questions"),
+      ])
+      .where("c.id", "=", courseId)
+      .executeTakeFirstOrThrow();
+    const problems: string[] = [];
+    if (stats.lessons === 0) problems.push("ต้องมีบทเรียนอย่างน้อย 1 บท");
+    if (stats.total_duration_sec < PUBLISH_RULES.minTotalDurationSec) problems.push("ความยาวรวมต้องอย่างน้อย 10 นาที");
+    if (stats.questions < PUBLISH_RULES.minQuestions) problems.push("ต้องมีข้อสอบอย่างน้อย 3 ข้อ");
+    if (stats.broken > 0) problems.push("มีวิดีโอที่ใช้งานไม่ได้");
+    if (problems.length) throw new HttpError(422, "PUBLISH_REQUIREMENTS_NOT_MET", problems.join(" · "));
+  }
+
+  await db
+    .updateTable("courses")
+    .set({ visibility, ...(visibility === "published" ? { published_at: sql<Date>`coalesce(published_at, now())` } : {}) })
+    .where("id", "=", courseId)
+    .execute();
+  if (visibility === "published") await audit(db, { action: "course.published", userId: user.id, entityType: "course", entityId: courseId, ip: meta.ip });
+}
+

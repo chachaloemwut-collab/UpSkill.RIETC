@@ -1,0 +1,351 @@
+/* VEC UI design tokens (vendored from the vec-day01 theme). Fonts are self-hosted by next/font (no Google CDN at runtime). */
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: var(--font-inter), var(--font-noto-thai), system-ui, sans-serif;
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-success: hsl(var(--success));
+  --color-warning: hsl(var(--warning));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  /*
+   * Spring easings, simulated from real damped springs (see Motion › Spring Physics in the docs) and sampled into
+   * CSS linear(). Motion leaves fast, eases off naturally and — for snappy/bouncy — overshoots a touch before settling.
+   *   smooth: damping 1.0,  settles in ~590ms, no overshoot  → sheets, layout, color, anything that must not wobble
+   *   snappy: damping 0.78, settles in ~500ms, ~2% overshoot → the default for UI movement (menus, indicators, presses)
+   *   bouncy: damping 0.58, settles in ~730ms, ~10% overshoot → playful entrances (badges, reactions, checkmarks)
+   * The curve shape is what matters; a shorter duration simply makes the same spring stiffer.
+   */
+  --ease-spring-smooth: linear(0, 0.0181, 0.0613, 0.1152, 0.1768, 0.2476, 0.3137, 0.3783, 0.4452, 0.5032, 0.557, 0.6105, 0.6553, 0.6958, 0.7351, 0.7675, 0.7963, 0.8239, 0.8463, 0.866, 0.8848, 0.8999, 0.9131, 0.9256, 0.9355, 0.9442, 0.9524, 0.9589, 0.9645, 0.9698, 0.9739, 0.9776, 0.9809, 0.9836, 0.9859, 0.988, 0.9897, 0.9912, 0.9925, 0.9936, 0.9945, 0.9953, 0.996, 0.9966, 0.9971, 0.9975, 0.9979, 0.9982, 1);
+  --ease-spring-snappy: linear(0, 0.0165, 0.0575, 0.1098, 0.1783, 0.2465, 0.3245, 0.3956, 0.465, 0.538, 0.6001, 0.6632, 0.7154, 0.7625, 0.8084, 0.8451, 0.88, 0.9072, 0.9325, 0.9517, 0.9677, 0.982, 0.9923, 1.0011, 1.0072, 1.0117, 1.0151, 1.0171, 1.0183, 1.0186, 1.0184, 1.0178, 1.0169, 1.0157, 1.0144, 1.013, 1.0116, 1.0103, 1.0089, 1.0078, 1.0066, 1.0056, 1.0046, 1.0038, 1.0031, 1.0024, 1.0019, 1.0014, 1);
+  --ease-spring-bouncy: linear(0, 0.0244, 0.0814, 0.168, 0.2646, 0.3689, 0.4752, 0.5857, 0.6828, 0.7713, 0.8494, 0.9206, 0.9756, 1.0196, 1.0533, 1.0776, 1.0943, 1.1028, 1.1053, 1.1032, 1.0971, 1.0887, 1.0786, 1.0677, 1.0558, 1.0448, 1.0345, 1.0251, 1.0167, 1.0091, 1.0032, 0.9984, 0.9947, 0.9919, 0.9902, 0.9892, 0.9889, 0.9891, 0.9897, 0.9906, 0.9916, 0.9927, 0.994, 0.9952, 0.9963, 0.9973, 0.9982, 0.999, 1);
+  --default-transition-duration: 320ms;
+  --default-transition-timing-function: var(--ease-spring-snappy);
+  --animate-fade-in: fade-in 0.3s var(--ease-spring-smooth);
+  --animate-zoom-in: zoom-in 0.45s var(--ease-spring-snappy);
+  --animate-slide-up: slide-up 0.5s var(--ease-spring-snappy);
+  --animate-slide-in-right: slide-in-right 0.5s var(--ease-spring-smooth);
+  --animate-slide-in-left: slide-in-left 0.5s var(--ease-spring-smooth);
+  --animate-slide-in-bottom: slide-in-bottom 0.5s var(--ease-spring-smooth);
+
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes zoom-in { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+  @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+  @keyframes slide-in-left { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+  @keyframes slide-in-bottom { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* exit animations (paired with usePresence) */
+  --animate-fade-out: fade-out 0.15s ease-in forwards;
+  --animate-zoom-out: zoom-out 0.15s ease-in forwards;
+  --animate-slide-down: slide-down 0.15s ease-in forwards;
+  --animate-slide-out-right: slide-out-right 0.2s ease-in forwards;
+  --animate-slide-out-left: slide-out-left 0.2s ease-in forwards;
+  --animate-slide-out-bottom: slide-out-bottom 0.2s ease-in forwards;
+  @keyframes fade-out { to { opacity: 0; } }
+  @keyframes zoom-out { to { opacity: 0; transform: scale(0.96); } }
+  @keyframes slide-down { to { opacity: 0; transform: translateY(8px); } }
+  @keyframes slide-out-right { to { transform: translateX(100%); } }
+  @keyframes slide-out-left { to { transform: translateX(-100%); } }
+  @keyframes slide-out-bottom { to { transform: translateY(100%); } }
+
+  /* feedback & playful motion */
+  --animate-pop: pop 0.45s var(--ease-spring-smooth);
+  --animate-spring-in: spring-in 0.7s var(--ease-spring-bouncy) both;
+  @keyframes spring-in { from { opacity: 0; transform: scale(0.4); } 30% { opacity: 1; } to { transform: scale(1); } }
+  --animate-burst: burst 0.6s ease-out forwards;
+  --animate-shimmer: shimmer 2.5s linear infinite;
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-wave: wave 1.2s ease-in-out infinite;
+  --animate-blink: blink 1s step-end infinite;
+  --animate-bar: bar 1s ease-in-out infinite;
+  --animate-ripple: ripple 0.6s ease-out forwards;
+  --animate-pop-sm: pop-sm 0.35s var(--ease-spring-smooth);
+  --animate-grow-y: grow-y 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-draw: draw 1.2s cubic-bezier(0.65, 0, 0.35, 1) both;
+  --animate-trace: trace 3s linear infinite;
+  --animate-wave-x: wave-x 2s linear infinite;
+  @keyframes trace { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+  @keyframes wave-x { to { transform: translateX(60px); } }
+  --animate-marquee: marquee 30s linear infinite;
+  @keyframes marquee { to { transform: translateX(-50%); } }
+  --animate-next: next 0.45s var(--ease-spring-snappy);
+  --animate-prev: prev 0.45s var(--ease-spring-snappy);
+  @keyframes pop-sm { 50% { transform: scale(1.12); } }
+  @keyframes grow-y { from { transform: scaleY(0); } }
+  @keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  @keyframes next { from { opacity: 0; transform: translateX(16px); } }
+  @keyframes prev { from { opacity: 0; transform: translateX(-16px); } }
+  @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  @keyframes burst { from { transform: translate(0, 0) scale(1); opacity: 1; } to { transform: translate(var(--x), var(--y)) scale(0); opacity: 0; } }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  @keyframes wave { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-0.35em); } }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes bar { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
+  @keyframes ripple { from { transform: scale(0); opacity: 0.35; } to { transform: scale(2.5); opacity: 0; } }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+    --primary: 240 6% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 71% 36%;
+    --warning: 32 95% 40%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 240 6% 10%;
+    --radius: 0.625rem;
+  }
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 6% 10%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 60% 45%;
+    --warning: 38 92% 55%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 240 5% 84%;
+  }
+
+  /* Color themes (set via data-theme on <html>). Only the brand tokens change; neutrals stay zinc. */
+  [data-theme="blue"] { --primary: 221 83% 53%; --primary-foreground: 0 0% 98%; --ring: 221 83% 53%; }
+  .dark[data-theme="blue"] { --primary: 217 91% 60%; --primary-foreground: 222 47% 11%; --ring: 217 91% 60%; }
+  [data-theme="violet"] { --primary: 262 83% 58%; --primary-foreground: 0 0% 98%; --ring: 262 83% 58%; }
+  .dark[data-theme="violet"] { --primary: 263 70% 65%; --primary-foreground: 260 40% 10%; --ring: 263 70% 65%; }
+  [data-theme="green"] { --primary: 142 71% 34%; --primary-foreground: 0 0% 98%; --ring: 142 71% 34%; }
+  .dark[data-theme="green"] { --primary: 142 65% 45%; --primary-foreground: 144 60% 8%; --ring: 142 65% 45%; }
+  [data-theme="orange"] { --primary: 24 95% 50%; --primary-foreground: 0 0% 98%; --ring: 24 95% 50%; }
+  .dark[data-theme="orange"] { --primary: 21 90% 55%; --primary-foreground: 20 60% 8%; --ring: 21 90% 55%; }
+  [data-theme="rose"] { --primary: 346 77% 50%; --primary-foreground: 0 0% 98%; --ring: 346 77% 50%; }
+  .dark[data-theme="rose"] { --primary: 346 77% 58%; --primary-foreground: 346 50% 8%; --ring: 346 77% 58%; }
+
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+  body { @apply bg-background text-foreground antialiased; font-feature-settings: "cv11", "ss01"; }
+}
+
+/* Theme toggle uses a circular reveal driven from JS; disable the default cross-fade. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================================
+ * Story icons (see src/components/ui/animated-icons.tsx)
+ * Each icon is split into parts that act out what the action means. `data-play` runs the full
+ * story once; hovering the button that holds the icon shows a small hint of it. States (open,
+ * dark, hidden, unlocked) morph with transitions instead.
+ * ============================================================================================ */
+.ai { overflow: visible; }
+.ai * { transform-box: fill-box; }
+
+/* door (login / logout) */
+.ai .door-panel { transform-origin: right center; transition: scale 300ms var(--ease-spring-snappy); }
+.ai .person { opacity: 0; }
+.ai .person .leg-a, .ai .person .leg-b { transform-origin: center top; }
+:where(button, a, [role="menuitem"]):hover .ai .door-panel { scale: 0.75 1; }
+.ai-logout[data-play] .door-panel, .ai-login[data-play] .door-panel { animation: ai-door 1.5s both; }
+.ai-logout[data-play] .arrow, .ai-login[data-play] .arrow { animation: ai-arrow-away 1.5s both; }
+.ai-logout[data-play] .person { animation: ai-walk-out 1.5s both; }
+.ai-login[data-play] .person { animation: ai-walk-in 1.5s both; }
+.ai[data-play] .person .leg-a { animation: ai-stride 0.3s ease-in-out 5 alternate; }
+.ai[data-play] .person .leg-b { animation: ai-stride 0.3s ease-in-out 5 alternate-reverse; }
+@keyframes ai-door {
+  0% { scale: 1 1; animation-timing-function: var(--ease-spring-snappy); }
+  22%, 68% { scale: 0.18 1; animation-timing-function: var(--ease-spring-bouncy); }
+  92%, 100% { scale: 1 1; }
+}
+@keyframes ai-arrow-away { 0% { opacity: 1; } 10%, 85% { opacity: 0; translate: 3px 0; } 100% { opacity: 1; translate: 0 0; } }
+@keyframes ai-walk-out {
+  0%, 16% { opacity: 0; translate: 0 0; }
+  24% { opacity: 1; translate: 0 0; animation-timing-function: ease-in-out; }
+  72% { opacity: 1; translate: -11px 0; }
+  82%, 100% { opacity: 0; translate: -13px 0; }
+}
+@keyframes ai-walk-in {
+  0% { opacity: 0; translate: -13px 0; }
+  12% { opacity: 1; translate: -11px 0; animation-timing-function: ease-in-out; }
+  62% { opacity: 1; translate: 0 0; }
+  70%, 100% { opacity: 0; translate: 0 0; }
+}
+@keyframes ai-stride { from { rotate: 22deg; } to { rotate: -22deg; } }
+
+/* trash: lid lifts, paper drops in, can settles */
+.ai-trash .lid { transform-origin: left bottom; transition: rotate 350ms var(--ease-spring-bouncy), translate 350ms var(--ease-spring-bouncy); }
+.ai-trash .paper { opacity: 0; }
+.ai-trash .can { transform-origin: center bottom; }
+:where(button, a, [role="menuitem"]):hover .ai-trash .lid { rotate: -18deg; translate: 0 -1px; }
+.ai-trash[data-play] .lid { animation: ai-lid 1.2s both; }
+.ai-trash[data-play] .paper { animation: ai-paper 1.2s both; }
+.ai-trash[data-play] .can { animation: ai-can 1.2s both; }
+@keyframes ai-lid {
+  0% { rotate: 0deg; translate: 0 0; animation-timing-function: var(--ease-spring-snappy); }
+  18%, 58% { rotate: -38deg; translate: 0 -1px; animation-timing-function: var(--ease-spring-bouncy); }
+  85%, 100% { rotate: 0deg; translate: 0 0; }
+}
+@keyframes ai-paper {
+  0%, 14% { opacity: 0; translate: 0 -4px; rotate: 0deg; }
+  22% { opacity: 1; translate: 0 -4px; animation-timing-function: cubic-bezier(0.5, 0, 1, 0.6); }
+  52% { opacity: 1; translate: 0 10px; rotate: 90deg; }
+  56%, 100% { opacity: 0; translate: 0 10px; }
+}
+@keyframes ai-can { 0%, 52% { scale: 1 1; } 60% { scale: 1.06 0.9; animation-timing-function: var(--ease-spring-bouncy); } 90%, 100% { scale: 1 1; } }
+
+/* send: plane flies off top-right, loops back in from bottom-left */
+:where(button, a):hover .ai-send .plane { translate: 1.5px -1.5px; }
+.ai-send .plane { transition: translate 300ms var(--ease-spring-snappy); }
+.ai-send[data-play] .plane { animation: ai-fly 1.1s both; }
+@keyframes ai-fly {
+  0% { translate: 0 0; scale: 1; opacity: 1; animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
+  38% { translate: 14px -14px; scale: 0.5; opacity: 0; }
+  39% { translate: -12px 12px; scale: 0.5; opacity: 0; animation-timing-function: var(--ease-spring-snappy); }
+  100% { translate: 0 0; scale: 1; opacity: 1; }
+}
+
+/* download / upload: arrow drops into (or launches out of) the tray, tray takes the weight */
+.ai-download .arrow, .ai-upload .arrow { transition: translate 300ms var(--ease-spring-snappy); }
+:where(button, a):hover .ai-download .arrow { translate: 0 2px; }
+:where(button, a):hover .ai-upload .arrow { translate: 0 -2px; }
+.ai-download[data-play] .arrow { animation: ai-drop 1.1s both; }
+.ai-upload[data-play] .arrow { animation: ai-launch 1.1s both; }
+.ai-download[data-play] .tray, .ai-upload[data-play] .tray { animation: ai-tray 1.1s both; }
+@keyframes ai-drop {
+  0% { translate: 0 0; opacity: 1; animation-timing-function: cubic-bezier(0.5, 0, 1, 0.5); }
+  30% { translate: 0 7px; opacity: 0; }
+  31% { translate: 0 -9px; opacity: 0; animation-timing-function: var(--ease-spring-snappy); }
+  100% { translate: 0 0; opacity: 1; }
+}
+@keyframes ai-launch {
+  0% { translate: 0 0; opacity: 1; animation-timing-function: cubic-bezier(0.5, 0, 1, 0.5); }
+  30% { translate: 0 -10px; opacity: 0; }
+  31% { translate: 0 7px; opacity: 0; animation-timing-function: var(--ease-spring-snappy); }
+  100% { translate: 0 0; opacity: 1; }
+}
+@keyframes ai-tray { 0%, 26% { translate: 0 0; } 34% { translate: 0 1.5px; animation-timing-function: var(--ease-spring-bouncy); } 70%, 100% { translate: 0 0; } }
+
+/* copy: a duplicate slides out from under the original */
+.ai-copy .dup { transition: translate 300ms var(--ease-spring-snappy); }
+:where(button, a):hover .ai-copy .dup { translate: 1px 1px; }
+.ai-copy[data-play] .dup { animation: ai-dup 0.8s var(--ease-spring-bouncy) both; }
+@keyframes ai-dup { from { translate: -6px -6px; opacity: 0; } 30% { opacity: 1; } to { translate: 0 0; opacity: 1; } }
+
+/* bell: damped swing, clapper lags behind */
+.ai-bell .body { transform-origin: center top; }
+.ai-bell[data-play] .body, :where(button, a):hover .ai-bell .body { animation: ai-swing 1s ease-out both; }
+.ai-bell[data-play] .clapper, :where(button, a):hover .ai-bell .clapper { animation: ai-clap 1s ease-out both; }
+@keyframes ai-swing { 10% { rotate: 18deg; } 25% { rotate: -14deg; } 40% { rotate: 9deg; } 55% { rotate: -5deg; } 70% { rotate: 2deg; } 100% { rotate: 0deg; } }
+@keyframes ai-clap { 14% { translate: -2px 0; } 29% { translate: 1.6px 0; } 44% { translate: -1px 0; } 60% { translate: 0.5px 0; } 100% { translate: 0 0; } }
+
+/* refresh / sync: one full turn with overshoot */
+.ai-refresh { transform-origin: center; }
+.ai-refresh[data-play] { animation: ai-turn 0.9s var(--ease-spring-snappy); }
+:where(button, a):hover .ai-refresh { rotate: 30deg; transition: rotate 400ms var(--ease-spring-snappy); }
+@keyframes ai-turn { from { rotate: 0deg; } to { rotate: 360deg; } }
+
+/* cart: an item drops in, basket takes the weight, wheels roll */
+.ai-cart .item { opacity: 0; }
+.ai-cart .wheel { transform-origin: center; }
+.ai-cart[data-play] .item { animation: ai-cart-item 0.9s both; }
+.ai-cart[data-play] .basket { animation: ai-basket 0.9s both; }
+.ai-cart[data-play] .wheel { animation: ai-wheel 0.9s var(--ease-spring-smooth) both; }
+@keyframes ai-cart-item {
+  0% { opacity: 0; translate: 0 -8px; animation-timing-function: cubic-bezier(0.5, 0, 1, 0.6); }
+  10% { opacity: 1; }
+  32% { opacity: 1; translate: 0 0; }
+  80% { opacity: 1; }
+  100% { opacity: 0; translate: 0 0; }
+}
+@keyframes ai-basket { 0%, 30% { translate: 0 0; } 40% { translate: 0 1.5px; animation-timing-function: var(--ease-spring-bouncy); } 100% { translate: 0 0; } }
+@keyframes ai-wheel { from { rotate: 0deg; } to { rotate: 360deg; } }
+
+/* check: the tick draws itself */
+.ai-check[data-play] .tick { animation: ai-draw 0.5s var(--ease-spring-smooth) both; }
+@keyframes ai-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
+/* ---- morphing state icons ---- */
+.ai-menu line { transform-box: view-box; transform-origin: 12px 12px; transition: rotate 450ms var(--ease-spring-snappy), translate 450ms var(--ease-spring-snappy), scale 300ms var(--ease-spring-smooth), opacity 200ms; }
+.ai-menu[data-open] .l1 { translate: 0 6px; rotate: 45deg; }
+.ai-menu[data-open] .l2 { scale: 0 1; opacity: 0; }
+.ai-menu[data-open] .l3 { translate: 0 -6px; rotate: -45deg; }
+
+.ai-theme .rays { transform-origin: center; transition: rotate 550ms var(--ease-spring-snappy), scale 450ms var(--ease-spring-snappy), opacity 250ms; }
+.ai-theme .core { transform-origin: center; transition: scale 550ms var(--ease-spring-bouncy); }
+.ai-theme .cut { transition: translate 550ms var(--ease-spring-snappy); translate: 9px -9px; }
+.ai-theme[data-dark] .rays { rotate: -90deg; scale: 0.3; opacity: 0; }
+.ai-theme[data-dark] .core { scale: 1.9; }
+.ai-theme[data-dark] .cut { translate: 0 0; }
+
+.ai-eye .pupil { transform-origin: center; transition: scale 350ms var(--ease-spring-snappy); }
+.ai-eye .lid { transform-origin: center; transition: scale 350ms var(--ease-spring-snappy); scale: 1 0; }
+.ai-eye .slash { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 400ms var(--ease-spring-smooth); }
+.ai-eye[data-hidden] .pupil { scale: 1 0.1; }
+.ai-eye[data-hidden] .lid { scale: 1 1; }
+.ai-eye[data-hidden] .slash { stroke-dashoffset: 0; transition-delay: 120ms; }
+
+.ai-lock .shackle { transform-origin: right bottom; transition: rotate 500ms var(--ease-spring-bouncy), translate 500ms var(--ease-spring-bouncy); }
+.ai-lock[data-open] .shackle { translate: 0 -2.5px; rotate: 25deg; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ai *, .ai { animation: none !important; transition: none !important; }
+}
+
+/* LMS additions */
+@layer base {
+  :root { color-scheme: light; }
+  .dark { color-scheme: dark; }
+}

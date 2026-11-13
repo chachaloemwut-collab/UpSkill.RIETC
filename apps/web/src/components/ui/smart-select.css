@@ -1,0 +1,38 @@
+/* SmartSelect motion. Easing tokens (--ease-spring-*) come from the theme in index.css. */
+.ss-pop { transform-origin: top left; }
+.ss-pop[data-side="top"] { transform-origin: bottom left; }
+.ss-pop[data-state="open"] { animation: ss-pop-in 420ms var(--ease-spring-snappy) both; }
+.ss-pop[data-state="closed"] { animation: ss-pop-out 150ms cubic-bezier(0.4, 0, 1, 1) forwards; pointer-events: none; }
+.ss-pop[data-side="top"][data-state="open"] { animation-name: ss-pop-in-up; }
+@keyframes ss-pop-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } }
+@keyframes ss-pop-in-up { from { opacity: 0; transform: translateY(6px) scale(0.96); } }
+@keyframes ss-pop-out { to { opacity: 0; transform: scale(0.97); } }
+
+.ss-sheet[data-state="open"] { animation: ss-sheet-in 560ms var(--ease-spring-smooth) both; }
+.ss-sheet[data-state="closed"] { animation: ss-sheet-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards; pointer-events: none; }
+@keyframes ss-sheet-in { from { transform: translateY(100%); } }
+@keyframes ss-sheet-out { to { transform: translateY(100%); } }
+
+/* rows cascade in when the panel opens or the results change */
+.ss-row { animation: ss-row-in 380ms var(--ease-spring-snappy) both; animation-delay: calc(var(--i, 0) * 14ms); }
+@keyframes ss-row-in { from { opacity: 0; translate: 0 -3px; } }
+
+/* the highlight pill glides between rows */
+.ss-pill { transition: translate 260ms var(--ease-spring-snappy), height 260ms var(--ease-spring-snappy), opacity 150ms; }
+
+.ss-check { animation: ss-check 420ms var(--ease-spring-bouncy) both; }
+@keyframes ss-check { from { scale: 0; rotate: -30deg; } }
+.ss-chip { animation: ss-chip 380ms var(--ease-spring-bouncy) both; }
+@keyframes ss-chip { from { scale: 0.6; opacity: 0; } }
+.ss-value { animation: ss-value 380ms var(--ease-spring-snappy) both; }
+@keyframes ss-value { from { opacity: 0; translate: 0 5px; } }
+.ss-clear { animation: ss-chip 300ms var(--ease-spring-bouncy) both; }
+.ss-empty { animation: ss-wobble 700ms var(--ease-spring-bouncy) both; }
+@keyframes ss-wobble { 0% { rotate: -25deg; scale: 0.6; } 100% { rotate: 0deg; scale: 1; } }
+
+.ss-mark { background: hsl(var(--primary) / 0.16); color: inherit; border-radius: 3px; box-shadow: 0 0 0 1px hsl(var(--primary) / 0.12); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-pop, .ss-sheet, .ss-row, .ss-check, .ss-chip, .ss-value, .ss-clear, .ss-empty { animation: none !important; }
+  .ss-pill { transition: none; }
+}

@@ -8,7 +8,7 @@ import {
   signCertificate,
   verifyCertificate,
   type CertificatePayload,
-} from "./certificate.js";
+} from "./certificate.ts";
 
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const priv = privateKey.export({ format: "der", type: "pkcs8" }).toString("base64url");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateHeartbeat, type ProgressState, type LessonRules, chunksInRange } from "./heartbeat.js";
+import { evaluateHeartbeat, type ProgressState, type LessonRules, chunksInRange } from "./heartbeat.ts";
 
 const rules: LessonRules = { durationSec: 100, minWatchPercentage: 90 };
 const fresh: ProgressState = {

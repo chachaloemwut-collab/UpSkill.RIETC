@@ -5,7 +5,7 @@
  * - a cookie stores state too, binding the flow to this browser (prevents login CSRF / code injection)
  * - the id_token is verified with Google's JWKS: iss, aud, exp, nonce
  * - [CHANGED] spec uses prompt=login, which Google does not support (only none|consent|select_account).
- *   Use prompt=select_account, and for reset mode require a fresh callback from this flow (we control the timing).
+ *   Use prompt=select_account; reset mode is safe because the reset token is issued only right after this callback.
  */
 import "server-only";
 import { Google, generateCodeVerifier, generateState } from "arctic";
@@ -13,35 +13,46 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
 import type { GoogleClaims } from "@upskill/core";
+import { googleConfig, isHttpsOrigin } from "@upskill/infra/env";
 import { ctx } from "../context";
 import { HttpError } from "../http";
 
 export type OAuthMode = "login" | "link" | "reset";
 
-const STATE_COOKIE = process.env.NODE_ENV === "production" ? "__Host-oauth_state" : "oauth_state";
+const stateCookie = () => (isHttpsOrigin(ctx().env) ? "__Host-oauth_state" : "oauth_state");
 const GOOGLE_JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
 
-function client() {
-  const { env } = ctx();
-  return new Google(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, env.GOOGLE_REDIRECT_URI);
+function config() {
+  const cfg = googleConfig(ctx().env);
+  if (!cfg) throw new HttpError(503, "GOOGLE_NOT_CONFIGURED");
+  return cfg;
+}
+
+export function isGoogleEnabled(): boolean {
+  return googleConfig(ctx().env) !== null;
 }
 
 export async function buildGoogleAuthUrl(mode: OAuthMode, linkUserId?: string): Promise<URL> {
+  const cfg = config();
   const { redis } = ctx();
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
   const nonce = randomBytes(16).toString("base64url");
 
   await redis.set(`oauth:${state}`, JSON.stringify({ codeVerifier, nonce, mode, linkUserId }), "PX", 10 * 60_000);
-  (await cookies()).set(STATE_COOKIE, state, {
+  (await cookies()).set(stateCookie(), state, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isHttpsOrigin(ctx().env),
     sameSite: "lax", // must be Lax: the callback is a cross-site top-level GET from accounts.google.com
     path: "/",
     maxAge: 600,
   });
 
-  const url = client().createAuthorizationURL(state, codeVerifier, ["openid", "email", "profile"]);
+  const url = new Google(cfg.clientId, cfg.clientSecret, cfg.redirectUri).createAuthorizationURL(state, codeVerifier, [
+    "openid",
+    "email",
+    "profile",
+  ]);
   url.searchParams.set("nonce", nonce);
   url.searchParams.set("prompt", "select_account");
   return url;
@@ -51,20 +62,21 @@ export async function completeGoogleCallback(
   stateParam: string | null,
   code: string | null,
 ): Promise<{ claims: GoogleClaims; mode: OAuthMode; linkUserId?: string }> {
-  const { env, redis } = ctx();
+  const cfg = config();
+  const { redis } = ctx();
   const jar = await cookies();
-  const cookieState = jar.get(STATE_COOKIE)?.value;
-  jar.delete(STATE_COOKIE);
+  const cookieState = jar.get(stateCookie())?.value;
+  jar.delete(stateCookie());
 
   if (!stateParam || !code || !cookieState || cookieState !== stateParam) throw new HttpError(400, "OAUTH_STATE_MISMATCH");
   const raw = await redis.getdel(`oauth:${stateParam}`);
   if (!raw) throw new HttpError(400, "OAUTH_STATE_EXPIRED");
   const saved = JSON.parse(raw) as { codeVerifier: string; nonce: string; mode: OAuthMode; linkUserId?: string };
 
-  const tokens = await client().validateAuthorizationCode(code, saved.codeVerifier);
+  const tokens = await new Google(cfg.clientId, cfg.clientSecret, cfg.redirectUri).validateAuthorizationCode(code, saved.codeVerifier);
   const { payload } = await jwtVerify(tokens.idToken(), GOOGLE_JWKS, {
     issuer: ["https://accounts.google.com", "accounts.google.com"],
-    audience: env.GOOGLE_CLIENT_ID,
+    audience: cfg.clientId,
     clockTolerance: 30,
   });
   if (payload.nonce !== saved.nonce) throw new HttpError(400, "OAUTH_NONCE_MISMATCH");

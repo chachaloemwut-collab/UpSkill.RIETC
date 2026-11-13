@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1.7
+# Production image for apps/worker (BullMQ jobs + Playwright PDF rendering). Build from the repo root:
+#   docker build -f infra/docker/worker.Dockerfile -t upskill-worker .
+FROM node:24-bookworm-slim AS base
+RUN corepack enable
+WORKDIR /repo
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+FROM base AS deps
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY apps/worker/package.json apps/worker/
+COPY packages/core/package.json packages/core/
+COPY packages/db/package.json packages/db/
+COPY packages/infra/package.json packages/infra/
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --prod=false --filter "@upskill/worker..."
+# Chromium + its system libraries (only the headless shell is needed for page.pdf)
+RUN cd apps/worker && ./node_modules/.bin/playwright install --with-deps --only-shell chromium
+
+FROM deps AS runtime
+COPY packages packages
+COPY apps/worker apps/worker
+RUN useradd --system --create-home app && mkdir -p /data/certificates && chown app /data/certificates
+ENV NODE_ENV=production CERT_STORAGE_DIR=/data/certificates
+USER app
+WORKDIR /repo/apps/worker
+CMD ["node", "--import", "tsx", "src/index.ts"]

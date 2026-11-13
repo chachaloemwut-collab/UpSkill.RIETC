@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideGoogleSignIn, type GoogleClaims } from "./account-linking.js";
+import { decideGoogleSignIn, type GoogleClaims } from "./account-linking.ts";
 
 const gmail: GoogleClaims = { sub: "1", email: "a@gmail.com", emailVerified: true };
 const other: GoogleClaims = { sub: "2", email: "a@company.co.th", emailVerified: true };

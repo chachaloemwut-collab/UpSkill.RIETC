@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectInAppBrowser, externalBrowserUrl } from "./user-agent.js";
+import { detectInAppBrowser, externalBrowserUrl } from "./user-agent.ts";
 
 const UA = {
   lineIos:

@@ -134,3 +134,13 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# --- UpSkill ---
+.env*
+!.env.example
+.next/
+next-env.d.ts
+*.tsbuildinfo
+apps/worker/var/
+.DS_Store
+/var/

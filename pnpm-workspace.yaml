@@ -1,12 +1,13 @@
 packages:
   - apps/*
   - packages/*
+  - tests/*
 
 # Supply-chain hardening
-# - Only these packages may run install scripts (postinstall etc.).
 # - Do not install versions published less than 7 days ago (protects against hijacked releases).
-onlyBuiltDependencies:
-  - "@node-rs/argon2"
-  - esbuild
-  - sharp
+#   When upgrading, pick a version older than 7 days; don't add minimumReleaseAgeExclude.
 minimumReleaseAge: 10080
+# - Only these packages may run install scripts (postinstall etc.). Manage with: pnpm approve-builds <pkg> | '!<pkg>'
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: false   # optional native speedup for bullmq; JS fallback is fine

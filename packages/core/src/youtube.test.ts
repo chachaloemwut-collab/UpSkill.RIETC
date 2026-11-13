@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractYouTubeVideoId, parseIsoDuration, validateYouTubeVideo } from "./youtube.js";
+import { extractYouTubeVideoId, parseIsoDuration, validateYouTubeVideo } from "./youtube.ts";
 
 describe("extractYouTubeVideoId", () => {
   it.each([

@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege for GITHUB_TOKEN
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# TODO(security): pin every action to a commit SHA instead of a tag (Dependabot keeps them updated)
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  DATABASE_MIGRATION_URL: postgres://upskill_owner:dev_owner_password@localhost:55432/upskill
+  DATABASE_URL: postgres://upskill_app:dev_app_password@localhost:55432/upskill
+  REDIS_URL: redis://localhost:6379/0
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env: { POSTGRES_USER: upskill_owner, POSTGRES_PASSWORD: dev_owner_password, POSTGRES_DB: upskill }
+        ports: ["55432:5432"]
+        options: --health-cmd "pg_isready -U upskill_owner -d upskill" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@v5
+        with: { node-version-file: .nvmrc }
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      # Migrations must apply cleanly to a fresh DB, and the committed types must match them
+      - run: PGPASSWORD=dev_owner_password psql -h localhost -p 55432 -U upskill_owner -d upskill -v ON_ERROR_STOP=1 -f infra/postgres/init/00-roles.sql
+      - run: pnpm db:migrate
+      - run: pnpm db:codegen && git diff --exit-code packages/db/src/generated.ts
+
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm run audit # the project script (prod deps, high+); bare `pnpm audit` is pnpm's builtin
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: check
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env: { POSTGRES_USER: upskill_owner, POSTGRES_PASSWORD: dev_owner_password, POSTGRES_DB: upskill }
+        ports: ["55432:5432"]
+        options: --health-cmd "pg_isready -U upskill_owner -d upskill" --health-interval 5s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ["6379:6379"]
+      mailpit:
+        image: axllent/mailpit:latest
+        ports: ["1025:1025", "8025:8025"]
+    steps:
+      - uses: actions/checkout@v5
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@v5
+        with: { node-version-file: .nvmrc }
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm setup:env # fresh signing key for this run; job env vars above take precedence
+      - run: PGPASSWORD=dev_owner_password psql -h localhost -p 55432 -U upskill_owner -d upskill -v ON_ERROR_STOP=1 -f infra/postgres/init/00-roles.sql
+      - run: pnpm db:migrate && pnpm db:seed
+      - run: cd apps/worker && ./node_modules/.bin/playwright install --with-deps --only-shell chromium
+      - run: pnpm --filter @upskill/web build
+      - name: Start web + worker
+        run: |
+          (cd apps/web && nohup ./node_modules/.bin/next start -p 3000 > ../../web.log 2>&1 &)
+          (cd apps/worker && nohup ./node_modules/.bin/tsx --env-file-if-exists=../../.env.local src/index.ts > ../../worker.log 2>&1 &)
+          for i in $(seq 1 60); do curl -fs -o /dev/null http://localhost:3000/ && exit 0; sleep 1; done; cat web.log; exit 1
+      - run: pnpm test:e2e
+      - if: failure()
+        run: tail -100 web.log worker.log
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+        with: { persist-credentials: false }
+      - uses: github/codeql-action/init@v4
+        with: { languages: javascript-typescript, queries: security-extended }
+      - uses: github/codeql-action/analyze@v4

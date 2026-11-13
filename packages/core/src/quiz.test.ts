@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAttemptSnapshot, gradeAttempt, toClientQuestions, type QuestionRecord } from "./quiz.js";
+import { buildAttemptSnapshot, gradeAttempt, toClientQuestions, type QuestionRecord } from "./quiz.ts";
 
 const questions: QuestionRecord[] = [1, 2, 3, 4].map((n) => ({
   id: `q${n}`,

@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 // Static security headers. The CSP needs a per-request nonce, so it lives in src/proxy.ts
@@ -15,9 +16,11 @@ const securityHeaders = [
 ];
 
 const config: NextConfig = {
+  // Self-contained server bundle for the Docker image; trace files from the monorepo root
+  output: "standalone",
+  outputFileTracingRoot: path.join(import.meta.dirname, "../.."),
   poweredByHeader: false,
   reactStrictMode: true,
-  typedRoutes: true,
   transpilePackages: ["@upskill/core", "@upskill/infra", "@upskill/db"],
   serverExternalPackages: ["@node-rs/argon2", "pg"],
   async headers() {

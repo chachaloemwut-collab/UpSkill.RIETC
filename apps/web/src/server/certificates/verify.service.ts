@@ -1,0 +1,67 @@
+/**
+ * Public certificate verification (spec 5.4 #3). Exposes only what's needed: no user_id/email/enrollment_id.
+ */
+import "server-only";
+import { CERTIFICATE_CODE_RE, formatStudyDurationTh, verifyCertificate } from "@upskill/core";
+import { ctx } from "../context";
+
+export type PublicVerification =
+  | { status: "not_found" }
+  | { status: "tampered" } // signature fails or DB doesn't match -> alert the security team
+  | {
+      status: "valid" | "revoked";
+      code: string;
+      recipientName: string;
+      courseTitle: string;
+      instructorName: string;
+      studyDurationText: string;
+      totalStudySec: number;
+      quizScore: string;
+      verifiedCourse: boolean;
+      issuedAt: string;
+      revokedAt?: string;
+      revokedReason?: string;
+    };
+
+export async function verifyPublicCertificate(rawCode: string): Promise<PublicVerification> {
+  const code = rawCode.trim().toUpperCase();
+  if (!CERTIFICATE_CODE_RE.test(code)) return { status: "not_found" };
+
+  const { db, env } = ctx();
+  const c = await db.selectFrom("certificates").selectAll().where("certificate_code", "=", code).executeTakeFirst();
+  if (!c) return { status: "not_found" };
+
+  const result = verifyCertificate(
+    { signedPayload: c.signed_payload, signature: c.signature, keyId: c.signing_key_id },
+    env.CERT_PUBLIC_KEYS,
+    {
+      code: c.certificate_code,
+      enrollmentId: c.enrollment_id,
+      userId: c.user_id,
+      courseId: c.course_id,
+      recipientName: c.recipient_name_snapshot,
+      courseTitle: c.course_title_snapshot,
+      instructorName: c.instructor_name_snapshot,
+      totalStudySec: c.total_actual_study_sec,
+      quizScore: Number(c.quiz_score_snapshot).toFixed(2),
+      verifiedCourse: c.is_verified_course_snapshot,
+      issuedAt: new Date(c.issued_at).toISOString(),
+    },
+  );
+  if (!result.ok) return { status: "tampered" };
+
+  const p = result.payload;
+  return {
+    status: c.revoked_at ? "revoked" : "valid",
+    code: p.code,
+    recipientName: p.recipientName,
+    courseTitle: p.courseTitle,
+    instructorName: p.instructorName,
+    studyDurationText: formatStudyDurationTh(p.totalStudySec),
+    totalStudySec: p.totalStudySec,
+    quizScore: p.quizScore,
+    verifiedCourse: p.verifiedCourse,
+    issuedAt: p.issuedAt,
+    ...(c.revoked_at ? { revokedAt: new Date(c.revoked_at).toISOString(), revokedReason: c.revoked_reason ?? "" } : {}),
+  };
+}

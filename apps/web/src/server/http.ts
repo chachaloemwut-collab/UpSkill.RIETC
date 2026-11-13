@@ -33,7 +33,8 @@ interface Options<TBody extends z.ZodType> {
   roles?: readonly Role[];
   body?: TBody;
   maxBodyBytes?: number;
-  rateLimit?: (c: { ip: string; user: CurrentUser | null }) => Array<[RateLimitRule, string]>;
+  /** Runs after body validation, so rules can key on body fields (e.g. per-account login limits) */
+  rateLimit?: (c: { ip: string; user: CurrentUser | null; body: z.infer<TBody> }) => Array<[RateLimitRule, string]>;
 }
 
 export interface HandlerContext<TBody, TParams> {
@@ -72,11 +73,6 @@ export function route<TBody extends z.ZodType = z.ZodNever, TParams = Record<str
       if (opts.auth === "required" && !user) throw new HttpError(401, "UNAUTHENTICATED");
       if (opts.roles && (!user || !opts.roles.includes(user.role))) throw new HttpError(403, "FORBIDDEN");
 
-      for (const [rule, subject] of opts.rateLimit?.({ ip, user }) ?? []) {
-        const r = await hitRateLimit(redis, rule, subject);
-        if (!r.allowed) throw new HttpError(429, "RATE_LIMITED", undefined, { "Retry-After": String(r.retryAfterSec) });
-      }
-
       let body = undefined as z.infer<TBody>;
       if (opts.body) {
         const max = opts.maxBodyBytes ?? 16 * 1024;
@@ -94,6 +90,11 @@ export function route<TBody extends z.ZodType = z.ZodNever, TParams = Record<str
         body = parsed.data;
       }
 
+      for (const [rule, subject] of opts.rateLimit?.({ ip, user, body }) ?? []) {
+        const r = await hitRateLimit(redis, rule, subject);
+        if (!r.allowed) throw new HttpError(429, "RATE_LIMITED", undefined, { "Retry-After": String(r.retryAfterSec) });
+      }
+
       const result = await fn({
         req,
         params: await routeCtx.params,
@@ -106,7 +107,9 @@ export function route<TBody extends z.ZodType = z.ZodNever, TParams = Record<str
       return result instanceof Response ? result : NextResponse.json(result ?? { ok: true });
     } catch (err) {
       if (err instanceof HttpError) {
-        return NextResponse.json({ error: err.code, requestId }, { status: err.status, ...(err.headers ? { headers: err.headers } : {}) });
+        // err.message is only ever a user-facing text we wrote ourselves (never an internal error)
+        const message = err.message !== err.code ? { message: err.message } : {};
+        return NextResponse.json({ error: err.code, ...message, requestId }, { status: err.status, ...(err.headers ? { headers: err.headers } : {}) });
       }
       logger.error({ err, requestId, path: req.nextUrl.pathname }, "unhandled error");
       return NextResponse.json({ error: "INTERNAL", requestId }, { status: 500 });
