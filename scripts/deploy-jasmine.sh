@@ -7,6 +7,7 @@
 #   scripts/deploy-jasmine.sh ls           test the SFTP login and list /files
 #   scripts/deploy-jasmine.sh upload       stage + push the bundle to /files (never deletes remote files)
 #   scripts/deploy-jasmine.sh upload-env   push deploy/jasmine/secrets/.env to /files/.env (only when it changed)
+#   scripts/deploy-jasmine.sh status       what is on the server (RELEASE) and whether the public site answers
 #
 # Needs: lftp (brew install lftp), rsync, node 24.
 set -euo pipefail
@@ -151,6 +152,25 @@ cmd_upload_env() {
   lftp_run "put '$SECRETS/.env' -o '$REMOTE_DIR/.env'; chmod 600 '$REMOTE_DIR/.env'"
 }
 
+cmd_status() {
+  local origin
+  origin="$(sed -n 's/^APP_ORIGIN=//p' "$SECRETS/.env" 2>/dev/null)"
+  info "local HEAD: $(git -C "$ROOT" rev-parse --short HEAD) ($(git -C "$ROOT" status --porcelain | wc -l | tr -d ' ') uncommitted files)"
+  load_sftp
+  info "server RELEASE:"
+  lftp_run "cat $REMOTE_DIR/RELEASE" | sed 's/^/    /'
+  if [[ -n "$origin" ]]; then
+    local host code
+    host="${origin#https://}"; host="${host%%/*}"
+    if dig +short "$host" A | grep -q .; then
+      code="$(curl -s -o /dev/null -m 10 -w '%{http_code}' "$origin/login" || true)"
+      info "$origin/login -> HTTP ${code:-no response}"
+    else
+      info "$host: DNS not set yet (admin has not pointed the domain)"
+    fi
+  fi
+}
+
 case "${1:-}" in
   init) cmd_init ;;
   check) cmd_check ;;
@@ -158,5 +178,6 @@ case "${1:-}" in
   ls) cmd_ls ;;
   upload) cmd_upload ;;
   upload-env) cmd_upload_env ;;
-  *) sed -n '2,12p' "$0"; exit 1 ;;
+  status) cmd_status ;;
+  *) sed -n '2,13p' "$0"; exit 1 ;;
 esac

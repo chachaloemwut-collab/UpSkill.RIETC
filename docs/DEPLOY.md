@@ -67,6 +67,7 @@ docker image prune -f            # ลบ image เก่า
 | `scripts/deploy-jasmine.sh ls` | ทดสอบเข้า SFTP และแสดงไฟล์ใน `/files` |
 | `scripts/deploy-jasmine.sh upload` | stage แล้วอัปโหลดไป `/files` (ไม่ลบไฟล์บนเซิร์ฟเวอร์ และไม่แตะ `.env`) |
 | `scripts/deploy-jasmine.sh upload-env` | อัปโหลด `.env` (เฉพาะเมื่อแก้ค่า และต้องไม่มี `CHANGE_ME` เหลือ) |
+| `scripts/deploy-jasmine.sh status` | แสดง commit ที่อยู่บนเซิร์ฟเวอร์ และตรวจว่าโดเมนจริงตอบหรือยัง |
 
 หลังเปิดระบบครั้งแรก:
 - เข้าสู่ระบบด้วยบัญชีเจ้าของระบบ: ชื่อผู้ใช้ `SYSTEM_OWNER_USERNAME` และรหัสผ่าน `SYSTEM_OWNER_PASSWORD` ใน `.env` แล้วเปลี่ยนรหัสผ่านทันที
