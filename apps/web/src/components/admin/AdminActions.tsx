@@ -1,8 +1,9 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Ban, BadgeCheck, ExternalLink, MoreHorizontal, RotateCcw, Save, Send } from "lucide-react";
+import { Ban, BadgeCheck, ExternalLink, MoreHorizontal, Pencil, RotateCcw, Save, Send, UserCog } from "lucide-react";
 import { api } from "@/lib/api";
+import { ReassignInstructorDialog, type InstructorOption } from "./CourseOwnerActions";
 import { Alert, AlertDialog, Button, Checkbox, DropdownMenu, Field, Input, PasswordInput, Select, Textarea, useToast } from "@/components/ui";
 
 type EmailSettingsDefaults = {
@@ -155,10 +156,18 @@ export function TestEmailSettingsForm({ lastStatus, lastError }: { lastStatus: s
   );
 }
 
-export function CourseAdminControls({ courseId, title, visibility, verified }: { courseId: string; title: string; visibility: string; verified: boolean }) {
+export function CourseAdminControls({ courseId, title, visibility, verified, instructorId, instructors }: {
+  courseId: string;
+  title: string;
+  visibility: string;
+  verified: boolean;
+  instructorId?: string;
+  instructors?: InstructorOption[];
+}) {
   const router = useRouter();
   const toast = useToast();
   const [confirmSuspend, setConfirmSuspend] = useState(false);
+  const [reassign, setReassign] = useState(false);
   const patch = async (body: Record<string, unknown>, done: string) => {
     const r = await api(`/api/admin/courses/${courseId}`, { method: "PATCH", body });
     if (r.ok) {
@@ -176,6 +185,8 @@ export function CourseAdminControls({ courseId, title, visibility, verified }: {
           </Button>
         }
         items={[
+          { label: "แก้ไขรายวิชา", icon: <Pencil className="h-4 w-4" />, onSelect: () => router.push(`/instructor/courses/${courseId}`) },
+          ...(instructorId && instructors ? [{ label: "เปลี่ยนผู้สอน", icon: <UserCog className="h-4 w-4" />, onSelect: () => setReassign(true) }] : []),
           {
             label: verified ? "ยกเลิก Verified" : "รับรองเป็น Verified",
             icon: <BadgeCheck className="h-4 w-4" />,
@@ -197,6 +208,9 @@ export function CourseAdminControls({ courseId, title, visibility, verified }: {
         destructive
         onConfirm={() => void patch({ visibility: "suspended" }, "ระงับหลักสูตรแล้ว")}
       />
+      {instructorId && instructors && (
+        <ReassignInstructorDialog courseId={courseId} title={title} currentId={instructorId} instructors={instructors} open={reassign} onOpenChange={setReassign} />
+      )}
     </>
   );
 }

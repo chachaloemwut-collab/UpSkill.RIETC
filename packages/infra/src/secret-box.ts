@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from "node:crypto";
 
 function keyBytes(key: string): Buffer {
   const decoded = Buffer.from(key, "base64url");
@@ -46,3 +46,13 @@ export function formatSender(name: string, email: string): string {
   return escaped ? `"${escaped}" <${email}>` : email;
 }
 
+
+/**
+ * Keyed digest of a national ID, for "one account per person" lookups without storing the number in clear.
+ * The key is derived from SETTINGS_ENCRYPTION_KEY (HKDF, own label), so no extra secret has to be deployed.
+ * Rotating SETTINGS_ENCRYPTION_KEY requires re-computing these digests from the encrypted values.
+ */
+export function nationalIdDigest(nationalId: string, key: string): Buffer {
+  const macKey = Buffer.from(hkdfSync("sha256", keyBytes(key), Buffer.alloc(0), "upskill:national-id:v1", 32));
+  return createHmac("sha256", macKey).update(nationalId, "utf8").digest();
+}

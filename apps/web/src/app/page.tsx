@@ -1,6 +1,7 @@
 import { Dashboard } from "@/components/home/Dashboard";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { LmsShell } from "@/components/shell/LmsShell";
+import { ProfileBanner, needsProfile } from "@/components/account/ProfileBanner";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/server/viewer";
 
@@ -14,6 +15,7 @@ export default async function HomePage() {
   if (viewer.isSystemOwner) redirect("/admin");
   return (
     <LmsShell user={{ name: viewer.name, email: viewer.username ?? viewer.email, role: viewer.role }}>
+      <ProfileBanner show={needsProfile(viewer)} />
       <Dashboard viewer={viewer} />
     </LmsShell>
   );

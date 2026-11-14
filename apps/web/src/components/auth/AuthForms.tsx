@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { MailCheck } from "lucide-react";
 import { api } from "@/lib/api";
+import { validateProfile, type ProfileErrors } from "@upskill/core/profile";
+import { PdpaNotice, ProfileFields, readProfile } from "@/components/account/ProfileFields";
 import { errorMessage } from "@/lib/errors";
 import { Alert, Button, CheckDrawIcon, Field, Input, LoginIcon, PasswordInput, Separator, buttonClass, useActionScene, useToast } from "@/components/ui";
 
@@ -129,17 +131,36 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
 export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
   const s = useSubmit();
   const [mismatch, setMismatch] = useState(false);
+  const [errors, setErrors] = useState<ProfileErrors>({});
+  const [consentError, setConsentError] = useState<string | undefined>();
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const f = new FormData(form);
     if (f.get("password") !== f.get("confirm")) return setMismatch(true);
     setMismatch(false);
+    // Same rules as the server, so mistakes show next to their field before anything is sent
+    const profile = readProfile(f);
+    const checked = validateProfile(profile);
+    setErrors(checked.errors);
+    const consent = f.get("pdpaConsent") === "on";
+    setConsentError(consent ? undefined : "ต้องยอมรับประกาศความเป็นส่วนตัวก่อนสมัครสมาชิก");
+    if (!checked.profile || !consent) {
+      s.setError("กรุณาตรวจสอบข้อมูลที่ไฮไลต์");
+      form.querySelector("[aria-invalid=true], .text-destructive")?.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
     s.setBusy(true);
     s.setError(null);
-    const r = await api<{ message: string }>("/api/auth/register", { body: { email: f.get("email"), password: f.get("password") } });
+    const r = await api<{ message: string }>("/api/auth/register", {
+      body: { email: f.get("email"), password: f.get("password"), profile, pdpaConsent: consent },
+    });
     s.setBusy(false);
     if (r.ok) s.setNotice(r.data.message);
-    else s.setError(r.message);
+    else {
+      s.setError(r.message);
+      form.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
   }
   if (s.notice)
     return (
@@ -164,17 +185,22 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
           <OrDivider />
         </>
       )}
-      <form method="post" onSubmit={onSubmit} className="grid gap-4">
+      <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
         {s.error && <Alert variant="destructive" title={s.error} />}
-        <Field label="อีเมล">
-          <Input name="email" type="email" autoComplete="email" placeholder="you@example.com" required className="h-10" />
-        </Field>
-        <Field label="รหัสผ่าน" hint="อย่างน้อย 12 ตัวอักษร แนะนำให้ใช้วลีที่จำง่ายแต่เดายาก">
-          <PasswordInput name="password" autoComplete="new-password" minLength={12} required className="h-10" />
-        </Field>
-        <Field label="ยืนยันรหัสผ่าน" error={mismatch ? "รหัสผ่านทั้งสองช่องไม่ตรงกัน" : undefined}>
-          <PasswordInput name="confirm" autoComplete="new-password" minLength={12} required className="h-10" aria-invalid={mismatch || undefined} />
-        </Field>
+        <fieldset className="grid gap-4 rounded-lg border p-4">
+          <legend className="px-1 text-sm font-semibold">บัญชีสำหรับเข้าสู่ระบบ</legend>
+          <Field label="อีเมล" hint="ใช้เข้าสู่ระบบ ระบบจะส่งลิงก์ยืนยันไปที่อีเมลนี้ ต้องยืนยันก่อนจึงเข้าสู่ระบบได้">
+            <Input name="email" type="email" autoComplete="email" placeholder="you@example.com" required className="h-10" />
+          </Field>
+          <Field label="รหัสผ่าน" hint="อย่างน้อย 12 ตัวอักษร แนะนำให้ใช้วลีที่จำง่ายแต่เดายาก">
+            <PasswordInput name="password" autoComplete="new-password" minLength={12} required className="h-10" />
+          </Field>
+          <Field label="ยืนยันรหัสผ่าน" error={mismatch ? "รหัสผ่านทั้งสองช่องไม่ตรงกัน" : undefined}>
+            <PasswordInput name="confirm" autoComplete="new-password" minLength={12} required className="h-10" aria-invalid={mismatch || undefined} />
+          </Field>
+        </fieldset>
+        <ProfileFields errors={errors} />
+        <PdpaNotice error={consentError} />
         <Button type="submit" size="lg" loading={s.busy} className="w-full">
           สมัครสมาชิก
         </Button>

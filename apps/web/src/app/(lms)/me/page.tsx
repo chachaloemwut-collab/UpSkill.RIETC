@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Bell, CheckCircle2, KeyRound, Link2, Lock, Mail, UserRound } from "lucide-react";
+import Link from "next/link";
+import { Bell, CheckCircle2, IdCard, KeyRound, Link2, Lock, Mail, UserRound } from "lucide-react";
 import { Alert, Avatar, Badge, Card, buttonClass } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ChangePasswordForm } from "@/components/account/ChangePasswordForm";
@@ -57,6 +58,14 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </div>
         </Card>
 
+        <Section icon={<IdCard className="h-4 w-4" />} title="ข้อมูลผู้เรียน" description="ชื่อ-นามสกุล ไทย/อังกฤษ เลขประจำตัวประชาชน วันเกิด เบอร์โทรศัพท์ และที่อยู่">
+          <Card className="flex flex-wrap items-center gap-3 p-5">
+            {viewer.hasProfile ? <Badge variant="success">กรอกครบแล้ว</Badge> : <Badge variant="warning">ยังไม่ได้กรอก</Badge>}
+            <span className="flex-1 text-sm text-muted-foreground">จัดเก็บตามประกาศความเป็นส่วนตัว (PDPA) เลขประจำตัวประชาชนถูกเข้ารหัส</span>
+            <Link href="/me/profile" className={buttonClass(viewer.hasProfile ? "outline" : "default", "sm")}>{viewer.hasProfile ? "แก้ไขข้อมูล" : "กรอกข้อมูล"}</Link>
+          </Card>
+        </Section>
+
         <Section icon={<UserRound className="h-4 w-4" />} title="ชื่อบนใบรับรอง" description="ชื่อจริงตามบัตรประชาชน ใช้พิมพ์บนใบรับรองทุกใบ">
           {me.legal_name_locked_at ? (
             <Card className="grid gap-3 p-5">
@@ -75,7 +84,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
               </p>
             </Card>
           ) : (
-            <LockLegalNameForm />
+            <LockLegalNameForm defaultTh={me.legal_full_name_th} defaultEn={me.legal_full_name_en} />
           )}
         </Section>
 

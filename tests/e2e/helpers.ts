@@ -82,3 +82,32 @@ export async function waitForEmailLink(to: string, pathPrefix: string): Promise<
   }
   throw new Error(`no email with ${pathPrefix} for ${to} (is the worker running?)`);
 }
+
+/** Random Thai national ID with a correct check digit (first digit 1-8, never a real person by design of the test) */
+export function randomNationalId(): string {
+  const first12 = String(1 + Math.floor(Math.random() * 8)) + Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join("");
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += Number(first12[i]) * (13 - i);
+  return first12 + String((11 - (sum % 11)) % 10);
+}
+
+/** A complete, valid member profile for /api/auth/register and /api/user/profile */
+export function profileBody(over: Record<string, unknown> = {}) {
+  return {
+    titleTh: "นาย",
+    firstNameTh: "ทดสอบ",
+    lastNameTh: "ระบบ",
+    titleEn: "Mr.",
+    firstNameEn: "Test",
+    lastNameEn: "System",
+    phone: "0812345678",
+    birthDate: "1995-06-15",
+    nationalId: randomNationalId(),
+    addressLine: "99 หมู่ 1",
+    subdistrict: "ในเมือง",
+    district: "เมืองร้อยเอ็ด",
+    province: "ร้อยเอ็ด",
+    postalCode: "45000",
+    ...over,
+  };
+}

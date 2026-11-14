@@ -38,13 +38,34 @@
    - แจ้งโดเมนจริงกลับมา: นักพัฒนาจะตั้ง `APP_ORIGIN=https://<โดเมน>` ใน `.env` แล้วอัปโหลดใหม่ จากนั้นสั่ง `docker compose up -d` อีกครั้ง
 4. ถ้า migration ล้มเหลวด้วย `permission denied to create extension "citext"` ให้ผู้ดูแลรัน `CREATE EXTENSION IF NOT EXISTS citext;` ในฐาน `lpe1831zma9pmg` แล้วสั่ง `docker compose up -d` ใหม่
 
-## อัปเดตเวอร์ชัน (ทุกครั้งที่นักพัฒนาอัปโหลดโค้ดใหม่)
+## อัปเดตเวอร์ชัน: นักพัฒนาทำเองผ่าน deployer (ผู้ดูแลไม่ต้องสั่งทุกครั้ง)
+
+เมื่อสั่ง `docker compose up -d --build` ครั้งแรก จะมีบริการ `deployer` เปิดขึ้นด้วย บริการนี้เฝ้าไฟล์ `deploy-request`
+ที่นักพัฒนาอัปโหลดผ่าน SFTP แล้วรันคำสั่งตายตัวต่อไปนี้ให้เอง (ไม่รันสิ่งที่อยู่ในไฟล์คำขอ เพียงเทียบค่ากับ `RELEASE`):
+
+```bash
+docker compose -p jasmine build migrate web worker
+docker compose -p jasmine up -d migrate web worker redis
+docker image prune -f --filter label=com.docker.compose.project=jasmine
+```
+
+ผลลัพธ์เขียนไว้ที่ `deploy-status` และ `deploy-log.txt` ในโฟลเดอร์เดียวกัน นักพัฒนาอ่านได้ผ่าน SFTP
+
+**ข้อควรรู้ด้านความปลอดภัย:** `deployer` ต่อกับ `/var/run/docker.sock` ซึ่งมีสิทธิ์เทียบเท่า root ของเครื่อง จึงจำกัดไว้ดังนี้
+ไม่มีเครือข่าย (`network_mode: none`), ไม่เปิดพอร์ต, ระบบไฟล์อ่านอย่างเดียว และรันเฉพาะคำสั่ง compose ของโปรเจกต์ `jasmine`
+ผู้ที่อัปโหลดโค้ดผ่าน SFTP ได้ก็กำหนดสิ่งที่ถูก build ได้อยู่แล้ว deployer จึงไม่เพิ่มช่องทางใหม่ให้คนนอก
+หากนโยบายของ Hosting ไม่อนุญาตให้ container ใช้ Docker socket ให้ปิดด้วย `docker compose stop deployer`
+แล้วกลับไปใช้วิธีด้านล่าง
+
+ปิด deployer ถาวร: `docker compose rm -sf deployer` · ดูการทำงาน: `docker compose logs -f deployer`
+
+### อัปเดตด้วยมือ (กรณีไม่ใช้ deployer)
 
 ```bash
 cd /var/www/hosting/jasmine
 cat RELEASE                      # ตรวจว่าเป็นชุดที่ตั้งใจ
 docker compose up -d --build     # migrate รันก่อน web/worker อัตโนมัติ (migration เป็นแบบเดินหน้าอย่างเดียว)
-docker image prune -f            # ลบ image เก่า
+docker image prune -f --filter label=com.docker.compose.project=jasmine   # ลบเฉพาะ image เก่าของ jasmine
 ```
 
 ## สำรองข้อมูล (ยังไม่มีตารางสำรองของ Hosting — ควรตั้ง)
@@ -67,6 +88,8 @@ docker image prune -f            # ลบ image เก่า
 | `scripts/deploy-jasmine.sh ls` | ทดสอบเข้า SFTP และแสดงไฟล์ใน `/files` |
 | `scripts/deploy-jasmine.sh upload` | stage แล้วอัปโหลดไป `/files` (ไม่ลบไฟล์บนเซิร์ฟเวอร์ และไม่แตะ `.env`) |
 | `scripts/deploy-jasmine.sh upload-env` | อัปโหลด `.env` (เฉพาะเมื่อแก้ค่า และต้องไม่มี `CHANGE_ME` เหลือ) |
+| `scripts/deploy-jasmine.sh deploy` | อัปโหลด แล้วส่งคำขอให้ `deployer` build และเปิดเวอร์ชันใหม่ จากนั้นรอผล (สูงสุด 30 นาที) |
+| `scripts/deploy-jasmine.sh logs` | แสดงผล deploy ล่าสุด (`deploy-status`) และท้าย `deploy-log.txt` |
 | `scripts/deploy-jasmine.sh status` | แสดง commit ที่อยู่บนเซิร์ฟเวอร์ และตรวจว่าโดเมนจริงตอบหรือยัง |
 
 หลังเปิดระบบครั้งแรก:

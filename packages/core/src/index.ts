@@ -7,3 +7,6 @@ export * from "./quiz.ts";
 export * from "./account-linking.ts";
 export * from "./user-agent.ts";
 export * from "./tokens.ts";
+export * from "./cohort.ts";
+export * from "./eligibility.ts";
+export * from "./profile.ts";

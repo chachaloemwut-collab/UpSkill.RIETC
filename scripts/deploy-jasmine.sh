@@ -7,6 +7,8 @@
 #   scripts/deploy-jasmine.sh ls           test the SFTP login and list /files
 #   scripts/deploy-jasmine.sh upload       stage + push the bundle to /files (never deletes remote files)
 #   scripts/deploy-jasmine.sh upload-env   push deploy/jasmine/secrets/.env to /files/.env (only when it changed)
+#   scripts/deploy-jasmine.sh deploy       upload + ask the server's deployer to rebuild, then wait for the result
+#   scripts/deploy-jasmine.sh logs         show the last deploy result and log from the server
 #   scripts/deploy-jasmine.sh status       what is on the server (RELEASE) and whether the public site answers
 #
 # Needs: lftp (brew install lftp), rsync, node 24.
@@ -107,6 +109,7 @@ cmd_stage() {
     apps packages infra package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .dockerignore .nvmrc \
     "$STAGE/"
   cp deploy/jasmine/compose.yml "$STAGE/compose.yml"
+  cp deploy/jasmine/deployer.sh "$STAGE/deployer.sh"
   cp docs/DEPLOY.md "$STAGE/DEPLOY.md"
   {
     echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -152,6 +155,45 @@ cmd_upload_env() {
   lftp_run "put '$SECRETS/.env' -o '$REMOTE_DIR/.env'; chmod 600 '$REMOTE_DIR/.env'"
 }
 
+# Upload, then drop deploy-request (= RELEASE built_at) for the deployer service and wait for deploy-status
+cmd_deploy() {
+  cmd_upload
+  local release req
+  release="$(sed -n 's/^built_at=//p' "$STAGE/RELEASE")"
+  req="$(mktemp)"
+  printf '%s\n' "$release" >"$req"
+  info "requesting deploy of release $release"
+  lftp_run "put '$req' -o '$REMOTE_DIR/deploy-request'"
+  rm -f "$req"
+  local deadline=$(( $(date +%s) + 1800 )) status=""
+  while (( $(date +%s) < deadline )); do
+    sleep 20
+    status="$(lftp_run "cat $REMOTE_DIR/deploy-status" 2>/dev/null || true)"
+    if grep -q "^release=$release$" <<<"$status"; then
+      case "$(sed -n 's/^result=//p' <<<"$status")" in
+        ok) info "deployed $release"; cmd_logs_tail; return 0 ;;
+        failed|rejected) echo "$status"; cmd_logs_tail; die "deploy did not succeed" ;;
+        running) info "building… ($(date +%H:%M:%S))" ;;
+      esac
+    elif lftp_run "cls $REMOTE_DIR/deploy-request" >/dev/null 2>&1; then
+      info "waiting for the deployer to pick up the request… ($(date +%H:%M:%S))"
+    fi
+  done
+  die "no result after 30 minutes: is the deployer service running? (ask the admin: docker compose ps deployer)"
+}
+
+cmd_logs_tail() {
+  lftp_run "cat $REMOTE_DIR/deploy-log.txt" 2>/dev/null | tail -n 25 | sed 's/^/    /'
+}
+
+cmd_logs() {
+  load_sftp
+  info "deploy-status:"
+  lftp_run "cat $REMOTE_DIR/deploy-status" 2>/dev/null | sed 's/^/    /' || info "no deploy has run yet"
+  info "deploy-log.txt (last 25 lines):"
+  cmd_logs_tail
+}
+
 cmd_status() {
   local origin
   origin="$(sed -n 's/^APP_ORIGIN=//p' "$SECRETS/.env" 2>/dev/null)"
@@ -178,6 +220,8 @@ case "${1:-}" in
   ls) cmd_ls ;;
   upload) cmd_upload ;;
   upload-env) cmd_upload_env ;;
+  deploy) cmd_deploy ;;
+  logs) cmd_logs ;;
   status) cmd_status ;;
-  *) sed -n '2,13p' "$0"; exit 1 ;;
+  *) sed -n '2,15p' "$0"; exit 1 ;;
 esac

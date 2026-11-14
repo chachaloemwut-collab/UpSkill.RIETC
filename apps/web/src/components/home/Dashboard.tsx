@@ -5,6 +5,11 @@ import { PageHeader, SectionTitle } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
 import { CourseCard, CourseCover } from "@/components/course/CourseCard";
 import { listPublishedCourses, learnerOverview } from "@/server/courses/courses.service";
+import { myRegistrations } from "@/server/programs/cohorts.service";
+import { listUpcomingCohorts } from "@/server/programs/programs.service";
+import { UpcomingCohortCard } from "@/components/programs/UpcomingCohortCard";
+import { COHORT_PHASE, REGISTRATION_STATUS, formatDateTimeTh } from "@/lib/format";
+import { Badge } from "@/components/ui";
 import type { getViewer } from "@/server/viewer";
 
 type Viewer = NonNullable<Awaited<ReturnType<typeof getViewer>>>;
@@ -13,7 +18,10 @@ type Viewer = NonNullable<Awaited<ReturnType<typeof getViewer>>>;
 export async function Dashboard({ viewer }: { viewer: Viewer }) {
   const courses = await listPublishedCourses();
 
-  const { enrollments, stats } = await learnerOverview(viewer.id);
+  const [{ enrollments, stats }, registrations, upcoming] = await Promise.all([learnerOverview(viewer.id), myRegistrations(viewer.id), listUpcomingCohorts(3)]);
+  const activeRegs = registrations.filter((r) => r.phase !== "completed" && r.phase !== "cancelled" && r.status !== "rejected");
+  const appliedCohorts = new Set(registrations.map((r) => r.cohort_id));
+  const openForMe = upcoming.filter((c) => !appliedCohorts.has(c.id));
   const inProgress = enrollments.filter((e) => e.status === "in_progress");
   const enrolledSlugs = new Set(enrollments.map((e) => e.slug));
   const suggestions = courses.filter((c) => !enrolledSlugs.has(c.slug)).slice(0, 4);
@@ -114,6 +122,45 @@ export async function Dashboard({ viewer }: { viewer: Viewer }) {
           </div>
         )}
       </section>
+
+      {activeRegs.length > 0 && (
+        <section className="mt-8">
+          <SectionTitle>รอบอบรมที่คุณสมัคร</SectionTitle>
+          <Card className="divide-y">
+            {activeRegs.map((r) => {
+              const st = REGISTRATION_STATUS[r.status];
+              const ph = COHORT_PHASE[r.phase];
+              return (
+                <Link key={r.id} href={`/programs/${r.program_slug}`} className="flex flex-wrap items-center gap-3 p-4 transition-colors hover:bg-muted/40">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{r.program_title}</p>
+                    <p className="text-xs text-muted-foreground">{r.cohort_title} · เริ่มอบรม {formatDateTimeTh(r.starts_at)}</p>
+                  </div>
+                  {ph && <Badge variant="outline">{ph.label}</Badge>}
+                  {st && <Badge variant={st.variant}>{st.label}</Badge>}
+                </Link>
+              );
+            })}
+          </Card>
+        </section>
+      )}
+
+      {openForMe.length > 0 && (
+        <section className="mt-8">
+          <SectionTitle
+            action={
+              <Link href="/programs" className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
+                ดูทั้งหมด <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            }
+          >
+            รอบอบรมที่เปิดรับสมัคร
+          </SectionTitle>
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {openForMe.map((c) => <UpcomingCohortCard key={c.id} c={c} />)}
+          </div>
+        </section>
+      )}
 
       {suggestions.length > 0 && (
         <section className="mt-8">

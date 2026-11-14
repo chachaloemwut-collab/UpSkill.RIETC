@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDialog, Button, Card, Checkbox, DownloadIcon, Field, Input, usePlay, useToast } from "@/components/ui";
 
-export function LockLegalNameForm({ className }: { className?: string }) {
+export function LockLegalNameForm({ className, defaultTh, defaultEn }: { className?: string; defaultTh?: string | null; defaultEn?: string | null }) {
   const router = useRouter();
   const toast = useToast();
   const [error, setError] = useState<string | null>(null);
@@ -51,10 +51,10 @@ export function LockLegalNameForm({ className }: { className?: string }) {
         {error && <Alert variant="destructive" title={error} />}
         <div className="grid items-start gap-4 sm:grid-cols-2">
           <Field label="ชื่อ-นามสกุล (ภาษาไทย)">
-            <Input name="th" autoComplete="name" maxLength={120} placeholder="เช่น สมชาย ใจดี" />
+            <Input name="th" autoComplete="name" maxLength={120} placeholder="เช่น นายสมชาย ใจดี" defaultValue={defaultTh ?? ""} />
           </Field>
           <Field label="Full name (English)">
-            <Input name="en" autoComplete="name" maxLength={120} placeholder="e.g. Somchai Jaidee" />
+            <Input name="en" autoComplete="name" maxLength={120} placeholder="e.g. Mr. Somchai Jaidee" defaultValue={defaultEn ?? ""} />
           </Field>
         </div>
         <Checkbox name="confirm" required label="ข้าพเจ้ายืนยันว่าชื่อ-นามสกุลนี้ถูกต้อง และรับทราบว่าจะแก้ไขชื่อในใบรับรองไม่ได้อีก" />

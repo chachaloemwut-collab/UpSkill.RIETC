@@ -4,7 +4,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
-import { BASE, Client, SEED_PASSWORD, resetRateLimits, sleep, waitForEmailLink, withDb } from "./helpers.ts";
+import { BASE, Client, SEED_PASSWORD, profileBody, resetRateLimits, sleep, waitForEmailLink, withDb } from "./helpers.ts";
 
 const run = randomBytes(4).toString("hex");
 const learnerEmail = `learner-${run}@e2e.test`;
@@ -61,15 +61,15 @@ describe("security baseline", () => {
 
 describe("sign-up and login", () => {
   it("register gives the same answer for new and existing emails (no enumeration)", async () => {
-    const a = await new Client().req("/api/auth/register", { body: { email: learnerEmail, password: learnerPassword } });
-    const b = await new Client().req("/api/auth/register", { body: { email: "admin@upskill.test", password: learnerPassword } });
+    const a = await new Client().req("/api/auth/register", { body: { email: learnerEmail, password: learnerPassword, profile: profileBody(), pdpaConsent: true } });
+    const b = await new Client().req("/api/auth/register", { body: { email: "admin@upskill.test", password: learnerPassword, profile: profileBody(), pdpaConsent: true } });
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
     expect(a.json.message).toBe(b.json.message);
   });
 
   it("rejects weak passwords", async () => {
-    const r = await new Client().req("/api/auth/register", { body: { email: `weak-${run}@e2e.test`, password: "short" } });
+    const r = await new Client().req("/api/auth/register", { body: { email: `weak-${run}@e2e.test`, password: "short", profile: profileBody(), pdpaConsent: true } });
     expect(r.json.error).toBe("WEAK_PASSWORD");
   });
 

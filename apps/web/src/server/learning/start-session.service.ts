@@ -17,9 +17,11 @@ export async function startLearningSession(input: { userId: string; lessonId: st
     .selectFrom("lessons as l")
     .innerJoin("courses as c", "c.id", "l.course_id")
     .innerJoin("enrollments as e", (j) => j.onRef("e.course_id", "=", "c.id").on("e.user_id", "=", input.userId))
+    .leftJoin("program_cohorts as pc", "pc.id", "e.cohort_id")
     .select([
       "l.id", "l.course_id", "l.sequence_order", "l.duration_sec", "l.video_status",
       "c.visibility", "c.is_sequential_locked", "e.id as enrollment_id", "e.status as enrollment_status",
+      "pc.starts_at as cohort_starts_at",
     ])
     .where("l.id", "=", input.lessonId)
     .executeTakeFirst();
@@ -28,6 +30,9 @@ export async function startLearningSession(input: { userId: string; lessonId: st
   if (!lesson || lesson.enrollment_status === "revoked") throw new HttpError(404, "NOT_FOUND");
   if (lesson.visibility === "suspended" || lesson.visibility === "draft") throw new HttpError(403, "COURSE_UNAVAILABLE");
   if (lesson.video_status !== "active") throw new HttpError(409, "VIDEO_BROKEN");
+  // Enrollments granted by a training cohort open on the cohort's start date
+  if (lesson.cohort_starts_at && lesson.cohort_starts_at > new Date()) throw new HttpError(403, "COHORT_NOT_STARTED");
+
   const preTest = await db
     .selectFrom("courses as c")
     .select([
@@ -37,7 +42,6 @@ export async function startLearningSession(input: { userId: string; lessonId: st
     .where("c.id", "=", lesson.course_id)
     .executeTakeFirstOrThrow();
   if (preTest.questions > 0 && preTest.attempts === 0) throw new HttpError(403, "PRE_TEST_REQUIRED");
-
 
   if (lesson.is_sequential_locked) {
     // Require every earlier lesson to be completed (robust to gaps in sequence_order)

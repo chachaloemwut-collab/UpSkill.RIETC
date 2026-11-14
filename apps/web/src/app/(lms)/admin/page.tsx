@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Award, BadgeCheck, Ban, BookOpen, Flag, GraduationCap, Mail, ShieldAlert, UserCog, Users } from "lucide-react";
-import { Badge, Card, EmptyState, Table, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
+import { Award, BadgeCheck, Ban, BookOpen, CalendarCheck, ClipboardList, Flag, GraduationCap, Mail, Megaphone, ShieldAlert, UserCog, Users } from "lucide-react";
+import { Badge, Card, EmptyState, Table, Tabs, TabsContent, TabsList, TabsTrigger, buttonClass } from "@/components/ui";
+import { AdminCreateCourseDialog } from "@/components/admin/CourseOwnerActions";
+import { listInstructors } from "@/server/courses/instructor.service";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
 import { CourseAdminControls, EmailSettingsForm, GoogleOAuthSettingsForm, RemoveSuppressionButton, RetryEmailButton, RevokeCertificateForm, TestEmailSettingsForm, UserAdminForm } from "@/components/admin/AdminActions";
@@ -19,11 +21,14 @@ const REASONS: Record<string, string> = { POSITION_JUMP: "กรอข้าม 
 export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") redirect("/");
-  const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings, googleSettings] = await Promise.all([adminOverview(), getEmailSettingsView(), getGoogleOAuthSettingsView()]);
+  const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings, googleSettings, instructors] = await Promise.all([adminOverview(), getEmailSettingsView(), getGoogleOAuthSettingsView(), listInstructors()]);
 
   return (
     <>
-      <PageHeader title="ภาพรวมระบบ" description="ดูแลหลักสูตร ผู้ใช้ ใบรับรอง และพฤติกรรมผิดปกติ" />
+      <PageHeader title="ภาพรวมระบบ" description="ดูแลหลักสูตร ผู้ใช้ ใบรับรอง และพฤติกรรมผิดปกติ">
+        <Link href="/admin/programs" className={buttonClass("outline")}><GraduationCap className="h-4 w-4" /> หลักสูตรอบรม</Link>
+        <Link href="/admin/announcements" className={buttonClass("outline")}><Megaphone className="h-4 w-4" /> ประกาศ</Link>
+      </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard index={0} label="ผู้ใช้ทั้งหมด" value={stats.users} unit="คน" icon={<Users />} />
@@ -31,6 +36,12 @@ export default async function AdminPage() {
         <StatCard index={2} label="การลงทะเบียน" value={stats.enrollments} unit="ครั้ง" icon={<GraduationCap />} />
         <StatCard index={3} label="ใบรับรองที่ใช้งานได้" value={stats.certificates} unit="ใบ" icon={<Award />} />
         <StatCard index={4} label="ผิดปกติ (7 วัน)" value={stats.flags7d} unit="ครั้ง" icon={<Flag />} />
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <Link href="/admin/programs" className="block"><StatCard index={5} label="หลักสูตรอบรมที่เผยแพร่" value={stats.publishedPrograms} unit="หลักสูตร" icon={<GraduationCap />} /></Link>
+        <Link href="/admin/programs" className="block"><StatCard index={6} label="รอบที่เปิดรับสมัคร" value={stats.openCohorts} unit="รอบ" icon={<CalendarCheck />} /></Link>
+        <Link href="/admin/programs" className="block"><StatCard index={7} label="ใบสมัครรอพิจารณา" value={stats.pendingRegistrations} unit="ใบ" hint={stats.pendingRegistrations ? "เปิดหลักสูตรเพื่อพิจารณา" : undefined} icon={<ClipboardList />} /></Link>
       </div>
 
       <Tabs defaultValue="courses" className="mt-8">
@@ -43,6 +54,7 @@ export default async function AdminPage() {
         </TabsList>
 
         <TabsContent value="courses" className="mt-4">
+          <div className="mb-3 flex justify-end"><AdminCreateCourseDialog instructors={instructors} selfId={user.id} /></div>
           {courses.length === 0 ? (
             <EmptyState icon={<BookOpen className="h-5 w-5" />} title="ยังไม่มีหลักสูตร" />
           ) : (
@@ -71,7 +83,7 @@ export default async function AdminPage() {
                         <Badge variant={vis?.variant ?? "secondary"}>{vis?.label ?? c.visibility}</Badge>
                       </td>
                       <td className="text-right">
-                        <CourseAdminControls courseId={c.id} title={c.title} visibility={c.visibility} verified={c.is_verified_course} />
+                        <CourseAdminControls courseId={c.id} title={c.title} visibility={c.visibility} verified={c.is_verified_course} instructorId={c.instructor_id} instructors={instructors} />
                       </td>
                     </tr>
                   );

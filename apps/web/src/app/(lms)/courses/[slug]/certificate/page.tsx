@@ -64,7 +64,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ sl
           </div>
         </Card>
       ) : !me.legal_name_locked_at ? (
-        <LockLegalNameForm />
+        <LockLegalNameForm defaultTh={me.legal_full_name_th} defaultEn={me.legal_full_name_en} />
       ) : (
         <IssueCertificateButton courseId={data.course.id} nameTh={me.legal_full_name_th} nameEn={me.legal_full_name_en} />
       )}

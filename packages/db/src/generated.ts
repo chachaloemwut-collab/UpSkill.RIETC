@@ -27,13 +27,26 @@ export type Numeric = ColumnType<string, number | string, number | string>;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
-export interface AssessmentFocusEvents {
-  attempt_id: string;
+export interface Announcements {
+  body: string;
+  broadcast_at: Timestamp | null;
+  cohort_id: string | null;
   created_at: Generated<Timestamp>;
-  elapsed_sec: Generated<number>;
-  event_type: string;
-  id: Generated<Int8>;
-  user_id: string;
+  created_by: string;
+  event_ends_at: Timestamp | null;
+  event_starts_at: Timestamp | null;
+  expires_at: Timestamp | null;
+  id: Generated<string>;
+  is_pinned: Generated<boolean>;
+  kind: Generated<string>;
+  location: string | null;
+  program_id: string | null;
+  publish_at: Generated<Timestamp>;
+  slug: string;
+  summary: string | null;
+  title: string;
+  updated_at: Generated<Timestamp>;
+  visibility: Generated<string>;
 }
 
 export interface AnticheatEvents {
@@ -43,6 +56,15 @@ export interface AnticheatEvents {
   learning_session_id: string | null;
   lesson_id: string;
   reason: string;
+  user_id: string;
+}
+
+export interface AssessmentFocusEvents {
+  attempt_id: string;
+  created_at: Generated<Timestamp>;
+  elapsed_sec: Generated<number>;
+  event_type: string;
+  id: Generated<Int8>;
   user_id: string;
 }
 
@@ -82,6 +104,19 @@ export interface Certificates {
   signed_payload: string;
   signing_key_id: string;
   total_actual_study_sec: number;
+  user_id: string;
+}
+
+export interface CohortRegistrations {
+  answers: Generated<Json>;
+  applied_at: Generated<Timestamp>;
+  cancelled_at: Timestamp | null;
+  cohort_id: string;
+  decided_at: Timestamp | null;
+  decided_by: string | null;
+  decision_note: string | null;
+  id: Generated<string>;
+  status: Generated<string>;
   user_id: string;
 }
 
@@ -214,6 +249,7 @@ export interface EmailVerificationTokens {
 }
 
 export interface Enrollments {
+  cohort_id: string | null;
   completed_at: Timestamp | null;
   course_id: string;
   enrolled_at: Generated<Timestamp>;
@@ -301,6 +337,47 @@ export interface PasswordResetTokens {
   user_id: string;
 }
 
+export interface ProgramCohorts {
+  cancelled_at: Timestamp | null;
+  capacity: number | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  eligibility: Generated<Json>;
+  ends_at: Timestamp;
+  id: Generated<string>;
+  program_id: string;
+  published_at: Timestamp | null;
+  registration_closes_at: Timestamp;
+  registration_opens_at: Timestamp;
+  requires_approval: Generated<boolean>;
+  starts_at: Timestamp;
+  status: Generated<string>;
+  title: string;
+  updated_at: Generated<Timestamp>;
+  waitlist_enabled: Generated<boolean>;
+}
+
+export interface ProgramCourses {
+  course_id: string;
+  is_required: Generated<boolean>;
+  program_id: string;
+  sequence_order: number;
+}
+
+export interface Programs {
+  category: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  description: string | null;
+  id: Generated<string>;
+  published_at: Timestamp | null;
+  slug: string;
+  summary: string | null;
+  title: string;
+  updated_at: Generated<Timestamp>;
+  visibility: Generated<string>;
+}
+
 export interface QuizAttempts {
   assessment_type: Generated<string>;
   enrollment_id: string;
@@ -335,6 +412,33 @@ export interface UserOauthAccounts {
   provider: Generated<string>;
   provider_email: string;
   provider_user_id: string;
+  user_id: string;
+}
+
+export interface UserProfiles {
+  address_line: string;
+  birth_date: Timestamp;
+  created_at: Generated<Timestamp>;
+  district: string;
+  first_name_en: string;
+  first_name_th: string;
+  guardian_consented_at: Timestamp | null;
+  guardian_name: string | null;
+  guardian_phone: string | null;
+  last_name_en: string;
+  last_name_th: string;
+  national_id_encrypted: string;
+  national_id_hmac: Buffer;
+  national_id_last4: string;
+  pdpa_consented_at: Timestamp;
+  pdpa_notice_version: string;
+  phone: string;
+  postal_code: string;
+  province: string;
+  subdistrict: string;
+  title_en: string;
+  title_th: string;
+  updated_at: Generated<Timestamp>;
   user_id: string;
 }
 
@@ -379,10 +483,12 @@ export interface VideoReports {
 }
 
 export interface DB {
+  announcements: Announcements;
   anticheat_events: AnticheatEvents;
   assessment_focus_events: AssessmentFocusEvents;
   audit_logs: AuditLogs;
   certificates: Certificates;
+  cohort_registrations: CohortRegistrations;
   course_assignment_recipients: CourseAssignmentRecipients;
   course_assignments: CourseAssignments;
   courses: Courses;
@@ -400,9 +506,13 @@ export interface DB {
   lesson_progress: LessonProgress;
   lessons: Lessons;
   password_reset_tokens: PasswordResetTokens;
+  program_cohorts: ProgramCohorts;
+  program_courses: ProgramCourses;
+  programs: Programs;
   quiz_attempts: QuizAttempts;
   quiz_questions: QuizQuestions;
   user_oauth_accounts: UserOauthAccounts;
+  user_profiles: UserProfiles;
   user_sessions: UserSessions;
   users: Users;
   video_reports: VideoReports;

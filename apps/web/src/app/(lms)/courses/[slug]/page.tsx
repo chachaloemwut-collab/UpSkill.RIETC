@@ -127,7 +127,16 @@ export default async function CoursePage({ params }: Props) {
                   <Progress value={progress} />
                 </div>
               )}
-              {!enrolled ? (
+              {!enrolled && data.programOnly ? (
+                <div className="grid gap-2">
+                  <p className="text-sm text-muted-foreground">รายวิชานี้เปิดให้เรียนผ่านการสมัครหลักสูตรอบรม</p>
+                  {data.programs.map((p) => (
+                    <Link key={p.slug} href={`/programs/${p.slug}`} className={buttonClass("default", "lg", "w-full")}>
+                      สมัคร {p.title} <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  ))}
+                </div>
+              ) : !enrolled ? (
                 <EnrollButton courseId={course.id} loggedIn={!!user} />
               ) : enrollment?.status === "completed" ? (
                 <>

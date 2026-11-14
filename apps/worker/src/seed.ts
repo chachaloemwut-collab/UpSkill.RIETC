@@ -2,7 +2,9 @@
 // Refuses to run in production. Re-running is safe (skips existing rows).
 import { createDb } from "@upskill/db";
 import { getEnv } from "@upskill/infra/env";
+import { PDPA_NOTICE_VERSION } from "@upskill/core";
 import { hashPassword } from "@upskill/infra/password";
+import { encryptSettingSecret, nationalIdDigest } from "@upskill/infra/secret-box";
 import { fetchVideos } from "@upskill/infra/youtube-client";
 
 const env = getEnv();
@@ -37,7 +39,34 @@ async function upsertUser(email: string, role: "admin" | "instructor" | "member"
 
 await upsertUser("admin@upskill.test", "admin", "ผู้ดูแล ระบบ", "System Admin");
 const instructorId = await upsertUser("instructor@upskill.test", "instructor", "ครูสมศรี ใจดี", "Somsri Jaidee");
-await upsertUser("learner@upskill.test", "member", "สมชาย เรียนดี", "Somchai Riandee");
+const learnerId = await upsertUser("learner@upskill.test", "member", "นายสมชาย เรียนดี", "Mr. Somchai Riandee");
+
+/** Test national ID: fixed first 12 digits + the real check digit (not a real person's number) */
+function testNationalId(first12: string) {
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += Number(first12[i]) * (13 - i);
+  return first12 + String((11 - (sum % 11)) % 10);
+}
+
+// The demo learner gets a complete profile so enrollment works out of the box
+if (!(await db.selectFrom("user_profiles").select("user_id").where("user_id", "=", learnerId).executeTakeFirst())) {
+  const nationalId = testNationalId("199990000001");
+  await db
+    .insertInto("user_profiles")
+    .values({
+      user_id: learnerId,
+      title_th: "นาย", first_name_th: "สมชาย", last_name_th: "เรียนดี",
+      title_en: "Mr.", first_name_en: "Somchai", last_name_en: "Riandee",
+      phone: "0812345678", birth_date: "1995-01-15",
+      address_line: "99 หมู่ 1", subdistrict: "ในเมือง", district: "เมืองร้อยเอ็ด", province: "ร้อยเอ็ด", postal_code: "45000",
+      national_id_hmac: nationalIdDigest(nationalId, env.SETTINGS_ENCRYPTION_KEY),
+      national_id_encrypted: encryptSettingSecret(nationalId, env.SETTINGS_ENCRYPTION_KEY),
+      national_id_last4: nationalId.slice(-4),
+      pdpa_notice_version: PDPA_NOTICE_VERSION,
+      pdpa_consented_at: new Date(),
+    })
+    .execute();
+}
 
 let durationSec = DEMO_VIDEO.fallbackDurationSec;
 if (env.YOUTUBE_API_KEY) {

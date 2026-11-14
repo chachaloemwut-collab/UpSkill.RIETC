@@ -4,6 +4,10 @@ import { AnimatedNumber, EmptyState, Reveal, SpotlightCard, buttonClass } from "
 import { BRAND_NAME, BrandLogo } from "@/components/brand/BrandLogo";
 import { CourseCard, CourseCover } from "@/components/course/CourseCard";
 import { listPublishedCourses, publicStats } from "@/server/courses/courses.service";
+import { listUpcomingCohorts } from "@/server/programs/programs.service";
+import { listPublicAnnouncements } from "@/server/programs/announcements.service";
+import { AnnouncementCard } from "@/components/programs/AnnouncementCard";
+import { UpcomingCohortCard } from "@/components/programs/UpcomingCohortCard";
 import { LandingNav } from "./LandingNav";
 
 const STEPS = [
@@ -25,7 +29,7 @@ const GRID =
 
 /** Public landing page for visitors who are not signed in. */
 export async function LandingPage() {
-  const [courses, stats] = await Promise.all([listPublishedCourses(), publicStats()]);
+  const [courses, stats, upcoming, announcements] = await Promise.all([listPublishedCourses(), publicStats(), listUpcomingCohorts(3), listPublicAnnouncements({ limit: 3 })]);
   // Verified courses lead; otherwise newest first (the catalog order)
   const featured = [...courses].sort((a, b) => Number(b.is_verified_course) - Number(a.is_verified_course)).slice(0, 3);
   const longContent = stats.durationSec >= 10 * 3600;
@@ -126,6 +130,40 @@ export async function LandingPage() {
           ))}
         </div>
       </section>
+
+      {/* ---------- Upcoming cohorts and announcements ---------- */}
+      {(upcoming.length > 0 || announcements.length > 0) && (
+        <section id="events" className="scroll-mt-20 border-t">
+          <div className="mx-auto grid max-w-6xl gap-12 px-4 py-20 sm:px-6">
+            {upcoming.length > 0 && (
+              <div>
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <SectionHeading eyebrow="รอบอบรม" title="กิจกรรมที่กำลังจะเกิดขึ้น" align="left" />
+                  <Link href="/programs" className={buttonClass("outline", "md", "group")}>
+                    หลักสูตรอบรมทั้งหมด <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </div>
+                <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {upcoming.map((c) => <UpcomingCohortCard key={c.id} c={c} />)}
+                </div>
+              </div>
+            )}
+            {announcements.length > 0 && (
+              <div>
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <SectionHeading eyebrow="ประชาสัมพันธ์" title="ประกาศและข่าวสาร" align="left" />
+                  <Link href="/announcements" className={buttonClass("outline", "md", "group")}>
+                    ประกาศทั้งหมด <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </div>
+                <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {announcements.map((a) => <AnnouncementCard key={a.id} a={a} />)}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ---------- Courses ---------- */}
       <section id="courses" className="scroll-mt-20 border-t bg-muted/30">

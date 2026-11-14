@@ -7,7 +7,10 @@
     ".": "./src/index.ts",
     "./heartbeat": "./src/heartbeat.ts",
     "./user-agent": "./src/user-agent.ts",
-    "./youtube": "./src/youtube.ts"
+    "./youtube": "./src/youtube.ts",
+    "./cohort": "./src/cohort.ts",
+    "./eligibility": "./src/eligibility.ts",
+    "./profile": "./src/profile.ts"
   },
   "//exports": "Client components must import only from the subpaths above (no node:crypto). The '.' entry is server-only.",
   "scripts": {

@@ -13,7 +13,7 @@ export async function adminOverview() {
   const courses = await db
     .selectFrom("courses as c")
     .innerJoin("users as u", "u.id", "c.instructor_id")
-    .select(["c.id", "c.slug", "c.title", "c.visibility", "c.is_verified_course", "u.email as instructor_email"])
+    .select(["c.id", "c.slug", "c.title", "c.visibility", "c.is_verified_course", "c.instructor_id", "u.email as instructor_email"])
     .orderBy("c.updated_at", "desc")
     .limit(200)
     .execute();
@@ -43,6 +43,9 @@ export async function adminOverview() {
       sql<number>`(select count(*)::int from anticheat_events where created_at > now() - interval '7 days')`.as("flags7d"),
       sql<number>`(select count(*)::int from email_outbox where status in ('pending','processing'))`.as("emailPending"),
       sql<number>`(select count(*)::int from email_outbox where status = 'failed')`.as("emailFailed"),
+      sql<number>`(select count(*)::int from programs where visibility = 'published')`.as("publishedPrograms"),
+      sql<number>`(select count(*)::int from program_cohorts where status = 'published' and registration_opens_at <= now() and registration_closes_at > now())`.as("openCohorts"),
+      sql<number>`(select count(*)::int from cohort_registrations r join program_cohorts c on c.id = r.cohort_id where r.status = 'pending' and c.status = 'published')`.as("pendingRegistrations"),
     ])
     .executeTakeFirstOrThrow();
   const emails = await db

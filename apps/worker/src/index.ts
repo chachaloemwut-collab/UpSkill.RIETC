@@ -13,6 +13,7 @@ import {
   enqueueWeeklySummaries,
   processEmailOutbox,
 } from "./jobs/process-email-outbox.ts";
+import { enqueueCohortStartingEmails } from "./jobs/cohort-notifications.ts";
 import { ensureSystemOwner } from "./system-owner.ts";
 import { configuredEmailSender } from "./email-transport.ts";
 
@@ -22,7 +23,16 @@ const db = createDb(env.DATABASE_URL);
 const connection = createRedis(env.REDIS_URL, { maxRetriesPerRequest: null });
 await ensureSystemOwner(db, env);
 const getEmailSender = configuredEmailSender(db, env);
-const schedulerQueues = [new Queue("email-outbox", { connection }), new Queue("assignment-reminders", { connection }), new Queue("weekly-summary", { connection }), new Queue("video-recheck", { connection })];
+// Scheduler (repeat) jobs must be removed once completed; otherwise BullMQ retains
+// every iteration forever (e.g. outbox-poll fires every second → ~86k jobs/day).
+const schedulerQueueOptions = { connection, defaultJobOptions: { removeOnComplete: true } };
+const schedulerQueues = [
+  new Queue("email-outbox", schedulerQueueOptions),
+  new Queue("assignment-reminders", schedulerQueueOptions),
+  new Queue("weekly-summary", schedulerQueueOptions),
+  new Queue("video-recheck", schedulerQueueOptions),
+  new Queue("cohort-notifications", schedulerQueueOptions),
+];
 
 const workers = [
   new Worker(
@@ -55,6 +65,7 @@ const workers = [
   new Worker("email-outbox", () => processEmailOutbox(db, getEmailSender, env.APP_ORIGIN), { connection, concurrency: 1 }),
   new Worker("assignment-reminders", () => enqueueAssignmentReminders(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
   new Worker("weekly-summary", () => enqueueWeeklySummaries(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
+  new Worker("cohort-notifications", () => enqueueCohortStartingEmails(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
 ];
 
 // Daily cron: re-check every lesson's video (catches broken videos before learners hit them)
@@ -62,6 +73,7 @@ await schedulerQueues[3]!.upsertJobScheduler("daily-stale", { pattern: "0 3 * * 
 await schedulerQueues[0]!.upsertJobScheduler("outbox-poll", { every: 1_000 }, { name: "poll" });
 await schedulerQueues[1]!.upsertJobScheduler("due-reminders", { pattern: "0 * * * *", tz: "Asia/Bangkok" }, { name: "due" });
 await schedulerQueues[2]!.upsertJobScheduler("weekly", { pattern: "0 8 * * 1", tz: "Asia/Bangkok" }, { name: "weekly" });
+await schedulerQueues[4]!.upsertJobScheduler("cohort-starting", { pattern: "*/15 * * * *", tz: "Asia/Bangkok" }, { name: "starting" });
 
 for (const w of workers) {
   // Log only the job id/template: job data can hold email addresses and links with tokens

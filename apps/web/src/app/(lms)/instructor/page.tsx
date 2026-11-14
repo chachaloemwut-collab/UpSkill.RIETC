@@ -9,7 +9,8 @@ import { StatCard } from "@/components/common/StatCard";
 import { CreateCourseDialog } from "@/components/instructor/CreateCourseForm";
 import { VISIBILITY, formatDateTh, formatDuration, youtubeThumb } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
-import { listMyCourses } from "@/server/courses/instructor.service";
+import { listInstructors, listMyCourses } from "@/server/courses/instructor.service";
+import { AdminCreateCourseDialog } from "@/components/admin/CourseOwnerActions";
 
 export const metadata: Metadata = { title: "จัดการหลักสูตร" };
 
@@ -17,15 +18,19 @@ export default async function InstructorPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role !== "instructor" && user.role !== "admin") redirect("/");
-  const courses = await listMyCourses(user);
+  const isAdmin = user.role === "admin";
+  const [courses, instructors] = await Promise.all([listMyCourses(user), isAdmin ? listInstructors() : Promise.resolve([])]);
   const learners = courses.reduce((n, c) => n + c.enrollment_count, 0);
   const graduates = courses.reduce((n, c) => n + c.completed_count, 0);
   const broken = courses.reduce((n, c) => n + c.broken_count, 0);
 
   return (
     <>
-      <PageHeader title="จัดการหลักสูตร" description="สร้างและดูแลหลักสูตรของคุณ ติดตามจำนวนผู้เรียน">
-        <CreateCourseDialog />
+      <PageHeader
+        title="จัดการหลักสูตร"
+        description={isAdmin ? "ผู้ดูแลระบบเห็นและแก้ไขได้ทุกรายวิชา สร้างรายวิชาแทนผู้สอน และนำไปจัดเป็นหลักสูตรอบรม" : "สร้างและดูแลหลักสูตรของคุณ ติดตามจำนวนผู้เรียน"}
+      >
+        {isAdmin ? <AdminCreateCourseDialog instructors={instructors} selfId={user.id} /> : <CreateCourseDialog />}
       </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -37,7 +42,7 @@ export default async function InstructorPage() {
 
       <Card className="mt-6">
         <div className="flex items-center justify-between border-b px-5 py-4">
-          <h2 className="font-semibold">หลักสูตรของฉัน</h2>
+          <h2 className="font-semibold">{isAdmin ? "ทุกหลักสูตรในระบบ" : "หลักสูตรของฉัน"}</h2>
           <span className="text-sm text-muted-foreground">{courses.length} หลักสูตร</span>
         </div>
         {courses.length === 0 ? (
@@ -50,6 +55,7 @@ export default async function InstructorPage() {
               <thead>
                 <tr>
                   <th>หลักสูตร</th>
+                  {isAdmin && <th>ผู้สอน</th>}
                   <th>สถานะ</th>
                   <th className="text-right">บทเรียน</th>
                   <th className="text-right">ผู้เรียน</th>
@@ -72,10 +78,12 @@ export default async function InstructorPage() {
                           {c.is_verified_course && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-success" aria-label="Verified" />}
                         </Link>
                       </td>
+                      {isAdmin && <td className="text-muted-foreground">{c.instructor_id === user.id ? "คุณ" : c.instructor_name}</td>}
                       <td>
                         <div className="flex gap-1.5">
                           <Badge variant={vis?.variant ?? "secondary"}>{vis?.label ?? c.visibility}</Badge>
                           {c.broken_count > 0 && <Badge variant="destructive">วิดีโอเสีย {c.broken_count}</Badge>}
+                          {c.program_count > 0 && <Badge variant="outline">ในหลักสูตรอบรม</Badge>}
                         </div>
                       </td>
                       <td className="text-right tabular-nums">

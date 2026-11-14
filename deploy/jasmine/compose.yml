@@ -1,8 +1,9 @@
 # Hosting "มะลิ (Jasmine)" — runs from the upload root (/var/www/hosting/jasmine, SFTP path /files).
-# The hosting admin starts it; the SFTP account cannot control containers:
+# The hosting admin starts it once; afterwards the `deployer` service rebuilds the app when the developer
+# uploads a new release and writes deploy-request over SFTP (scripts/deploy-jasmine.sh deploy):
 #
 #   cd /var/www/hosting/jasmine
-#   docker compose up -d --build          # first time / after each upload
+#   docker compose up -d --build          # first time (also starts the deployer)
 #   docker compose logs -f web worker     # watch
 #
 # Secrets live in ./.env (uploaded separately, never part of the code bundle). Compose reads it both for
@@ -69,6 +70,24 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes: [redis-data:/data]
     networks: [internal]
+
+  # Self-service deploys (see deployer.sh). It holds the Docker socket, which is root-equivalent on the host:
+  # it runs no network, no published port, a read-only filesystem, and only fixed compose commands for this project.
+  deployer:
+    image: docker:27.5.1-cli
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/var/www/hosting/jasmine/deployer.sh"]
+    network_mode: none
+    read_only: true
+    tmpfs: [/tmp]
+    environment:
+      DOCKER_CONFIG: /tmp/docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/www/hosting/jasmine:/var/www/hosting/jasmine
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "3" }
 
 volumes:
   certificates: # issued certificate PDFs — include in backups

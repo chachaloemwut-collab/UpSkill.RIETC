@@ -23,15 +23,21 @@ type EmailJobData =
   | { template: "weekly-summary"; to: string; inProgress: number; completed: number; dashboardLink: string }
   | { template: "video-broken"; to: string; courseTitle: string; lessonTitle: string; manageLink: string }
   | { template: "course-status-changed"; to: string; courseTitle: string; statusLabel: string; manageLink: string }
-  | { template: "system-alert"; to: string; title: string; details: string; manageLink?: string };
+  | { template: "system-alert"; to: string; title: string; details: string; manageLink?: string }
+  | { template: "cohort-application-received"; to: string; programTitle: string; cohortTitle: string; waitlisted: boolean; programLink: string }
+  | { template: "cohort-application-approved"; to: string; programTitle: string; cohortTitle: string; startsAt: string; programLink: string }
+  | { template: "cohort-application-rejected"; to: string; programTitle: string; cohortTitle: string; note?: string }
+  | { template: "cohort-cancelled"; to: string; programTitle: string; cohortTitle: string }
+  | { template: "cohort-starting"; to: string; programTitle: string; cohortTitle: string; startsAt: string; programLink: string }
+  | { template: "announcement"; to: string; title: string; summary: string; link: string };
 
 export type EmailJob = EmailJobData & { locale?: "th" | "en" };
 
 export type EmailTemplate = EmailJob["template"];
 
 const SECURITY = new Set<EmailTemplate>(["verify-email", "reset-password", "password-changed", "account-status-changed"]);
-const COURSE_UPDATE = new Set<EmailTemplate>(["course-suspended", "course-status-changed"]);
-const REMINDER = new Set<EmailTemplate>(["assignment-due-reminder", "weekly-summary"]);
+const COURSE_UPDATE = new Set<EmailTemplate>(["course-suspended", "course-status-changed", "cohort-cancelled", "announcement"]);
+const REMINDER = new Set<EmailTemplate>(["assignment-due-reminder", "weekly-summary", "cohort-starting"]);
 const SYSTEM = new Set<EmailTemplate>(["video-broken", "system-alert"]);
 
 export function emailCategory(template: EmailTemplate): EmailCategory {
@@ -70,6 +76,12 @@ function renderEmailEn(job: EmailJob): { subject: string; text: string; html: st
     case "video-broken": return result(`Course video unavailable: ${job.courseTitle}`, `Lesson: ${job.lessonTitle}`, job.manageLink, "Manage lesson");
     case "course-status-changed": return result(`Course status changed: ${job.courseTitle}`, `Current status: ${job.statusLabel}`, job.manageLink, "Manage course");
     case "system-alert": return result(`System alert: ${job.title}`, job.details, job.manageLink, "Open administration");
+    case "cohort-application-received": return result(`Application received: ${job.programTitle}`, `Cohort: ${job.cohortTitle}. ${job.waitlisted ? "The cohort is full; you are on the waiting list." : "Your application is waiting for review."}`, job.programLink, "View program");
+    case "cohort-application-approved": return result(`Application approved: ${job.programTitle}`, `Cohort: ${job.cohortTitle}. Training starts ${job.startsAt}.`, job.programLink, "View program");
+    case "cohort-application-rejected": return result(`Application result: ${job.programTitle}`, `Your application for ${job.cohortTitle} was not approved.${job.note ? ` Note: ${job.note}` : ""}`);
+    case "cohort-cancelled": return result(`Cohort cancelled: ${job.programTitle}`, `The cohort ${job.cohortTitle} was cancelled.`);
+    case "cohort-starting": return result(`Training has started: ${job.programTitle}`, `Cohort: ${job.cohortTitle}. Start: ${job.startsAt}.`, job.programLink, "Start learning");
+    case "announcement": return result(job.title, job.summary, job.link, "Read more");
   }
 }
 
@@ -116,6 +128,20 @@ export function renderEmail(job: EmailJob): { subject: string; text: string; htm
       return { subject: `สถานะหลักสูตรถูกเปลี่ยน: ${job.courseTitle}`, text: `สถานะปัจจุบัน: ${job.statusLabel}\n${job.manageLink}`, html: `<p>หลักสูตร <b>${esc(job.courseTitle)}</b></p><p>สถานะปัจจุบัน: ${esc(job.statusLabel)}</p>${action(job.manageLink, "จัดการหลักสูตร")}` };
     case "system-alert":
       return { subject: `แจ้งเตือนระบบ: ${job.title}`, text: `${job.details}${job.manageLink ? `\n${job.manageLink}` : ""}`, html: `<p><b>${esc(job.title)}</b></p><p>${esc(job.details)}</p>${job.manageLink ? action(job.manageLink, "เปิดหน้าจัดการ") : ""}` };
+    case "cohort-application-received": {
+      const status = job.waitlisted ? "รอบนี้ที่นั่งเต็มแล้ว คุณอยู่ในรายชื่อสำรอง" : "ใบสมัครอยู่ระหว่างรอผู้ดูแลพิจารณา";
+      return { subject: `ได้รับใบสมัครแล้ว: ${job.programTitle}`, text: `หลักสูตร "${job.programTitle}" รอบ ${job.cohortTitle}\n${status}\n${job.programLink}`, html: `<p>หลักสูตร <b>${esc(job.programTitle)}</b> รอบ ${esc(job.cohortTitle)}</p><p>${esc(status)}</p>${action(job.programLink, "ดูหลักสูตร")}` };
+    }
+    case "cohort-application-approved":
+      return { subject: `อนุมัติการสมัครแล้ว: ${job.programTitle}`, text: `คุณได้รับอนุมัติให้เข้าอบรมหลักสูตร "${job.programTitle}" รอบ ${job.cohortTitle}\nเริ่มอบรม: ${job.startsAt}\n${job.programLink}`, html: `<p>คุณได้รับอนุมัติให้เข้าอบรมหลักสูตร <b>${esc(job.programTitle)}</b> รอบ ${esc(job.cohortTitle)}</p><p>เริ่มอบรม: ${esc(job.startsAt)}</p>${action(job.programLink, "ดูหลักสูตร")}` };
+    case "cohort-application-rejected":
+      return { subject: `ผลการสมัคร: ${job.programTitle}`, text: `ใบสมัครหลักสูตร "${job.programTitle}" รอบ ${job.cohortTitle} ไม่ได้รับการอนุมัติ${optionalText("หมายเหตุ", job.note)}`, html: `<p>ใบสมัครหลักสูตร <b>${esc(job.programTitle)}</b> รอบ ${esc(job.cohortTitle)} ไม่ได้รับการอนุมัติ</p>${optionalHtml("หมายเหตุ", job.note)}` };
+    case "cohort-cancelled":
+      return { subject: `ยกเลิกรอบอบรม: ${job.programTitle}`, text: `รอบอบรม ${job.cohortTitle} ของหลักสูตร "${job.programTitle}" ถูกยกเลิก`, html: `<p>รอบอบรม ${esc(job.cohortTitle)} ของหลักสูตร <b>${esc(job.programTitle)}</b> ถูกยกเลิก</p>` };
+    case "cohort-starting":
+      return { subject: `เริ่มอบรมแล้ว: ${job.programTitle}`, text: `หลักสูตร "${job.programTitle}" รอบ ${job.cohortTitle} เริ่มอบรมแล้ว (${job.startsAt})\n${job.programLink}`, html: `<p>หลักสูตร <b>${esc(job.programTitle)}</b> รอบ ${esc(job.cohortTitle)} เริ่มอบรมแล้ว</p><p>เริ่ม: ${esc(job.startsAt)}</p>${action(job.programLink, "เริ่มเรียน")}` };
+    case "announcement":
+      return { subject: job.title, text: `${job.summary}\n${job.link}`, html: `<p><b>${esc(job.title)}</b></p><p>${esc(job.summary)}</p>${action(job.link, "อ่านรายละเอียด")}` };
   }
 }
 

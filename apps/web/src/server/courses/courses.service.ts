@@ -5,6 +5,8 @@ import { ctx } from "../context";
 import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import type { CurrentUser } from "../auth/session";
+import { programsForCourse } from "../programs/programs.service";
+import { assertProfileComplete } from "../auth/profile.service";
 
 export async function listPublishedCourses() {
   return ctx()
@@ -103,6 +105,7 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
     };
   });
 
+  const programs = await programsForCourse(course.id);
   const certificate = user
     ? await db.selectFrom("certificates").select(["certificate_code", "revoked_at"]).where("user_id", "=", user.id).where("course_id", "=", course.id).executeTakeFirst()
     : undefined;
@@ -118,6 +121,8 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
     preTest: { required: assessmentState.pre_questions > 0, completed: preTestCompleted },
     postTest: { configured: assessmentState.post_questions > 0 },
     certificate: certificate ?? null,
+    programs: programs.map((p) => ({ slug: p.slug, title: p.title })),
+    programOnly: course.visibility === "unlisted" && programs.length > 0,
   };
 }
 
@@ -127,6 +132,12 @@ export async function enroll(user: CurrentUser, courseId: string): Promise<void>
   if (!course || (course.visibility !== "published" && course.visibility !== "unlisted")) throw new HttpError(404, "NOT_FOUND");
   // Anti-farming: an instructor can't earn a certificate from their own course
   if (course.instructor_id === user.id) throw new HttpError(403, "CANNOT_ENROLL_OWN_COURSE");
+  // An unlisted course that belongs to a live training program is reachable only through a cohort registration
+  // (approval creates the enrollment), so the link can't be used to skip the program's conditions.
+  if (course.visibility === "unlisted" && (await programsForCourse(courseId)).length > 0) {
+    throw new HttpError(403, "PROGRAM_REGISTRATION_REQUIRED", "รายวิชานี้เปิดให้เรียนผ่านการสมัครหลักสูตรอบรมเท่านั้น");
+  }
+  await assertProfileComplete(user.id);
 
   await db.transaction().execute(async (trx) => {
     const now = new Date();

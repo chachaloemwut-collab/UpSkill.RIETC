@@ -29,8 +29,13 @@
 │   │       │       ├── courses/         คลังหลักสูตร (ค้นหา/กรอง) · [slug] รายละเอียด, lessons/[id] (player), quiz, certificate
 │   │       │       ├── my-courses/      คอร์สของฉัน + ความคืบหน้า
 │   │       │       ├── certificates/    ใบรับรองของฉัน
-│   │       │       ├── instructor/      แดชบอร์ดผู้สอน + editor (tabs: บทเรียน/ข้อสอบ/ตั้งค่า)
+│   │       │       ├── programs/        หลักสูตรอบรมสาธารณะ · [slug] รายวิชา + รอบอบรม + สมัคร/ยกเลิก
+│   │       │       ├── announcements/   ประกาศและกิจกรรมสาธารณะ · [slug] รายละเอียด
+│   │       │       ├── instructor/      แดชบอร์ดผู้สอน (admin เห็นทุกรายวิชา) + editor (tabs: บทเรียน/ข้อสอบ/ตั้งค่า)
 │   │       │       ├── admin/           สถิติ + tabs: หลักสูตร, cheat flags, ผู้ใช้, เพิกถอนใบรับรอง
+│   │       │       │   ├── programs/    หลักสูตรอบรม: ข้อมูล, รายวิชา, รอบอบรม, การเผยแพร่
+│   │       │       │   ├── cohorts/     รอบอบรม: ผู้สมัคร (อนุมัติ/ไม่อนุมัติ/CSV) + ตั้งค่าวันที่/ที่นั่ง/เงื่อนไข
+│   │       │       │   └── announcements/ ประกาศประชาสัมพันธ์ + ส่งอีเมลครั้งเดียว
 │   │       │       ├── me/              ตั้งค่าบัญชี, ชื่อจริง, รหัสผ่าน, ผูก Google
 │   │       │       └── verify/          ฟอร์มกรอกรหัส + [code] หน้าตรวจสอบสาธารณะ
 │   │       ├── components/
@@ -120,3 +125,17 @@ quiz ผ่าน → enrollments.status='completed'
 - ทดสอบ player บนอุปกรณ์จริง: iOS Safari, Android Chrome, iPad Split View, LINE/Facebook in-app browser
 - Deploy: reverse proxy ที่ตั้ง `X-Real-IP`, TLS, Secret Manager, backup DB
 - Monitoring/alert: verify ผล `tampered`, อัตรา `anticheat_events`, job ที่ fail ใน BullMQ
+
+## Flow: หลักสูตรอบรมและรอบอบรม
+
+1. admin สร้างรายวิชา (กำหนดผู้สอนได้) แล้วรวมเป็น `programs` ผ่าน `program_courses` (เรียงลำดับ, วิชาบังคับ/เลือก)
+2. เผยแพร่หลักสูตรได้เมื่อผ่าน `programPublishProblems` (packages/core) แนะนำให้ตั้งรายวิชาเป็น `unlisted`
+   รายวิชา `unlisted` ที่อยู่ในหลักสูตรที่เผยแพร่ ลงทะเบียนตรงไม่ได้ (`PROGRAM_REGISTRATION_REQUIRED`)
+3. `program_cohorts` เก็บเฉพาะสถานะที่ admin กำหนด (draft/published/cancelled) ส่วน phase ที่ผู้ใช้เห็น
+   (scheduled/open/closed/in_progress/completed) คำนวณจากวันที่และเวลาปัจจุบันด้วย `deriveCohortPhase` ทุกครั้ง
+4. สมัคร: ล็อกแถว cohort (`FOR UPDATE`) → ตรวจ phase, กฎผู้สอน, `evaluateEligibility`, คำตอบใบสมัคร → `decideSeat`
+   ไม่ต้องอนุมัติ = approved + ลงทะเบียนทุกรายวิชา (`enrollments.cohort_id`) · ต้องอนุมัติ = pending · ที่นั่งเต็ม = waitlisted
+5. เข้าเรียนได้ตั้งแต่ `starts_at` ของรอบ (`COHORT_NOT_STARTED`) · ไม่อนุมัติ/ยกเลิก จะเลื่อนรายชื่อสำรองอัตโนมัติ
+6. ยกเลิกรอบ = ยกเลิกใบสมัครที่ค้าง เพิกถอน enrollment ที่ได้จากรอบนั้น และส่งอีเมลแจ้ง
+7. worker `cohort-notifications` (ทุก 15 นาที) ส่งอีเมลแจ้งผู้ได้รับอนุมัติเมื่อรอบเริ่ม
+

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo, type ReactNode } from "react";
 import {
-  Award, BookOpen, LayoutDashboard, Library, LogIn, Presentation, Search, Settings, ShieldAlert, ShieldCheck, UserPlus, UsersRound,
+  Award, BookOpen, CalendarRange, GraduationCap, LayoutDashboard, Library, LogIn, Megaphone, Presentation, Search, Settings, ShieldAlert, ShieldCheck, UserPlus, UsersRound,
 } from "lucide-react";
 import {
   AppShell, Avatar, Button, DropdownMenu, InputGroup, LogoutIcon, ThemeCustomizer, ThemeToggle, buttonClass, useActionScene, useToast,
@@ -26,6 +26,8 @@ function buildNav(user: ShellUser | null): ShellNavGroup[] {
       items: [
         { id: "/", href: "/", label: user ? "แดชบอร์ด" : "หน้าแรก", icon: <LayoutDashboard /> },
         { id: "/courses", href: "/courses", label: "คลังหลักสูตร", icon: <Library /> },
+        { id: "/programs", href: "/programs", label: "หลักสูตรอบรม", icon: <GraduationCap /> },
+        { id: "/announcements", href: "/announcements", label: "ประกาศและกิจกรรม", icon: <Megaphone /> },
         ...(user
           ? [
               { id: "/my-courses", href: "/my-courses", label: "คอร์สของฉัน", icon: <BookOpen /> },
@@ -40,7 +42,14 @@ function buildNav(user: ShellUser | null): ShellNavGroup[] {
     groups.push({ label: "ผู้สอน", items: [{ id: "/instructor", href: "/instructor", label: "จัดการหลักสูตร", icon: <Presentation /> }, { id: "/assignments", href: "/assignments", label: "มอบหมายหลักสูตร", icon: <UsersRound /> }] });
   }
   if (user?.role === "admin") {
-    groups.push({ label: "ผู้ดูแลระบบ", items: [{ id: "/admin", href: "/admin", label: "ภาพรวมระบบ", icon: <ShieldAlert /> }] });
+    groups.push({
+      label: "ผู้ดูแลระบบ",
+      items: [
+        { id: "/admin", href: "/admin", label: "ภาพรวมระบบ", icon: <ShieldAlert /> },
+        { id: "/admin/programs", href: "/admin/programs", label: "หลักสูตรและรอบอบรม", icon: <CalendarRange /> },
+        { id: "/admin/announcements", href: "/admin/announcements", label: "ประกาศประชาสัมพันธ์", icon: <Megaphone /> },
+      ],
+    });
   }
   if (user) groups.push({ label: "บัญชี", items: [{ id: "/me", href: "/me", label: "ตั้งค่าบัญชี", icon: <Settings /> }] });
   return groups;

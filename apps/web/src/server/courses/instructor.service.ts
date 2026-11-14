@@ -3,7 +3,6 @@
  * IDOR check `course.instructor_id === current_user.id` (admins may manage any course).
  */
 import "server-only";
-import { randomBytes } from "node:crypto";
 import { extractYouTubeVideoId, type VideoValidation } from "@upskill/core";
 import { sql, type Tx } from "@upskill/db";
 import { fetchVideos } from "@upskill/infra/youtube-client";
@@ -11,6 +10,7 @@ import { ctx } from "../context";
 import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import { audit } from "../audit";
+import { slugify } from "../slug";
 import type { CurrentUser } from "../auth/session";
 
 export const PUBLISH_RULES = { minTotalDurationSec: 600, minQuestions: 3 } as const;
@@ -36,31 +36,63 @@ async function loadOwnedCourse(user: CurrentUser, courseId: string) {
   return c;
 }
 
-function slugify(title: string): string {
-  const base = title
-    .normalize("NFKD")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-  // Thai titles produce an empty ASCII slug: always add a random suffix for uniqueness
-  return `${base || "course"}-${randomBytes(3).toString("hex")}`;
-}
-
+/** Instructors see their own courses; admins see every course (with its instructor) so they can manage all of them */
 export async function listMyCourses(user: CurrentUser) {
   return ctx()
     .db.selectFrom("courses as c")
+    .innerJoin("users as u", "u.id", "c.instructor_id")
     .select([
-      "c.id", "c.slug", "c.title", "c.visibility", "c.total_duration_sec", "c.is_verified_course", "c.updated_at",
+      "c.id", "c.slug", "c.title", "c.visibility", "c.total_duration_sec", "c.is_verified_course", "c.updated_at", "c.instructor_id",
+      sql<string>`coalesce(u.legal_full_name_th, u.legal_full_name_en, split_part(u.email, '@', 1))`.as("instructor_name"),
       sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("lesson_count"),
       sql<number>`(select count(*)::int from enrollments e where e.course_id = c.id)`.as("enrollment_count"),
       sql<number>`(select count(*)::int from lessons l where l.course_id = c.id and l.video_status <> 'active')`.as("broken_count"),
       sql<number>`(select count(*)::int from enrollments e where e.course_id = c.id and e.status = 'completed')`.as("completed_count"),
       sql<string | null>`(select l.youtube_video_id from lessons l where l.course_id = c.id order by l.sequence_order limit 1)`.as("cover_video_id"),
+      sql<number>`(select count(*)::int from program_courses pc where pc.course_id = c.id)`.as("program_count"),
     ])
-    .where("c.instructor_id", "=", user.id)
+    .$if(user.role !== "admin", (q) => q.where("c.instructor_id", "=", user.id))
     .orderBy("c.updated_at", "desc")
     .execute();
+}
+
+/** Users who may own a course (active instructors and admins), for the admin's instructor picker */
+export async function listInstructors() {
+  return ctx()
+    .db.selectFrom("users")
+    .select(["id", "email", sql<string>`coalesce(legal_full_name_th, legal_full_name_en, split_part(email, '@', 1))`.as("name"), "role"])
+    .where("role", "in", ["instructor", "admin"])
+    .where("status", "=", "active")
+    .where("is_system_owner", "=", false)
+    .orderBy("email")
+    .limit(500)
+    .execute();
+}
+
+async function assertCourseOwnerCandidate(instructorId: string) {
+  const owner = await ctx()
+    .db.selectFrom("users")
+    .select(["id", "role", "status"])
+    .where("id", "=", instructorId)
+    .executeTakeFirst();
+  if (!owner || owner.status !== "active" || (owner.role !== "instructor" && owner.role !== "admin")) {
+    throw new HttpError(422, "INSTRUCTOR_INVALID", "ผู้สอนต้องเป็นบัญชีผู้สอนหรือผู้ดูแลที่ใช้งานอยู่");
+  }
+}
+
+/** Admin moves a course to another instructor. Audited: it changes who signs certificates and who may not enroll. */
+export async function reassignInstructor(admin: CurrentUser, courseId: string, instructorId: string, meta: { ip: string }) {
+  if (admin.role !== "admin") throw new HttpError(403, "FORBIDDEN");
+  const { db } = ctx();
+  const course = await db.selectFrom("courses").select(["id", "instructor_id"]).where("id", "=", courseId).executeTakeFirst();
+  if (!course) throw new HttpError(404, "NOT_FOUND");
+  if (course.instructor_id === instructorId) return;
+  await assertCourseOwnerCandidate(instructorId);
+  // Anti-farming: the new instructor must not be a learner of this course
+  const enrolled = await db.selectFrom("enrollments").select("id").where("course_id", "=", courseId).where("user_id", "=", instructorId).executeTakeFirst();
+  if (enrolled) throw new HttpError(409, "INSTRUCTOR_ENROLLED", "ผู้สอนคนนี้ลงทะเบียนเรียนรายวิชานี้อยู่ จึงเป็นผู้สอนไม่ได้");
+  await db.updateTable("courses").set({ instructor_id: instructorId }).where("id", "=", courseId).execute();
+  await audit(db, { action: "course.instructor_changed", userId: admin.id, entityType: "course", entityId: courseId, ip: meta.ip, details: { from: course.instructor_id, to: instructorId } });
 }
 
 export async function getCourseForEditing(user: CurrentUser, courseId: string) {
@@ -84,13 +116,27 @@ export async function getCourseForEditing(user: CurrentUser, courseId: string) {
   return { course, lessons, questions };
 }
 
-export async function createCourse(user: CurrentUser, input: { title: string; description?: string | undefined }) {
+export async function createCourse(
+  user: CurrentUser,
+  input: { title: string; description?: string | undefined; instructorId?: string | undefined },
+  meta?: { ip: string },
+) {
   if (user.role !== "instructor" && user.role !== "admin") throw new HttpError(403, "FORBIDDEN");
-  const c = await ctx()
-    .db.insertInto("courses")
-    .values({ instructor_id: user.id, title: input.title.trim(), description: input.description?.trim() || null, slug: slugify(input.title) })
+  // Only admins may create a course on behalf of another instructor
+  if (input.instructorId && input.instructorId !== user.id) {
+    if (user.role !== "admin") throw new HttpError(403, "FORBIDDEN");
+    await assertCourseOwnerCandidate(input.instructorId);
+  }
+  const instructorId = input.instructorId ?? user.id;
+  const { db } = ctx();
+  const c = await db
+    .insertInto("courses")
+    .values({ instructor_id: instructorId, title: input.title.trim(), description: input.description?.trim() || null, slug: slugify(input.title, "course") })
     .returning(["id", "slug"])
     .executeTakeFirstOrThrow();
+  if (instructorId !== user.id) {
+    await audit(db, { action: "course.created_for_instructor", userId: user.id, entityType: "course", entityId: c.id, ip: meta?.ip, details: { instructorId } });
+  }
   return c;
 }
 

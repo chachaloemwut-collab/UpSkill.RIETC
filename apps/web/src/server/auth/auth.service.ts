@@ -6,7 +6,7 @@
  * for unknown emails so response time is the same.
  */
 import "server-only";
-import { decideGoogleSignIn, generateToken, hashToken, normalizeName, type GoogleClaims } from "@upskill/core";
+import { PDPA_NOTICE_VERSION, decideGoogleSignIn, generateToken, hashToken, normalizeName, type GoogleClaims, type ProfileInput } from "@upskill/core";
 import { PG, pgErrorCode, type Database, type Tx } from "@upskill/db";
 import { hashPassword, validatePasswordPolicy, verifyPassword } from "@upskill/infra/password";
 import { ctx } from "../context";
@@ -14,6 +14,7 @@ import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import { audit } from "../audit";
 import { createSession, revokeAllSessions } from "./session";
+import { NATIONAL_ID_IN_USE, checkedProfile, insertProfile, nationalIdInUse } from "./profile.service";
 
 const VERIFY_TTL_MS = 24 * 3600_000;
 const RESET_EMAIL_TTL_MS = 15 * 60_000; // spec: 15 minutes
@@ -41,8 +42,15 @@ async function addVerificationEmail(db: Database | Tx, userId: string, email: st
   );
 }
 
-export async function register(input: { email: string; password: string }): Promise<void> {
+/**
+ * Sign-up with the full member profile. Anti-enumeration: an existing email gets the same answer as a new one
+ * (and its national ID is never compared). A national ID already in use is reported, because one person must
+ * not hold two accounts; the per-IP rate limit bounds how fast IDs can be probed.
+ */
+export async function register(input: { email: string; password: string; profile: ProfileInput; pdpaConsent: boolean }, meta: Meta): Promise<void> {
   assertPassword(input.password);
+  if (input.pdpaConsent !== true) throw new HttpError(400, "PDPA_CONSENT_REQUIRED", "กรุณายอมรับประกาศความเป็นส่วนตัวก่อนสมัครสมาชิก");
+  const profile = checkedProfile(input.profile);
   const { db } = ctx();
   const email = input.email.trim().toLowerCase();
 
@@ -52,21 +60,26 @@ export async function register(input: { email: string; password: string }): Prom
     if (!existing.email_verified_at) await db.transaction().execute((trx) => addVerificationEmail(trx, existing.id, email));
     return;
   }
+  if (await nationalIdInUse(profile.nationalId)) throw new HttpError(409, "NATIONAL_ID_IN_USE", NATIONAL_ID_IN_USE);
 
   const passwordHash = await hashPassword(input.password);
+  let userId: string | null = null;
   try {
-    await db.transaction().execute(async (trx) => {
+    userId = await db.transaction().execute(async (trx) => {
       const user = await trx
         .insertInto("users")
         .values({ email, password_hash: passwordHash, password_updated_at: new Date() })
         .returning("id")
         .executeTakeFirstOrThrow();
+      await insertProfile(trx, user.id, profile);
       await addVerificationEmail(trx, user.id, email);
+      return user.id;
     });
   } catch (err) {
-    if (pgErrorCode(err) === PG.UNIQUE_VIOLATION) return; // concurrent register: same generic response
+    if (pgErrorCode(err) === PG.UNIQUE_VIOLATION) return; // concurrent register of the same email: same generic response
     throw err;
   }
+  await audit(db, { action: "user.pdpa_consent", userId, ip: meta.ip, userAgent: meta.userAgent, details: { notice: PDPA_NOTICE_VERSION, via: "register" } });
 }
 
 export async function resendVerification(emailRaw: string): Promise<void> {
@@ -275,6 +288,7 @@ export async function applyGoogleSignIn(
     case "CREATE_USER_AND_LOGIN": {
       const created = await db.transaction().execute(async (trx) => {
         const u = await trx.insertInto("users").values({ email: claims.email, email_verified_at: new Date() }).returning("id").executeTakeFirstOrThrow();
+        // Google gives no profile: the member completes it (with the privacy notice) on the profile page
         await trx.insertInto("user_oauth_accounts").values({ user_id: u.id, provider_user_id: claims.sub, provider_email: claims.email }).execute();
         return u;
       });
@@ -295,7 +309,7 @@ export async function applyGoogleSignIn(
       .execute();
     return { redirectTo: `/reset-password?token=${token}` };
   }
-  return { redirectTo: "/" };
+  return { redirectTo: decision.action === "CREATE_USER_AND_LOGIN" ? "/me/profile?welcome=1" : "/" };
 }
 
 /** Link Google to the logged-in account from the settings page */

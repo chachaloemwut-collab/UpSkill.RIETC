@@ -22,6 +22,12 @@ const jobs: EmailJob[] = [
   { template: "video-broken", to: "a@example.com", courseTitle: "Course", lessonTitle: "Lesson", manageLink: "https://example.com/manage" },
   { template: "course-status-changed", to: "a@example.com", courseTitle: "Course", statusLabel: "published", manageLink: "https://example.com/manage" },
   { template: "system-alert", to: "a@example.com", title: "Alert", details: "Details", manageLink: "https://example.com/admin" },
+  { template: "cohort-application-received", to: "a@example.com", programTitle: "Program", cohortTitle: "Cohort 1", waitlisted: true, programLink: "https://example.com/programs/p" },
+  { template: "cohort-application-approved", to: "a@example.com", programTitle: "Program", cohortTitle: "Cohort 1", startsAt: "2026-12-15", programLink: "https://example.com/programs/p" },
+  { template: "cohort-application-rejected", to: "a@example.com", programTitle: "Program", cohortTitle: "Cohort 1", note: "Full" },
+  { template: "cohort-cancelled", to: "a@example.com", programTitle: "Program", cohortTitle: "Cohort 1" },
+  { template: "cohort-starting", to: "a@example.com", programTitle: "Program", cohortTitle: "Cohort 1", startsAt: "2026-12-15", programLink: "https://example.com/programs/p" },
+  { template: "announcement", to: "a@example.com", title: "Open day", summary: "Join us", link: "https://example.com/announcements/a" },
 ];
 
 describe("email templates", () => {

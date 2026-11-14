@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { decryptSettingSecret, encryptSettingSecret, formatSender, smtpUrlFromSettings } from "./secret-box.ts";
+import { decryptSettingSecret, encryptSettingSecret, formatSender, nationalIdDigest, smtpUrlFromSettings } from "./secret-box.ts";
 
 describe("encrypted runtime settings", () => {
   it("round-trips an SMTP password without storing plaintext", () => {
@@ -29,3 +29,18 @@ describe("encrypted runtime settings", () => {
   });
 });
 
+
+describe("nationalIdDigest", () => {
+  const key = Buffer.alloc(32, 7).toString("base64url");
+  const other = Buffer.alloc(32, 8).toString("base64url");
+  it("is deterministic per key, 32 bytes, and never contains the number", () => {
+    const a = nationalIdDigest("1101700203451", key);
+    expect(a).toHaveLength(32);
+    expect(a.equals(nationalIdDigest("1101700203451", key))).toBe(true);
+    expect(a.toString("hex")).not.toContain("1101700203451");
+  });
+  it("differs across ids and keys", () => {
+    expect(nationalIdDigest("1101700203451", key).equals(nationalIdDigest("1101700203452", key))).toBe(false);
+    expect(nationalIdDigest("1101700203451", key).equals(nationalIdDigest("1101700203451", other))).toBe(false);
+  });
+});
