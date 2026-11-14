@@ -1,5 +1,5 @@
 import { sql, type Database } from "@upskill/db";
-import { enqueueAdminAlert } from "./process-email-outbox";
+import { enqueueAdminAlert } from "./process-email-outbox.ts";
 
 // How many anticheat flags in a rolling hour before we page the admins. Deliberately high:
 // a few false positives are expected, but a large spike means either a coordinated cheating
