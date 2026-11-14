@@ -8,7 +8,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Maximize, Minimize } from "lucide-react";
+import { Maximize, Minimize, CircleHelp } from "lucide-react";
 import { PlayPauseIcon, useToast } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { HEARTBEAT } from "@upskill/core/heartbeat";
@@ -32,6 +32,7 @@ interface Props {
   initialMaxWatchedSec: number;
   minWatchPercentage: number;
   initiallyCompleted: boolean;
+  checkpoint: { question: string; options: string[]; atSec: number } | null;
 }
 
 async function postJson(url: string, body?: unknown): Promise<Response> {
@@ -44,7 +45,7 @@ async function postJson(url: string, body?: unknown): Promise<Response> {
   });
 }
 
-export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatchedSec, minWatchPercentage, initiallyCompleted }: Props) {
+export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatchedSec, minWatchPercentage, initiallyCompleted, checkpoint }: Props) {
   const router = useRouter();
   const completedRef = useRef(initiallyCompleted);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -56,6 +57,8 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
   const maxWatchedRef = useRef(initialMaxWatchedSec);
   const focusPauseRef = useRef(false);
   const lastFocusEventAtRef = useRef(0);
+  const checkpointPassedRef = useRef(false);
+  const checkpointOpenRef = useRef(false);
 
   const [status, setStatus] = useState<Status>(initiallyCompleted ? { kind: "completed" } : { kind: "idle" });
   const [position, setPosition] = useState(0);
@@ -64,6 +67,9 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
   const [playing, setPlaying] = useState(false);
   const [pseudoFullscreen, setPseudoFullscreen] = useState(false);
   const [ready, setReady] = useState(false);
+  const [checkpointOpen, setCheckpointOpen] = useState(false);
+  const [checkpointError, setCheckpointError] = useState<string | null>(null);
+  const [checkpointBusy, setCheckpointBusy] = useState(false);
 
   const startSession = useCallback(async () => {
     const res = await postJson(`/api/learning/lessons/${lessonId}/start-session`);
@@ -205,13 +211,22 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
     }, HEARTBEAT.INTERVAL_SEC * 1000);
     const ui = setInterval(() => {
       const p = playerRef.current;
-      if (p) setPosition(p.getCurrentTime());
+      if (!p) return;
+      const t = p.getCurrentTime();
+      setPosition(t);
+      // In-video checkpoint: pause and ask once the playhead reaches it (until answered correctly).
+      if (checkpoint && !checkpointPassedRef.current && !checkpointOpenRef.current && t >= checkpoint.atSec) {
+        checkpointOpenRef.current = true;
+        p.pauseVideo();
+        setPlaying(false);
+        setCheckpointOpen(true);
+      }
     }, 500);
     return () => {
       clearInterval(hb);
       clearInterval(ui);
     };
-  }, [sendHeartbeat]);
+  }, [sendHeartbeat, checkpoint]);
 
   // Pause immediately when the page is hidden/minimized. Do not use window.blur:
   // focusing the YouTube iframe itself can emit blur and would make playback unusable.
@@ -238,6 +253,28 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
     p.seekTo(targetSec, true);
   };
 
+  const submitCheckpoint = async (optionIndex: number) => {
+    setCheckpointBusy(true);
+    setCheckpointError(null);
+    try {
+      const res = await postJson(`/api/learning/lessons/${lessonId}/checkpoint`, { option_index: optionIndex });
+      const data = (await res.json()) as { correct?: boolean };
+      if (data.correct) {
+        checkpointPassedRef.current = true;
+        checkpointOpenRef.current = false;
+        setCheckpointOpen(false);
+        playerRef.current?.playVideo();
+        setPlaying(true);
+      } else {
+        setCheckpointError("คำตอบไม่ถูกต้อง ลองอีกครั้ง");
+      }
+    } catch {
+      setCheckpointError("ไม่สามารถตรวจคำตอบได้ กรุณาลองใหม่");
+    } finally {
+      setCheckpointBusy(false);
+    }
+  };
+
   const toggleFullscreen = async () => {
     const el = containerRef.current;
     if (!el) return;
@@ -262,6 +299,30 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
       <div ref={containerRef} className={pseudoFullscreen ? "fixed inset-0 z-50 flex flex-col justify-center bg-black" : "relative"}>
         <div className="relative aspect-video w-full">
           <div ref={hostRef} className="absolute inset-0 h-full w-full" />
+          {checkpointOpen && checkpoint && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/80 p-4">
+              <div className="w-full max-w-md rounded-xl border bg-background p-5 text-foreground shadow-xl">
+                <p className="mb-1 flex items-center gap-2 font-semibold">
+                  <CircleHelp className="h-5 w-5" /> คำถามระหว่างเรียน
+                </p>
+                <p className="mb-4 text-sm">{checkpoint.question}</p>
+                <div className="grid gap-2">
+                  {checkpoint.options.map((opt, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={checkpointBusy}
+                      onClick={() => void submitCheckpoint(i)}
+                      className="rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-muted disabled:opacity-50"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+                {checkpointError && <p className="mt-3 text-sm text-destructive">{checkpointError}</p>}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3 bg-zinc-950 px-3 py-2 text-white">

@@ -101,7 +101,7 @@ export async function getCourseForEditing(user: CurrentUser, courseId: string) {
   const course = await db.selectFrom("courses").selectAll().where("id", "=", courseId).executeTakeFirstOrThrow();
   const lessons = await db
     .selectFrom("lessons")
-    .select(["id", "sequence_order", "title", "youtube_video_id", "duration_sec", "video_status"])
+    .select(["id", "sequence_order", "title", "youtube_video_id", "duration_sec", "video_status", "checkpoint_question", "checkpoint_options", "checkpoint_correct_index", "checkpoint_at_sec"])
     .where("course_id", "=", courseId)
     .orderBy("sequence_order")
     .execute();
@@ -244,6 +244,25 @@ export async function replaceLessonVideo(user: CurrentUser, courseId: string, le
 export async function renameLesson(user: CurrentUser, courseId: string, lessonId: string, title: string) {
   await loadOwnedCourse(user, courseId);
   await ctx().db.updateTable("lessons").set({ title: title.trim() }).where("id", "=", lessonId).where("course_id", "=", courseId).execute();
+}
+
+export async function setLessonCheckpoint(
+  user: CurrentUser,
+  courseId: string,
+  lessonId: string,
+  input: { question: string; options: string[]; correctIndex: number; atSec: number } | null,
+) {
+  await loadOwnedCourse(user, courseId);
+  await ctx()
+    .db.updateTable("lessons")
+    .set(
+      input === null
+        ? { checkpoint_question: null, checkpoint_options: null, checkpoint_correct_index: null, checkpoint_at_sec: null }
+        : { checkpoint_question: input.question, checkpoint_options: JSON.stringify(input.options), checkpoint_correct_index: input.correctIndex, checkpoint_at_sec: input.atSec },
+    )
+    .where("id", "=", lessonId)
+    .where("course_id", "=", courseId)
+    .execute();
 }
 
 export async function deleteLesson(user: CurrentUser, courseId: string, lessonId: string) {

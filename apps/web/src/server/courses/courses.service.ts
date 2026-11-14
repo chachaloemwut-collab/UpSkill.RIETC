@@ -62,6 +62,7 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
     .leftJoin("lesson_progress as p", (j) => j.onRef("p.lesson_id", "=", "l.id").on("p.enrollment_id", "=", enrollment?.id ?? "00000000-0000-0000-0000-000000000000"))
     .select([
       "l.id", "l.sequence_order", "l.title", "l.youtube_video_id", "l.duration_sec", "l.video_status",
+      "l.checkpoint_question", "l.checkpoint_options", "l.checkpoint_at_sec",
       "p.is_completed", "p.max_watched_sec", "p.watched_chunks", "p.total_chunks_required", "p.accumulated_valid_sec",
       sql<number>`(select count(*)::int from quiz_questions q where q.lesson_id = l.id and q.assessment_type = 'lesson' and q.is_active)`.as("test_question_count"),
       sql<number>`(select count(*)::int from quiz_attempts a where a.enrollment_id = ${enrollment?.id ?? "00000000-0000-0000-0000-000000000000"} and a.lesson_id = l.id and a.assessment_type = 'lesson' and a.is_passed)`.as("passed_test_count"),
@@ -102,6 +103,9 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
       unlocked,
       lessonTestRequired,
       lessonTestPassed,
+      checkpoint: l.checkpoint_question
+        ? { question: l.checkpoint_question, options: (l.checkpoint_options ?? []) as string[], atSec: l.checkpoint_at_sec ?? 0 }
+        : null,
     };
   });
 

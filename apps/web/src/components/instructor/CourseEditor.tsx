@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { ArrowDown, ArrowUp, Check, Circle, ExternalLink, Minus, Plus, RefreshCw, Rocket, Trash2, TriangleAlert, SquarePlay } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Circle, CircleHelp, ExternalLink, Minus, Plus, RefreshCw, Rocket, Trash2, TriangleAlert, SquarePlay } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { VISIBILITY, formatDuration } from "@/lib/format";
@@ -36,7 +36,7 @@ export interface EditorData {
     credential_achievement_th: string;
     credential_achievement_en: string | null;
   };
-  lessons: Array<{ id: string; sequence_order: number; title: string; youtube_video_id: string; duration_sec: number; video_status: string }>;
+  lessons: Array<{ id: string; sequence_order: number; title: string; youtube_video_id: string; duration_sec: number; video_status: string; checkpoint_question: string | null; checkpoint_options: unknown | null; checkpoint_correct_index: number | null; checkpoint_at_sec: number | null }>;
   questions: Array<{
     id: string;
     question_text: string;
@@ -245,6 +245,7 @@ function LessonsSection({ base, lessons, devManualDuration }: { base: string; le
   const a = useAction();
   const [replacing, setReplacing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<EditorData["lessons"][number] | null>(null);
+  const [checkpointing, setCheckpointing] = useState<string | null>(null);
 
   async function onAdd(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -307,6 +308,11 @@ function LessonsSection({ base, lessons, devManualDuration }: { base: string; le
                         <RefreshCw className="h-4 w-4" />
                       </Button>
                     </Tooltip>
+                    <Tooltip content="คำถามระหว่างเรียน">
+                      <Button variant="ghost" size="icon" onClick={() => setCheckpointing(checkpointing === l.id ? null : l.id)} aria-label="คำถามระหว่างเรียน">
+                        <CircleHelp className="h-4 w-4" />
+                      </Button>
+                    </Tooltip>
                     <Tooltip content="ลบบทเรียน">
                       <Button variant="ghost" size="icon" disabled={a.busy} onClick={() => setDeleting(l)} aria-label="ลบบทเรียน" className="text-muted-foreground hover:text-destructive">
                         <Trash2 className="h-4 w-4" />
@@ -330,6 +336,67 @@ function LessonsSection({ base, lessons, devManualDuration }: { base: string; le
                     <Button type="submit" loading={a.busy}>
                       บันทึก
                     </Button>
+                  </form>
+                )}
+                {checkpointing === l.id && (
+                  <form
+                    className="grid animate-slide-up gap-2 rounded-md bg-muted/50 p-3"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const f = new FormData(e.currentTarget);
+                      const options = String(f.get("options") ?? "")
+                        .split("\n")
+                        .map((s) => s.trim())
+                        .filter(Boolean);
+                      if (options.length < 2 || options.length > 6) return;
+                      const ok = await a.run(
+                        `${base}/lessons/${l.id}`,
+                        {
+                          method: "PATCH",
+                          body: {
+                            checkpoint: {
+                              question: String(f.get("question") ?? ""),
+                              options,
+                              correct_index: Number(f.get("correct_index")),
+                              at_sec: Number(f.get("at_sec")),
+                            },
+                          },
+                        },
+                        "บันทึกคำถามระหว่างเรียนแล้ว",
+                      );
+                      if (ok) setCheckpointing(null);
+                    }}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input name="question" placeholder="คำถาม (เช่น เนื้อหาในคลิปกล่าวถึงอะไร?)" required className="min-w-0 flex-1 bg-background" defaultValue={l.checkpoint_question ?? ""} />
+                      <Input name="at_sec" type="number" min={1} placeholder="วินาทีที่โผล่" required className="w-32 bg-background" defaultValue={l.checkpoint_at_sec ?? undefined} />
+                    </div>
+                    <Textarea
+                      name="options"
+                      placeholder={"ตัวเลือก (หนึ่งบรรทัดต่อข้อ)\n2–6 ข้อ"}
+                      rows={3}
+                      className="bg-background"
+                      defaultValue={Array.isArray(l.checkpoint_options) ? (l.checkpoint_options as string[]).join("\n") : ""}
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Field label="ข้อที่ถูก (เริ่มจาก 0)" hint="0 = ข้อแรก">
+                        <Input name="correct_index" type="number" min={0} max={5} required className="w-28 bg-background" defaultValue={l.checkpoint_correct_index ?? 0} />
+                      </Field>
+                      <Button type="submit" loading={a.busy}>
+                        บันทึกคำถาม
+                      </Button>
+                      {l.checkpoint_question && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={async () => {
+                            if (await a.run(`${base}/lessons/${l.id}`, { method: "PATCH", body: { checkpoint: null } }, "ลบคำถามแล้ว")) setCheckpointing(null);
+                          }}
+                        >
+                          ลบคำถาม
+                        </Button>
+                      )}
+                    </div>
                   </form>
                 )}
               </li>

@@ -328,6 +328,10 @@ export interface LessonProgress {
 }
 
 export interface Lessons {
+  checkpoint_at_sec: number | null;
+  checkpoint_correct_index: number | null;
+  checkpoint_options: Json | null;
+  checkpoint_question: string | null;
   course_id: string;
   created_at: Generated<Timestamp>;
   duration_sec: number;

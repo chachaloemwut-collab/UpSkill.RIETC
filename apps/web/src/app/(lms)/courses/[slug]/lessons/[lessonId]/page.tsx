@@ -43,6 +43,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
             initialMaxWatchedSec={lesson.maxWatchedSec}
             minWatchPercentage={data.course.min_watch_percentage}
             initiallyCompleted={lesson.completed}
+            checkpoint={lesson.checkpoint}
           />
         )}
       </div>
