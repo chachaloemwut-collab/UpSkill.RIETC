@@ -6,6 +6,7 @@ import { Alert, Badge, Card, EmptyState, buttonClass } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { CohortApply } from "@/components/programs/CohortApply";
 import { WatchCohortButton } from "@/components/programs/WatchCohortButton";
+import { ProgramCertificateButton } from "@/components/programs/ProgramCertificateButton";
 import { RichText } from "@/components/programs/RichText";
 import { COHORT_PHASE, PROGRAM_VISIBILITY, REGISTRATION_STATUS, formatDateTimeTh, formatDuration } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
@@ -139,6 +140,11 @@ export default async function ProgramPage({ params }: Props) {
                           {mine.status === "approved" && new Date(c.startsAt) > new Date() && `เริ่มเข้าเรียนได้ตั้งแต่ ${formatDateTimeTh(c.startsAt)}`}
                           {mine.note && `หมายเหตุ: ${mine.note}`}
                         </Alert>
+                      )}
+                      {mine?.status === "approved" && (
+                        <div className="flex flex-wrap gap-2">
+                          <ProgramCertificateButton programId={data.program.id} />
+                        </div>
                       )}
                       {user && c.ineligibleReasons.length > 0 && (
                         <Alert variant="warning" title="คุณยังไม่ผ่านเงื่อนไขการสมัคร">

@@ -83,11 +83,12 @@ export interface AuditLogs {
 export interface Certificates {
   achievement_snapshot: string | null;
   certificate_code: string;
-  course_id: string;
+  cohort_id: string | null;
+  course_id: string | null;
   course_title_snapshot: string;
   document_name_snapshot: Generated<string>;
   document_type_snapshot: Generated<string>;
-  enrollment_id: string;
+  enrollment_id: string | null;
   expires_at: Timestamp | null;
   id: Generated<string>;
   instructor_name_snapshot: string;
@@ -97,6 +98,7 @@ export interface Certificates {
   pdf_failed_at: Timestamp | null;
   pdf_last_error: string | null;
   pdf_ready_at: Timestamp | null;
+  program_id: string | null;
   quiz_score_snapshot: Numeric;
   recipient_name_snapshot: string;
   revoked_at: Timestamp | null;

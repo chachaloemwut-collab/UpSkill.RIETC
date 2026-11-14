@@ -40,6 +40,7 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
   const expiry = c.expires_at ? new Date(c.expires_at).toLocaleDateString("th-TH", { dateStyle: "long", timeZone: "Asia/Bangkok" }) : null;
   const achievementLine = c.achievement_snapshot ?? "ได้ผ่านการอบรมและการประเมินตามเกณฑ์";
   const signerSuffix = c.signer_title_snapshot ? ` · ${c.signer_title_snapshot}` : "";
+  const coursePrefix = c.document_type_snapshot === "program" ? "หลักสูตรอบรม" : "หลักสูตร";
 
   const html = `<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
     ${fonts}
@@ -79,7 +80,7 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
       <div class="name">${esc(c.recipient_name_snapshot)}</div>
       <div class="name-line"></div>
       <div class="achieve">${esc(achievementLine)}</div>
-      <div class="course">หลักสูตร ${esc(c.course_title_snapshot)}</div>
+      <div class="course">${esc(coursePrefix)} ${esc(c.course_title_snapshot)}</div>
       <div class="meta">
         ผู้สอน ${esc(c.instructor_name_snapshot)}${esc(signerSuffix)}<br>
         เวลาเรียนสะสมจริง ${esc(formatStudyDurationTh(c.total_actual_study_sec))} · คะแนนสอบ ${esc(Number(c.quiz_score_snapshot).toFixed(2))}%<br>

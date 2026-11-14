@@ -44,6 +44,8 @@ export async function verifyPublicCertificate(rawCode: string): Promise<PublicVe
       enrollmentId: c.enrollment_id,
       userId: c.user_id,
       courseId: c.course_id,
+      programId: c.program_id ?? null,
+      cohortId: c.cohort_id ?? null,
       recipientName: c.recipient_name_snapshot,
       courseTitle: c.course_title_snapshot,
       instructorName: c.instructor_name_snapshot,

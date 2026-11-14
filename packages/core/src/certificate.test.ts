@@ -66,6 +66,17 @@ describe("certificate", () => {
     expect(computeVisualDigest("คนอื่น", "พื้นฐาน TypeScript", "CERT-2026-AAAA-BBBB-CCCC")).not.toBe(d);
   });
 
+  it("round-trips a v4 program-level certificate", () => {
+    const v4 = {
+      ...payload, v: 4 as const, enrollmentId: null, courseId: null, programId: "p1", cohortId: "c1",
+      documentName: "ใบประกาศนียบัตร", documentType: "program", expiresAt: null,
+      signerTitle: null, achievement: "ผ่านการอบรมครบทุกวิชาบังคับของหลักสูตร", visualDigest: "fedcba987654",
+    };
+    const { v: _version, ...v4Record } = v4;
+    const signed = signCertificate(v4, "k1", priv);
+    expect(verifyCertificate(signed, { k1: pub }, v4Record)).toMatchObject({ ok: true, payload: { v: 4, programId: "p1" } });
+  });
+
   it("detects a DB row edited after issuance", () => {
     const signed = signCertificate(payload, "k1", priv);
     expect(verifyCertificate(signed, { k1: pub }, { ...record, totalStudySec: 99999 })).toEqual({

@@ -47,8 +47,22 @@ export interface CertificatePayloadV3 extends CertificatePayloadBase {
   /** Short anti-forgery fingerprint printed on the paper and shown on the verify page */
   visualDigest: string;
 }
-export type CertificatePayload = CertificatePayloadV1 | CertificatePayloadV2 | CertificatePayloadV3;
-export type CertificateRecord = Omit<CertificatePayloadV1, "v"> & Partial<Pick<CertificatePayloadV2, "documentName" | "documentType" | "expiresAt">> & Partial<Pick<CertificatePayloadV3, "signerTitle" | "achievement" | "visualDigest">>;
+export interface CertificatePayloadV4 extends Omit<CertificatePayloadBase, "enrollmentId" | "courseId"> {
+  v: 4;
+  documentName: string;
+  documentType: string;
+  expiresAt: string | null;
+  signerTitle: string | null;
+  achievement: string | null;
+  visualDigest: string;
+  /** null for program-level certificates (which span several enrollments) */
+  enrollmentId: string | null;
+  courseId: string | null;
+  programId: string;
+  cohortId: string;
+}
+export type CertificatePayload = CertificatePayloadV1 | CertificatePayloadV2 | CertificatePayloadV3 | CertificatePayloadV4;
+export type CertificateRecord = Omit<CertificatePayloadV1, "v" | "enrollmentId" | "courseId"> & Partial<Pick<CertificatePayloadV2, "documentName" | "documentType" | "expiresAt">> & Partial<Pick<CertificatePayloadV3, "signerTitle" | "achievement" | "visualDigest">> & { enrollmentId: string | null; courseId: string | null; programId?: string | null; cohortId?: string | null };
 
 /** 12 hex chars of SHA-256 over the visually-compared identity fields (paper vs online). */
 export function computeVisualDigest(recipientName: string, courseTitle: string, code: string): string {
@@ -135,18 +149,21 @@ export function verifyCertificate(
   } catch {
     return { ok: false, reason: "MALFORMED" };
   }
-  if (payload.v !== 1 && payload.v !== 2 && payload.v !== 3) return { ok: false, reason: "MALFORMED" };
+  if (payload.v !== 1 && payload.v !== 2 && payload.v !== 3 && payload.v !== 4) return { ok: false, reason: "MALFORMED" };
   const base = {
     code: record.code, enrollmentId: record.enrollmentId, userId: record.userId, courseId: record.courseId,
     recipientName: record.recipientName, courseTitle: record.courseTitle, instructorName: record.instructorName,
     totalStudySec: record.totalStudySec, quizScore: record.quizScore, verifiedCourse: record.verifiedCourse, issuedAt: record.issuedAt,
   };
   const v2 = { documentName: record.documentName, documentType: record.documentType, expiresAt: record.expiresAt ?? null };
+  const v3x = { ...v2, signerTitle: record.signerTitle ?? null, achievement: record.achievement ?? null, visualDigest: record.visualDigest ?? "" };
   const expected = payload.v === 1
     ? { ...base, v: 1 }
     : payload.v === 2
       ? { ...base, v: 2, ...v2 }
-      : { ...base, v: 3, ...v2, signerTitle: record.signerTitle ?? null, achievement: record.achievement ?? null, visualDigest: record.visualDigest ?? "" };
+      : payload.v === 3
+        ? { ...base, v: 3, ...v3x }
+        : { ...base, v: 4, ...v3x, programId: record.programId ?? null, cohortId: record.cohortId ?? null };
   if (canonicalJson(expected) !== signed.signedPayload) return { ok: false, reason: "RECORD_MISMATCH" };
   return { ok: true, payload };
 }
