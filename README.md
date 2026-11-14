@@ -7,6 +7,8 @@ LMS แบบเปิดที่ใช้วิดีโอ YouTube เป็�
 - ความปลอดภัย และจุดที่ต่างจาก SRS: [docs/SECURITY.md](docs/SECURITY.md)
 - นำขึ้น Hosting มะลิ (Jasmine) ผ่าน SFTP: [docs/DEPLOY.md](docs/DEPLOY.md)
 - สถานะฟังก์ชันและงานที่ยังไม่พร้อม production: [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)
+- Checklist ความพร้อม production: [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md)
+- ขั้นตอนเปิดระบบจริง (go-live): [docs/GO_LIVE.md](docs/GO_LIVE.md)
 
 ## เริ่มต้นพัฒนา
 
