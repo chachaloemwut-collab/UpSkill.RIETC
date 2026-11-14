@@ -7,20 +7,20 @@ WORKDIR /repo
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
-COPY apps/worker/package.json apps/worker/
-COPY packages/core/package.json packages/core/
-COPY packages/db/package.json packages/db/
-COPY packages/infra/package.json packages/infra/
+COPY --chown=10001:10001 package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY --chown=10001:10001 apps/worker/package.json apps/worker/
+COPY --chown=10001:10001 packages/core/package.json packages/core/
+COPY --chown=10001:10001 packages/db/package.json packages/db/
+COPY --chown=10001:10001 packages/infra/package.json packages/infra/
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --prod=false --filter "@upskill/worker..."
 # Chromium + its system libraries (only the headless shell is needed for page.pdf)
 RUN cd apps/worker && ./node_modules/.bin/playwright install --with-deps --only-shell chromium
 
 FROM deps AS runtime
-COPY packages packages
-COPY apps/worker apps/worker
-COPY infra/docker/worker-healthcheck.mjs /healthcheck.mjs
+COPY --chown=10001:10001 packages packages
+COPY --chown=10001:10001 apps/worker apps/worker
+COPY --chown=10001:10001 infra/docker/worker-healthcheck.mjs /healthcheck.mjs
 # uid/gid 10001 = same as the web image (shared certificates volume)
 RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app --create-home app \
     && mkdir -p /data/certificates && chown app:app /data/certificates

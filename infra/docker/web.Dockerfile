@@ -26,9 +26,9 @@ WORKDIR /app
 # Run as an unprivileged user. Fixed uid/gid 10001 = same as the worker image, so both can share the
 # certificates volume. Writable paths: the image-optimizer cache and the certificates mount point only.
 RUN addgroup -S -g 10001 app && adduser -S -u 10001 -G app app
-COPY --from=build /repo/apps/web/.next/standalone ./
-COPY --from=build /repo/apps/web/.next/static ./apps/web/.next/static
-COPY --from=build /repo/apps/web/public ./apps/web/public
+COPY --chown=10001:10001 --from=build /repo/apps/web/.next/standalone ./
+COPY --chown=10001:10001 --from=build /repo/apps/web/.next/static ./apps/web/.next/static
+COPY --chown=10001:10001 --from=build /repo/apps/web/public ./apps/web/public
 RUN mkdir -p apps/web/.next/cache /data/certificates && chown app:app apps/web/.next/cache /data/certificates
 USER app
 EXPOSE 3000
