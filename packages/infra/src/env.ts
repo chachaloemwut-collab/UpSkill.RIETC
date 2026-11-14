@@ -9,6 +9,21 @@ const b64u = (minBytes: number) =>
 /** Empty string in .env counts as "not set" */
 const optional = <T extends z.ZodType>(t: T) => z.preprocess((v) => (v === "" ? undefined : v), t.optional());
 
+const originList = z.string().transform((value, ctx) => {
+  const origins: string[] = [];
+  for (const item of value.split(",").map((part) => part.trim()).filter(Boolean)) {
+    try {
+      const url = new URL(item);
+      if (url.origin === "null" || url.href !== `${url.origin}/`) throw new Error("not an origin");
+      origins.push(url.origin);
+    } catch {
+      ctx.addIssue({ code: "custom", message: `invalid origin: ${item}` });
+    }
+  }
+  if (origins.length > 10) ctx.addIssue({ code: "custom", message: "must contain at most 10 origins" });
+  return [...new Set(origins)];
+});
+
 const schema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -16,6 +31,9 @@ const schema = z
     // always sets NODE_ENV=production, even when you run the production build on your laptop).
     APP_ENV: z.enum(["local", "staging", "production"]).default("local"),
     APP_ORIGIN: z.url(),
+    // Explicit aliases that may submit same-origin browser requests. APP_ORIGIN
+    // remains canonical for links, OAuth callbacks and secure-cookie policy.
+    APP_ALLOWED_ORIGINS: optional(originList),
     DATABASE_URL: z.string().startsWith("postgres"),
     REDIS_URL: z.string().startsWith("redis"),
 
@@ -57,6 +75,9 @@ const schema = z
     }
     if (env.APP_ENV === "production") {
       if (!env.APP_ORIGIN.startsWith("https://")) ctx.addIssue({ code: "custom", path: ["APP_ORIGIN"], message: "must be https in production" });
+      if (env.APP_ALLOWED_ORIGINS?.some((origin) => !origin.startsWith("https://"))) {
+        ctx.addIssue({ code: "custom", path: ["APP_ALLOWED_ORIGINS"], message: "all origins must be https in production" });
+      }
       if (!env.YOUTUBE_API_KEY) ctx.addIssue({ code: "custom", path: ["YOUTUBE_API_KEY"], message: "required in production" });
     }
   });
@@ -83,6 +104,11 @@ export function googleConfig(env: Env) {
     clientSecret: env.GOOGLE_CLIENT_SECRET,
     redirectUri: env.GOOGLE_REDIRECT_URI ?? `${env.APP_ORIGIN}/api/auth/google/callback`,
   };
+}
+
+export function isAllowedOrigin(env: Env, origin: string | null): boolean {
+  if (!origin) return false;
+  return origin === new URL(env.APP_ORIGIN).origin || (env.APP_ALLOWED_ORIGINS?.includes(origin) ?? false);
 }
 
 /** Cookies get Secure + the __Host- prefix whenever the site is served over https */

@@ -10,6 +10,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import type { z } from "zod";
+import { isAllowedOrigin } from "@upskill/infra/env";
 import { logger } from "@upskill/infra/logger";
 import { hitRateLimit, type RateLimitRule } from "@upskill/infra/rate-limit";
 import { ctx } from "./context";
@@ -65,7 +66,7 @@ export function route<TBody extends z.ZodType = z.ZodNever, TParams = Record<str
 
       if (!SAFE_METHODS.has(req.method)) {
         const origin = req.headers.get("origin");
-        if (origin !== env.APP_ORIGIN) throw new HttpError(403, "BAD_ORIGIN");
+        if (!isAllowedOrigin(env, origin)) throw new HttpError(403, "BAD_ORIGIN");
       }
 
       const ip = clientIp(req);
