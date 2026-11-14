@@ -29,6 +29,7 @@ type EmailJobData =
   | { template: "cohort-application-rejected"; to: string; programTitle: string; cohortTitle: string; note?: string }
   | { template: "cohort-cancelled"; to: string; programTitle: string; cohortTitle: string }
   | { template: "cohort-starting"; to: string; programTitle: string; cohortTitle: string; startsAt: string; programLink: string }
+  | { template: "cohort-registration-open"; to: string; programTitle: string; cohortTitle: string; opensAt: string; programLink: string }
   | { template: "announcement"; to: string; title: string; summary: string; link: string };
 
 export type EmailJob = EmailJobData & { locale?: "th" | "en" };
@@ -36,7 +37,7 @@ export type EmailJob = EmailJobData & { locale?: "th" | "en" };
 export type EmailTemplate = EmailJob["template"];
 
 const SECURITY = new Set<EmailTemplate>(["verify-email", "reset-password", "password-changed", "account-status-changed"]);
-const COURSE_UPDATE = new Set<EmailTemplate>(["course-suspended", "course-status-changed", "cohort-cancelled", "announcement"]);
+const COURSE_UPDATE = new Set<EmailTemplate>(["course-suspended", "course-status-changed", "cohort-cancelled", "cohort-registration-open", "announcement"]);
 const REMINDER = new Set<EmailTemplate>(["assignment-due-reminder", "weekly-summary", "cohort-starting"]);
 const SYSTEM = new Set<EmailTemplate>(["video-broken", "system-alert"]);
 
@@ -81,6 +82,7 @@ function renderEmailEn(job: EmailJob): { subject: string; text: string; html: st
     case "cohort-application-rejected": return result(`Application result: ${job.programTitle}`, `Your application for ${job.cohortTitle} was not approved.${job.note ? ` Note: ${job.note}` : ""}`);
     case "cohort-cancelled": return result(`Cohort cancelled: ${job.programTitle}`, `The cohort ${job.cohortTitle} was cancelled.`);
     case "cohort-starting": return result(`Training has started: ${job.programTitle}`, `Cohort: ${job.cohortTitle}. Start: ${job.startsAt}.`, job.programLink, "Start learning");
+    case "cohort-registration-open": return result(`Registration open: ${job.programTitle}`, `Cohort: ${job.cohortTitle}. Registration opens ${job.opensAt}.`, job.programLink, "Apply now");
     case "announcement": return result(job.title, job.summary, job.link, "Read more");
   }
 }
@@ -140,6 +142,8 @@ export function renderEmail(job: EmailJob): { subject: string; text: string; htm
       return { subject: `ยกเลิกรอบอบรม: ${job.programTitle}`, text: `รอบอบรม ${job.cohortTitle} ของหลักสูตร "${job.programTitle}" ถูกยกเลิก`, html: `<p>รอบอบรม ${esc(job.cohortTitle)} ของหลักสูตร <b>${esc(job.programTitle)}</b> ถูกยกเลิก</p>` };
     case "cohort-starting":
       return { subject: `เริ่มอบรมแล้ว: ${job.programTitle}`, text: `หลักสูตร "${job.programTitle}" รอบ ${job.cohortTitle} เริ่มอบรมแล้ว (${job.startsAt})\n${job.programLink}`, html: `<p>หลักสูตร <b>${esc(job.programTitle)}</b> รอบ ${esc(job.cohortTitle)} เริ่มอบรมแล้ว</p><p>เริ่ม: ${esc(job.startsAt)}</p>${action(job.programLink, "เริ่มเรียน")}` };
+    case "cohort-registration-open":
+      return { subject: `เปิดรับสมัครแล้ว: ${job.programTitle}`, text: `หลักสูตร "${job.programTitle}" รอบ ${job.cohortTitle} เปิดรับสมัครแล้ว (${job.opensAt})\n${job.programLink}`, html: `<p>หลักสูตร <b>${esc(job.programTitle)}</b> รอบ ${esc(job.cohortTitle)} เปิดรับสมัครแล้ว</p><p>เปิดรับ: ${esc(job.opensAt)}</p>${action(job.programLink, "สมัครเลย")}` };
     case "announcement":
       return { subject: job.title, text: `${job.summary}\n${job.link}`, html: `<p><b>${esc(job.title)}</b></p><p>${esc(job.summary)}</p>${action(job.link, "อ่านรายละเอียด")}` };
   }

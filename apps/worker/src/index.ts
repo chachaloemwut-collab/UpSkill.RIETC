@@ -13,7 +13,7 @@ import {
   enqueueWeeklySummaries,
   processEmailOutbox,
 } from "./jobs/process-email-outbox.ts";
-import { enqueueCohortStartingEmails } from "./jobs/cohort-notifications.ts";
+import { enqueueCohortOpenEmails, enqueueCohortStartingEmails } from "./jobs/cohort-notifications.ts";
 import { checkAnticheatAnomaly } from "./jobs/anticheat-anomaly.ts";
 import { ensureSystemOwner } from "./system-owner.ts";
 import { configuredEmailSender } from "./email-transport.ts";
@@ -67,7 +67,10 @@ const workers = [
   new Worker("email-outbox", () => processEmailOutbox(db, getEmailSender, env.APP_ORIGIN), { connection, concurrency: 1 }),
   new Worker("assignment-reminders", () => enqueueAssignmentReminders(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
   new Worker("weekly-summary", () => enqueueWeeklySummaries(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
-  new Worker("cohort-notifications", () => enqueueCohortStartingEmails(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
+  new Worker("cohort-notifications", async () => {
+    await enqueueCohortStartingEmails(db, env.APP_ORIGIN);
+    await enqueueCohortOpenEmails(db, env.APP_ORIGIN);
+  }, { connection, concurrency: 1 }),
   new Worker("ops-health", () => checkAnticheatAnomaly(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
 ];
 

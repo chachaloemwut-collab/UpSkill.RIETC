@@ -123,6 +123,13 @@ export interface CohortRegistrations {
   user_id: string;
 }
 
+export interface CohortWatches {
+  cohort_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  user_id: string;
+}
+
 export interface CourseAssignmentRecipients {
   assigned_at: Generated<Timestamp>;
   assignment_id: string;
@@ -495,6 +502,7 @@ export interface DB {
   audit_logs: AuditLogs;
   certificates: Certificates;
   cohort_registrations: CohortRegistrations;
+  cohort_watches: CohortWatches;
   course_assignment_recipients: CourseAssignmentRecipients;
   course_assignments: CourseAssignments;
   courses: Courses;

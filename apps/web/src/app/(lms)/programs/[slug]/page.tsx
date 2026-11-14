@@ -5,6 +5,7 @@ import { CalendarDays, CheckCircle2, ChevronRight, Clock, Layers, ListChecks, Pe
 import { Alert, Badge, Card, EmptyState, buttonClass } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { CohortApply } from "@/components/programs/CohortApply";
+import { WatchCohortButton } from "@/components/programs/WatchCohortButton";
 import { RichText } from "@/components/programs/RichText";
 import { COHORT_PHASE, PROGRAM_VISIBILITY, REGISTRATION_STATUS, formatDateTimeTh, formatDuration } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
@@ -158,7 +159,12 @@ export default async function ProgramPage({ params }: Props) {
                           />
                         </div>
                       )}
-                      {c.phase === "scheduled" && <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><CalendarDays className="h-4 w-4" /> เปิดรับสมัคร {formatDateTimeTh(c.registrationOpensAt)}</p>}
+                      {c.phase === "scheduled" && (
+                        <div className="flex flex-wrap items-center gap-3">
+                          <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><CalendarDays className="h-4 w-4" /> เปิดรับสมัคร {formatDateTimeTh(c.registrationOpensAt)}</p>
+                          {user && <WatchCohortButton cohortId={c.id} />}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

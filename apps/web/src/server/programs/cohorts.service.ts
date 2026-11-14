@@ -376,6 +376,22 @@ export async function myRegistrations(userId: string) {
 
 // ---------------------------------------------------------------- admin: review
 
+export async function watchCohort(user: CurrentUser, cohortId: string) {
+  const { db } = ctx();
+  const c = await loadCohort(db, cohortId);
+  if (deriveCohortPhase(cohortTimeline(c), new Date()) !== "scheduled") throw new HttpError(409, "COHORT_NOT_SCHEDULED");
+  await db.insertInto("cohort_watches").values({ user_id: user.id, cohort_id: cohortId }).onConflict((oc) => oc.columns(["user_id", "cohort_id"]).doNothing()).execute();
+}
+
+export async function unwatchCohort(user: CurrentUser, cohortId: string) {
+  await ctx().db.deleteFrom("cohort_watches").where("user_id", "=", user.id).where("cohort_id", "=", cohortId).execute();
+}
+
+export async function isWatching(userId: string, cohortId: string): Promise<boolean> {
+  const row = await ctx().db.selectFrom("cohort_watches").select("id").where("user_id", "=", userId).where("cohort_id", "=", cohortId).executeTakeFirst();
+  return Boolean(row);
+}
+
 export async function getCohortForAdmin(user: CurrentUser, cohortId: string) {
   assertAdmin(user);
   const { db } = ctx();
@@ -396,11 +412,28 @@ export async function getCohortForAdmin(user: CurrentUser, cohortId: string) {
       .execute(),
     seatsTaken(db, cohortId),
   ]);
+
+  // Completion report: how many approved registrants finished every required course.
+  const required = await db
+    .selectFrom("program_courses")
+    .select(sql<number>`count(*)::int`.as("n"))
+    .where("program_id", "=", program.id)
+    .where("is_required", "=", true)
+    .executeTakeFirstOrThrow();
+  const completed = await db
+    .selectFrom("cohort_registrations as r")
+    .select(sql<number>`count(*)::int`.as("n"))
+    .where("r.cohort_id", "=", cohortId)
+    .where("r.status", "=", "approved")
+    .where(sql<boolean>`(select count(*) from enrollments e join program_courses pc on pc.course_id = e.course_id where pc.program_id = ${program.id} and pc.is_required = true and e.user_id = r.user_id and e.cohort_id = r.cohort_id and e.status = 'completed') >= ${required.n}`)
+    .executeTakeFirstOrThrow();
+
   return {
     cohort: { ...cohort, phase: deriveCohortPhase(cohortTimeline(cohort), new Date()), rules: parseEligibilityRules(cohort.eligibility) },
     program,
     registrations: registrations.map((r) => ({ ...r, answers: (r.answers ?? {}) as Record<string, string> })),
     taken,
+    completion: { required: required.n, completed: completed.n },
   };
 }
 
