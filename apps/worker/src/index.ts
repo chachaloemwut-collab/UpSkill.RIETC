@@ -14,6 +14,7 @@ import {
   processEmailOutbox,
 } from "./jobs/process-email-outbox.ts";
 import { enqueueCohortStartingEmails } from "./jobs/cohort-notifications.ts";
+import { checkAnticheatAnomaly } from "./jobs/anticheat-anomaly.ts";
 import { ensureSystemOwner } from "./system-owner.ts";
 import { configuredEmailSender } from "./email-transport.ts";
 
@@ -32,6 +33,7 @@ const schedulerQueues = [
   new Queue("weekly-summary", schedulerQueueOptions),
   new Queue("video-recheck", schedulerQueueOptions),
   new Queue("cohort-notifications", schedulerQueueOptions),
+  new Queue("ops-health", schedulerQueueOptions),
 ];
 
 const workers = [
@@ -66,6 +68,7 @@ const workers = [
   new Worker("assignment-reminders", () => enqueueAssignmentReminders(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
   new Worker("weekly-summary", () => enqueueWeeklySummaries(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
   new Worker("cohort-notifications", () => enqueueCohortStartingEmails(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
+  new Worker("ops-health", () => checkAnticheatAnomaly(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
 ];
 
 // Daily cron: re-check every lesson's video (catches broken videos before learners hit them)
@@ -74,10 +77,24 @@ await schedulerQueues[0]!.upsertJobScheduler("outbox-poll", { every: 1_000 }, { 
 await schedulerQueues[1]!.upsertJobScheduler("due-reminders", { pattern: "0 * * * *", tz: "Asia/Bangkok" }, { name: "due" });
 await schedulerQueues[2]!.upsertJobScheduler("weekly", { pattern: "0 8 * * 1", tz: "Asia/Bangkok" }, { name: "weekly" });
 await schedulerQueues[4]!.upsertJobScheduler("cohort-starting", { pattern: "*/15 * * * *", tz: "Asia/Bangkok" }, { name: "starting" });
+await schedulerQueues[5]!.upsertJobScheduler("anticheat-anomaly", { pattern: "*/15 * * * *", tz: "Asia/Bangkok" }, { name: "check" });
 
 for (const w of workers) {
   // Log only the job id/template: job data can hold email addresses and links with tokens
-  w.on("failed", (job, err) => logger.error({ queue: w.name, jobId: job?.id, name: job?.name, err: err.message }, "job failed"));
+  w.on("failed", (job, err) => {
+    logger.error({ queue: w.name, jobId: job?.id, name: job?.name, err: err.message }, "job failed");
+    // Alert admins on the FINAL attempt (no retries left). `certificate-pdf` already
+    // self-alerts with a more specific message, so skip it here to avoid duplicates.
+    if (job && w.name !== "certificate-pdf" && job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
+      void enqueueAdminAlert(
+        db,
+        "งานเบื้องหลังล้มเหลว",
+        `คิว ${w.name} งาน ${job.id} (${job.name}) ล้มเหลว: ${err.message.slice(0, 300)}`,
+        `job-failed:${w.name}:${job.id}`,
+        env.APP_ORIGIN,
+      );
+    }
+  });
 }
 
 const shutdown = async () => {

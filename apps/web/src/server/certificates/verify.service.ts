@@ -4,6 +4,7 @@
 import "server-only";
 import { CERTIFICATE_CODE_RE, formatStudyDurationTh, verifyCertificate } from "@upskill/core";
 import { ctx } from "../context";
+import { enqueueAdminAlert } from "../email/outbox.service";
 
 export type PublicVerification =
   | { status: "not_found" }
@@ -54,7 +55,19 @@ export async function verifyPublicCertificate(rawCode: string): Promise<PublicVe
       expiresAt: c.expires_at ? new Date(c.expires_at).toISOString() : null,
     },
   );
-  if (!result.ok) return { status: "tampered" };
+  if (!result.ok) {
+    // Signature failed or the DB row no longer matches the signed payload — this is either
+    // DB tampering or a signing-key misconfiguration. Both are security events worth alerting.
+    // Deduped per certificate so a single bad row can't spam the whole admin team.
+    await enqueueAdminAlert(
+      db,
+      "ตรวจพบใบรับรองถูกแก้ไข",
+      `รหัส ${code} ไม่ผ่านการตรวจสอบลายเซ็น (ฐานข้อมูลถูกแก้ไข หรือคีย์ลงนามไม่ตรง) โปรดตรวจสอบทันที`,
+      `cert-tampered:${code}`,
+      env.APP_ORIGIN,
+    );
+    return { status: "tampered" };
+  }
 
   const p = result.payload;
   const expired = c.expires_at ? new Date(c.expires_at).getTime() <= Date.now() : false;

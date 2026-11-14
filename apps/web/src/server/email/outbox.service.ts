@@ -68,3 +68,30 @@ export async function updateEmailPreferences(
     )
     .execute();
 }
+
+/**
+ * Notify every active admin via the "system-alert" template (deduped per admin).
+ * Used for operational/security events that the team must review: tampered
+ * certificate, failed background job, etc. Mirrors the worker's `enqueueAdminAlert`.
+ */
+export async function enqueueAdminAlert(
+  db: Database,
+  title: string,
+  details: string,
+  deduplicationKey: string,
+  appOrigin: string,
+): Promise<void> {
+  const admins = await db
+    .selectFrom("users")
+    .select(["id", "email"])
+    .where("role", "=", "admin")
+    .where("status", "=", "active")
+    .execute();
+  for (const admin of admins) {
+    await addEmailToOutbox(
+      db,
+      { template: "system-alert", to: admin.email, title, details, manageLink: `${appOrigin}/admin` },
+      { userId: admin.id, deduplicationKey: `${deduplicationKey}:${admin.id}` },
+    );
+  }
+}
