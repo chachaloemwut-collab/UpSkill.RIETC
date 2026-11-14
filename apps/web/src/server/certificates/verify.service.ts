@@ -22,6 +22,7 @@ export type PublicVerification =
       issuedAt: string;
       documentName: string;
       documentType: string;
+      visualDigest: string;
       expiresAt?: string;
       revokedAt?: string;
       revokedReason?: string;
@@ -84,6 +85,7 @@ export async function verifyPublicCertificate(rawCode: string): Promise<PublicVe
     issuedAt: p.issuedAt,
     documentName: p.v === 2 ? p.documentName : c.document_name_snapshot,
     documentType: p.v === 2 ? p.documentType : c.document_type_snapshot,
+    visualDigest: c.visual_digest,
     ...(c.expires_at ? { expiresAt: new Date(c.expires_at).toISOString() } : {}),
     ...(c.revoked_at ? { revokedAt: new Date(c.revoked_at).toISOString(), revokedReason: c.revoked_reason ?? "" } : {}),
   };

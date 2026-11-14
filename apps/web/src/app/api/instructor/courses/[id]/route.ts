@@ -19,6 +19,8 @@ const Body = z.strictObject({
   credential_validity_days: z.int().min(1).max(36_500).nullable().optional(),
   credential_signer_name: z.string().trim().max(255).nullable().optional(),
   credential_signer_title: z.string().trim().max(255).nullable().optional(),
+  credential_achievement_th: z.string().trim().min(1).max(255).optional(),
+  credential_achievement_en: z.string().trim().max(255).nullable().optional(),
 });
 
 export const PATCH = route<typeof Body, { id: string }>({ auth: "required", roles: ["instructor", "admin"], body: Body }, async ({ params, body, user }) => {

@@ -12,7 +12,7 @@
  * and delimiter injection (names containing "|"). At verify time, check the signature first,
  * then compare every field in the payload against the DB columns (catches direct DB edits).
  */
-import { createPrivateKey, createPublicKey, randomBytes, sign, verify } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, randomBytes, sign, verify } from "node:crypto";
 
 interface CertificatePayloadBase {
   code: string;
@@ -37,8 +37,23 @@ export interface CertificatePayloadV2 extends CertificatePayloadBase {
   documentType: string;
   expiresAt: string | null;
 }
-export type CertificatePayload = CertificatePayloadV1 | CertificatePayloadV2;
-export type CertificateRecord = Omit<CertificatePayloadV1, "v"> & Partial<Pick<CertificatePayloadV2, "documentName" | "documentType" | "expiresAt">>;
+export interface CertificatePayloadV3 extends CertificatePayloadBase {
+  v: 3;
+  documentName: string;
+  documentType: string;
+  expiresAt: string | null;
+  signerTitle: string | null;
+  achievement: string | null;
+  /** Short anti-forgery fingerprint printed on the paper and shown on the verify page */
+  visualDigest: string;
+}
+export type CertificatePayload = CertificatePayloadV1 | CertificatePayloadV2 | CertificatePayloadV3;
+export type CertificateRecord = Omit<CertificatePayloadV1, "v"> & Partial<Pick<CertificatePayloadV2, "documentName" | "documentType" | "expiresAt">> & Partial<Pick<CertificatePayloadV3, "signerTitle" | "achievement" | "visualDigest">>;
+
+/** 12 hex chars of SHA-256 over the visually-compared identity fields (paper vs online). */
+export function computeVisualDigest(recipientName: string, courseTitle: string, code: string): string {
+  return createHash("sha256").update(`${recipientName}\n${courseTitle}\n${code}`).digest("hex").slice(0, 12);
+}
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -120,15 +135,18 @@ export function verifyCertificate(
   } catch {
     return { ok: false, reason: "MALFORMED" };
   }
-  if (payload.v !== 1 && payload.v !== 2) return { ok: false, reason: "MALFORMED" };
+  if (payload.v !== 1 && payload.v !== 2 && payload.v !== 3) return { ok: false, reason: "MALFORMED" };
   const base = {
     code: record.code, enrollmentId: record.enrollmentId, userId: record.userId, courseId: record.courseId,
     recipientName: record.recipientName, courseTitle: record.courseTitle, instructorName: record.instructorName,
     totalStudySec: record.totalStudySec, quizScore: record.quizScore, verifiedCourse: record.verifiedCourse, issuedAt: record.issuedAt,
   };
+  const v2 = { documentName: record.documentName, documentType: record.documentType, expiresAt: record.expiresAt ?? null };
   const expected = payload.v === 1
     ? { ...base, v: 1 }
-    : { ...base, v: 2, documentName: record.documentName, documentType: record.documentType, expiresAt: record.expiresAt ?? null };
+    : payload.v === 2
+      ? { ...base, v: 2, ...v2 }
+      : { ...base, v: 3, ...v2, signerTitle: record.signerTitle ?? null, achievement: record.achievement ?? null, visualDigest: record.visualDigest ?? "" };
   if (canonicalJson(expected) !== signed.signedPayload) return { ok: false, reason: "RECORD_MISMATCH" };
   return { ok: true, payload };
 }

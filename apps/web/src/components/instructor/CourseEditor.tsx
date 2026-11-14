@@ -33,6 +33,8 @@ export interface EditorData {
     credential_validity_days: number | null;
     credential_signer_name: string | null;
     credential_signer_title: string | null;
+    credential_achievement_th: string;
+    credential_achievement_en: string | null;
   };
   lessons: Array<{ id: string; sequence_order: number; title: string; youtube_video_id: string; duration_sec: number; video_status: string }>;
   questions: Array<{
@@ -184,6 +186,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
           credential_validity_days: f.get("credential_validity_days") ? Number(f.get("credential_validity_days")) : null,
           credential_signer_name: String(f.get("credential_signer_name") ?? "") || null,
           credential_signer_title: String(f.get("credential_signer_title") ?? "") || null,
+          credential_achievement_th: f.get("credential_achievement_th"),
+          credential_achievement_en: String(f.get("credential_achievement_en") ?? "") || null,
         },
       },
       "บันทึกการตั้งค่าแล้ว",
@@ -226,6 +230,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
           <Field label="อายุเอกสาร (วัน)" hint="เว้นว่างหากไม่หมดอายุ"><Input name="credential_validity_days" type="number" min={1} max={36500} defaultValue={course.credential_validity_days ?? ""} /></Field>
           <Field label="ชื่อผู้ลงนาม" hint="เว้นว่างเพื่อใช้ชื่อผู้สอน"><Input name="credential_signer_name" maxLength={255} defaultValue={course.credential_signer_name ?? ""} /></Field>
           <Field label="ตำแหน่งผู้ลงนาม" hint="ไม่บังคับ"><Input name="credential_signer_title" maxLength={255} defaultValue={course.credential_signer_title ?? ""} /></Field>
+          <Field label="ข้อความผลสัมฤทธิ์ (ไทย)" hint="แสดงใต้ชื่อผู้รับ"><Input name="credential_achievement_th" maxLength={255} defaultValue={course.credential_achievement_th} /></Field>
+          <Field label="ข้อความผลสัมฤทธิ์ (อังกฤษ)" hint="ไม่บังคับ"><Input name="credential_achievement_en" maxLength={255} defaultValue={course.credential_achievement_en ?? ""} /></Field>
         </div>
         <Button type="submit" loading={a.busy} className="justify-self-start">
           บันทึกการตั้งค่า

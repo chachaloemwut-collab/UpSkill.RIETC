@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
-import { BadgeCheck, CircleHelp, Clock, GraduationCap, Hash, ShieldAlert, ShieldCheck, ShieldX, Target, UserRound } from "lucide-react";
+import { BadgeCheck, CircleHelp, Clock, Fingerprint, GraduationCap, Hash, ShieldAlert, ShieldCheck, ShieldX, Target, UserRound } from "lucide-react";
 import { hitRateLimit, RATE_LIMITS } from "@upskill/infra/rate-limit";
 import { Badge, Card, buttonClass } from "@/components/ui";
 import { formatDateTh } from "@/lib/format";
@@ -44,6 +44,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
     { icon: Clock, label: "ออกเมื่อ", value: formatDateTh(r.issuedAt, "long") },
     ...(r.expiresAt ? [{ icon: Clock, label: "ใช้ได้ถึง", value: formatDateTh(r.expiresAt, "long") }] : []),
     { icon: Hash, label: "รหัส", value: <span className="font-mono">{r.code}</span> },
+    { icon: Fingerprint, label: "ลายนิ้วมือภาพ", value: <span className="font-mono">{r.visualDigest || "—"}</span> },
   ];
 
   return (

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CERTIFICATE_CODE_RE,
   canonicalJson,
+  computeVisualDigest,
   formatStudyDurationTh,
   generateCertificateCode,
   signCertificate,
@@ -49,6 +50,20 @@ describe("certificate", () => {
     const { v: _version, ...v2Record } = v2;
     const signed = signCertificate(v2, "k1", priv);
     expect(verifyCertificate(signed, { k1: pub }, v2Record)).toMatchObject({ ok: true, payload: { v: 2, documentType: "completion" } });
+  });
+
+  it("round-trips a v3 credential with signer title, achievement and visual digest", () => {
+    const v3 = { ...payload, v: 3 as const, documentName: "ใบรับรอง", documentType: "completion", expiresAt: null, signerTitle: "ผู้อำนวยการ", achievement: "ผ่านการอบรมและการประเมินตามเกณฑ์", visualDigest: "abc123def456" };
+    const { v: _version, ...v3Record } = v3;
+    const signed = signCertificate(v3, "k1", priv);
+    expect(verifyCertificate(signed, { k1: pub }, v3Record)).toMatchObject({ ok: true, payload: { v: 3, visualDigest: "abc123def456" } });
+  });
+
+  it("computes a stable 12-hex visual digest", () => {
+    const d = computeVisualDigest("สมชาย ใจดี", "พื้นฐาน TypeScript", "CERT-2026-AAAA-BBBB-CCCC");
+    expect(d).toMatch(/^[0-9a-f]{12}$/);
+    expect(computeVisualDigest("สมชาย ใจดี", "พื้นฐาน TypeScript", "CERT-2026-AAAA-BBBB-CCCC")).toBe(d);
+    expect(computeVisualDigest("คนอื่น", "พื้นฐาน TypeScript", "CERT-2026-AAAA-BBBB-CCCC")).not.toBe(d);
   });
 
   it("detects a DB row edited after issuance", () => {

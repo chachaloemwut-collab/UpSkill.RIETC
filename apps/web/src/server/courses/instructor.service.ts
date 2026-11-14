@@ -159,6 +159,8 @@ export async function updateCourse(
     credential_validity_days: number | null;
     credential_signer_name: string | null;
     credential_signer_title: string | null;
+    credential_achievement_th: string;
+    credential_achievement_en: string | null;
   }>,
 ) {
   await loadOwnedCourse(user, courseId);

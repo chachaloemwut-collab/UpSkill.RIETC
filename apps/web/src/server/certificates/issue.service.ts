@@ -4,7 +4,7 @@
  */
 import "server-only";
 import { sql } from "@upskill/db";
-import { generateCertificateCode, normalizeName, signCertificate, type CertificatePayload } from "@upskill/core";
+import { computeVisualDigest, generateCertificateCode, normalizeName, signCertificate, type CertificatePayload } from "@upskill/core";
 import { ctx } from "../context";
 import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
@@ -29,7 +29,7 @@ export async function issueCertificate(input: { userId: string; courseId: string
     .innerJoin("users as ins", "ins.id", "c.instructor_id")
     .select([
       "e.id as enrollment_id", "e.status", "c.title", "c.visibility", "c.is_verified_course", "c.total_duration_sec",
-      "c.credential_enabled", "c.credential_type", "c.credential_name_th", "c.credential_name_en", "c.credential_validity_days", "c.credential_signer_name",
+      "c.credential_enabled", "c.credential_type", "c.credential_name_th", "c.credential_name_en", "c.credential_validity_days", "c.credential_signer_name", "c.credential_signer_title", "c.credential_achievement_th", "c.credential_achievement_en",
       "u.email", "u.legal_full_name_th", "u.legal_full_name_en", "u.legal_name_locked_at",
       "ins.legal_full_name_th as ins_th", "ins.legal_full_name_en as ins_en", "ins.email as ins_email",
     ])
@@ -65,14 +65,19 @@ export async function issueCertificate(input: { userId: string; courseId: string
   const issuedAt = new Date();
   const expiresAt = data.credential_validity_days ? new Date(issuedAt.getTime() + data.credential_validity_days * 86_400_000) : null;
   const documentName = input.locale === "en" && data.credential_name_en ? data.credential_name_en : data.credential_name_th;
+  const achievementRaw = (input.locale === "en" && data.credential_achievement_en ? data.credential_achievement_en : data.credential_achievement_th) ?? null;
+  const code = generateCertificateCode(issuedAt.getUTCFullYear());
+  const recipientName = normalizeName(recipient);
+  const courseTitle = normalizeName(data.title);
+  const visualDigest = computeVisualDigest(recipientName, courseTitle, code);
   const payload: CertificatePayload = {
-    v: 2,
-    code: generateCertificateCode(issuedAt.getUTCFullYear()),
+    v: 3,
+    code,
     enrollmentId: data.enrollment_id,
     userId: input.userId,
     courseId: input.courseId,
-    recipientName: normalizeName(recipient),
-    courseTitle: normalizeName(data.title),
+    recipientName,
+    courseTitle,
     instructorName: normalizeName(data.credential_signer_name ?? data.ins_th ?? data.ins_en ?? data.ins_email),
     totalStudySec: stats.study_sec,
     quizScore: Number(best.score).toFixed(2),
@@ -81,6 +86,9 @@ export async function issueCertificate(input: { userId: string; courseId: string
     documentName: normalizeName(documentName),
     documentType: data.credential_type,
     expiresAt: expiresAt?.toISOString() ?? null,
+    signerTitle: data.credential_signer_title ?? null,
+    achievement: achievementRaw ? normalizeName(achievementRaw) : null,
+    visualDigest,
   };
   const signed = signCertificate(payload, env.CERT_SIGNING_ACTIVE_KID, env.CERT_SIGNING_PRIVATE_KEY);
 
@@ -103,10 +111,13 @@ export async function issueCertificate(input: { userId: string; courseId: string
           signature: signed.signature,
           signing_key_id: signed.keyId,
           issued_at: issuedAt,
-          payload_version: 2,
+          payload_version: 3,
           document_name_snapshot: payload.documentName,
           document_type_snapshot: payload.documentType,
           expires_at: expiresAt,
+          signer_title_snapshot: payload.signerTitle,
+          achievement_snapshot: payload.achievement,
+          visual_digest: payload.visualDigest,
         })
         .returning("id")
         .executeTakeFirstOrThrow();

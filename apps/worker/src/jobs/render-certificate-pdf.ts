@@ -37,37 +37,61 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
   const qr = await QRCode.toDataURL(verifyUrl, { errorCorrectionLevel: "M", margin: 1, width: 360 });
   const fonts = (await Promise.all([fontFace("Sarabun-Regular.ttf", 400), fontFace("Sarabun-Bold.ttf", 700)])).join("\n");
   const issued = new Date(c.issued_at).toLocaleDateString("th-TH", { dateStyle: "long", timeZone: "Asia/Bangkok" });
+  const expiry = c.expires_at ? new Date(c.expires_at).toLocaleDateString("th-TH", { dateStyle: "long", timeZone: "Asia/Bangkok" }) : null;
+  const achievementLine = c.achievement_snapshot ?? "ได้ผ่านการอบรมและการประเมินตามเกณฑ์";
+  const signerSuffix = c.signer_title_snapshot ? ` · ${c.signer_title_snapshot}` : "";
 
   const html = `<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
     ${fonts}
     @page { size: A4 landscape; margin: 0 }
     * { box-sizing: border-box }
-    body { margin: 0; font-family: "Sarabun", sans-serif; color: #1c1917; }
-    .page { width: 297mm; height: 210mm; padding: 14mm; }
-    .frame { height: 100%; border: 1.2mm solid #14532d; outline: 0.4mm solid #14532d; outline-offset: -3mm; padding: 16mm 22mm; position: relative; }
-    .kicker { letter-spacing: 0.3em; font-size: 11pt; color: #166534; text-transform: uppercase; }
-    h1 { font-size: 36pt; margin: 2mm 0 10mm; font-weight: 700; }
-    .name { font-size: 30pt; font-weight: 700; margin: 3mm 0 6mm; border-bottom: 0.3mm solid #a8a29e; display: inline-block; padding-bottom: 2mm; min-width: 120mm; }
-    .course { font-size: 18pt; font-weight: 700; }
-    .meta { margin-top: 10mm; font-size: 11pt; color: #44403c; line-height: 1.7; }
-    .badge { display: inline-block; padding: 1mm 3mm; border-radius: 2mm; font-size: 9pt; background: ${c.is_verified_course_snapshot ? "#dcfce7" : "#f5f5f4"}; color: ${c.is_verified_course_snapshot ? "#14532d" : "#44403c"}; }
-    .qr { position: absolute; right: 16mm; bottom: 14mm; width: 38mm; text-align: center; font-size: 7.5pt; color: #57534e; }
+    body { margin: 0; font-family: "Sarabun", sans-serif; color: #17152e; }
+    .page { width: 297mm; height: 210mm; position: relative; overflow: hidden; background: #fffaf0; }
+    .orb { position: absolute; border-radius: 50%; opacity: .12; }
+    .orb.a { width: 115mm; height: 115mm; background: #6336c7; left: -38mm; top: -38mm; }
+    .orb.b { width: 135mm; height: 135mm; background: #14a6ca; right: -48mm; bottom: -52mm; }
+    .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-28deg); font-size: 30pt; font-weight: 700; color: #6336c7; opacity: .05; white-space: nowrap; letter-spacing: .12em; }
+    .frame { position: absolute; left: 7mm; top: 7mm; right: 7mm; bottom: 7mm; border: 1.2mm solid #6336c7; }
+    .frame-inner { position: absolute; left: 10mm; top: 10mm; right: 10mm; bottom: 10mm; border: 0.3mm solid #14a6ca; }
+    .content { position: absolute; left: 20mm; right: 20mm; top: 15mm; bottom: 15mm; }
+    .kicker { text-align: center; letter-spacing: .25em; font-size: 10pt; color: #14a6ca; text-transform: uppercase; }
+    h1 { text-align: center; font-size: 29pt; color: #6336c7; margin: 1.5mm 0 2mm; font-weight: 700; }
+    .sub { text-align: center; font-size: 8.5pt; color: #14a6ca; letter-spacing: .18em; }
+    .present { text-align: center; font-size: 13pt; color: #17152e; margin-top: 5mm; }
+    .name { text-align: center; font-size: 27pt; font-weight: 700; margin: 3mm 0 1.5mm; }
+    .name-line { width: 118mm; height: 0.5mm; background: #fa6b27; margin: 1mm auto; }
+    .achieve { text-align: center; font-size: 12.5pt; color: #17152e; margin-top: 3.5mm; }
+    .course { text-align: center; font-size: 16.5pt; font-weight: 700; color: #6336c7; margin: 2.5mm 0; }
+    .meta { text-align: center; font-size: 10.5pt; color: #665f7a; line-height: 1.85; margin-top: 5mm; }
+    .qr { position: absolute; left: 20mm; bottom: 11mm; width: 33mm; text-align: center; font-size: 7pt; color: #665f7a; }
     .qr img { width: 100%; display: block; }
-  </style></head><body><div class="page"><div class="frame">
-    <div class="kicker">${esc(c.document_type_snapshot)}</div>
-    <h1>${esc(c.document_name_snapshot)}</h1>
-    <div>ขอมอบให้แก่</div>
-    <div class="name">${esc(c.recipient_name_snapshot)}</div>
-    <div>ได้สำเร็จการศึกษาหลักสูตร</div>
-    <div class="course">${esc(c.course_title_snapshot)}</div>
-    <div class="meta">
-      ผู้สอน ${esc(c.instructor_name_snapshot)}<br>
-      เวลาเรียนสะสมจริง ${esc(formatStudyDurationTh(c.total_actual_study_sec))} · คะแนนสอบ ${esc(Number(c.quiz_score_snapshot).toFixed(2))}%<br>
-      ออกให้เมื่อ ${esc(issued)} · <span class="badge">${c.is_verified_course_snapshot ? "Verified Course" : "Community Course"}</span>
-      ${c.expires_at ? `<br>ใช้ได้ถึง ${esc(new Date(c.expires_at).toLocaleDateString("th-TH", { dateStyle: "long", timeZone: "Asia/Bangkok" }))}` : ""}
+    .right { position: absolute; right: 20mm; bottom: 15mm; text-align: right; font-size: 8.5pt; color: #665f7a; line-height: 1.6; }
+    .digest { font-family: ui-monospace, monospace; color: #6336c7; }
+  </style></head><body><div class="page">
+    <div class="orb a"></div><div class="orb b"></div>
+    <div class="watermark">ต้นฉบับดิจิทัล · ตรวจสอบออนไลน์</div>
+    <div class="frame"></div><div class="frame-inner"></div>
+    <div class="content">
+      <div class="kicker">${esc(c.document_type_snapshot)}</div>
+      <h1>${esc(c.document_name_snapshot)}</h1>
+      <div class="sub">DIGITAL CERTIFICATE · VERIFIABLE ONLINE</div>
+      <div class="present">ขอมอบให้แก่</div>
+      <div class="name">${esc(c.recipient_name_snapshot)}</div>
+      <div class="name-line"></div>
+      <div class="achieve">${esc(achievementLine)}</div>
+      <div class="course">หลักสูตร ${esc(c.course_title_snapshot)}</div>
+      <div class="meta">
+        ผู้สอน ${esc(c.instructor_name_snapshot)}${esc(signerSuffix)}<br>
+        เวลาเรียนสะสมจริง ${esc(formatStudyDurationTh(c.total_actual_study_sec))} · คะแนนสอบ ${esc(Number(c.quiz_score_snapshot).toFixed(2))}%<br>
+        ออกให้เมื่อ ${esc(issued)}${expiry ? ` · ใช้ได้ถึง ${esc(expiry)}` : ""}
+      </div>
     </div>
     <div class="qr"><img src="${qr}" alt=""><div>สแกนเพื่อตรวจสอบ</div><div>${esc(c.certificate_code)}</div></div>
-  </div></div></body></html>`;
+    <div class="right">
+      ลายนิ้วมือภาพ<br><span class="digest">${esc(c.visual_digest || "-")}</span><br><br>
+      เอกสารต้นฉบับดิจิทัล<br>ลงนาม Ed25519 · ตรวจสอบออนไลน์ได้
+    </div>
+  </div></body></html>`;
 
   const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
   try {
