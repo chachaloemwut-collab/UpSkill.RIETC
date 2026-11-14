@@ -449,6 +449,7 @@ export interface UserProfiles {
 
 export interface Users {
   created_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
   email: string;
   email_verified_at: Timestamp | null;
   id: Generated<string>;

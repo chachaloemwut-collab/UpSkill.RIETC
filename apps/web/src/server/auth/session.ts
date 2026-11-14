@@ -72,6 +72,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     .where("s.expires_at", ">", new Date())
     .where("s.idle_expires_at", ">", new Date())
     .where("u.status", "=", "active")
+    .where("u.deleted_at", "is", null)
     .executeTakeFirst();
   if (!row) return null;
 

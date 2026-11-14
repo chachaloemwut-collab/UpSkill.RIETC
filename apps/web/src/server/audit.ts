@@ -8,6 +8,7 @@ export type AuditAction =
   | "auth.google_linked"
   | "auth.unverified_account_taken_over"
   | "auth.password_reset"
+  | "auth.account_deleted"
   | "user.legal_name_locked"
   | "user.pdpa_consent"
   | "course.published"

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Bell, CheckCircle2, IdCard, KeyRound, Link2, Lock, Mail, UserRound } from "lucide-react";
+import { Bell, CheckCircle2, Database, IdCard, KeyRound, Link2, Lock, Mail, UserRound } from "lucide-react";
 import { Alert, Avatar, Badge, Card, buttonClass } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ChangePasswordForm } from "@/components/account/ChangePasswordForm";
 import { EmailPreferencesForm } from "@/components/account/EmailPreferencesForm";
+import { DataRights } from "@/components/account/DataRights";
 import { LockLegalNameForm } from "@/components/course/CertificatePanel";
 import { ROLE_LABEL, formatDateTh } from "@/lib/format";
 import { ctx } from "@/server/context";
@@ -122,6 +123,15 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             </Card>
           </Section>
         )}
+        <Section icon={<Database className="h-5 w-5" />} title="ข้อมูลและความเป็นส่วนตัว" description="ดาวน์โหลดข้อมูลของคุณ หรือขอลบบัญชีตามสิทธิของเจ้าของข้อมูล (พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล)">
+          <Card className="p-6">
+            <p className="mb-4 text-sm text-muted-foreground">
+              คุณดาวน์โหลดข้อมูลส่วนบุคคลที่ระบบเก็บไว้ได้ และขอลบบัญชีได้ตลอด การลบบัญชีจะลบข้อมูลที่ระบุตัวตน
+              แต่คงใบรับรองและบันทึกการตรวจสอบที่จำเป็นต่อการยืนยันเอกสารไว้
+            </p>
+            <DataRights />
+          </Card>
+        </Section>
       </div>
     </div>
   );
