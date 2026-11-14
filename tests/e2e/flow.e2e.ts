@@ -28,6 +28,14 @@ beforeAll(async () => {
 });
 
 describe("security baseline", () => {
+  it("removes credentials accidentally placed in the login URL", async () => {
+    const r = await fetch(`${BASE}/login?email=owner&password=`, { redirect: "manual" });
+    expect(r.status).toBe(307);
+    expect(r.headers.get("location")).toBe("/login");
+    expect(r.headers.get("cache-control")).toBe("no-store");
+    expect(r.headers.get("referrer-policy")).toBe("no-referrer");
+  });
+
   it("sends strict security headers with a nonce-based CSP", async () => {
     const r = await new Client().req("/login");
     const csp = r.headers.get("content-security-policy") ?? "";
