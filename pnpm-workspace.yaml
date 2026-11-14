@@ -3,6 +3,11 @@ packages:
   - packages/*
   - tests/*
 
+# Hoist the argon2 family to the root node_modules so Next.js standalone tracing can
+# preserve the resolution path for the runtime-loaded platform binary.
+publicHoistPattern:
+  - "@node-rs/*"
+
 # Supply-chain hardening
 # - Do not install versions published less than 7 days ago (protects against hijacked releases).
 #   When upgrading, pick a version older than 7 days; don't add minimumReleaseAgeExclude.

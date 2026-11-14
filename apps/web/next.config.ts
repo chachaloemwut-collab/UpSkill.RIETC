@@ -31,6 +31,18 @@ const config: NextConfig = {
   // Self-contained server bundle for the Docker image; trace files from the monorepo root
   output: "standalone",
   outputFileTracingRoot: path.join(import.meta.dirname, "../.."),
+  // nft cannot trace argon2's runtime platform-binary require, so the standalone bundle
+  // would miss it and every auth API route would 500 with "Cannot find module '@node-rs/argon2'".
+  // Include the whole argon2 family (main package + every platform binary) in the trace.
+  outputFileTracingIncludes: {
+    "/api/*": [
+      "./node_modules/@node-rs/argon2/**/*",
+      "./node_modules/@node-rs/argon2-*/**/*",
+      "../../node_modules/@node-rs/argon2/**/*",
+      "../../node_modules/@node-rs/argon2-*/**/*",
+      "../../node_modules/.pnpm/@node-rs+argon2*/**/*",
+    ],
+  },
   poweredByHeader: false,
   reactStrictMode: true,
   // Development uses Next's default Turbopack pipeline. Production build uses
