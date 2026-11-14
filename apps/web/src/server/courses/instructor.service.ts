@@ -76,7 +76,7 @@ export async function getCourseForEditing(user: CurrentUser, courseId: string) {
   // Includes the answer key: this view is for the course owner only
   const questions = await db
     .selectFrom("quiz_questions")
-    .select(["id", "question_text", "options", "correct_option_id"])
+    .select(["id", "question_text", "options", "correct_option_id", "assessment_type", "lesson_id"])
     .where("course_id", "=", courseId)
     .where("is_active", "=", true)
     .orderBy("created_at")
@@ -233,13 +233,29 @@ export async function reorderLessons(user: CurrentUser, courseId: string, ordere
     });
 }
 
-export async function addQuestion(user: CurrentUser, courseId: string, input: { text: string; options: string[]; correctIndex: number }) {
+export async function addQuestion(
+  user: CurrentUser,
+  courseId: string,
+  input: { text: string; options: string[]; correctIndex: number; assessmentType: "pre" | "lesson" | "post"; lessonId?: string | undefined },
+) {
   await loadOwnedCourse(user, courseId);
   if (input.correctIndex < 0 || input.correctIndex >= input.options.length) throw new HttpError(400, "BAD_CORRECT_INDEX");
+  if ((input.assessmentType === "lesson") !== Boolean(input.lessonId)) throw new HttpError(400, "ASSESSMENT_TARGET_INVALID");
+  if (input.lessonId) {
+    const lesson = await ctx().db.selectFrom("lessons").select("id").where("id", "=", input.lessonId).where("course_id", "=", courseId).executeTakeFirst();
+    if (!lesson) throw new HttpError(404, "NOT_FOUND");
+  }
   const options = input.options.map((text, i) => ({ id: String.fromCharCode(97 + i), text: text.trim() }));
   return ctx()
     .db.insertInto("quiz_questions")
-    .values({ course_id: courseId, question_text: input.text.trim(), options: JSON.stringify(options), correct_option_id: options[input.correctIndex]!.id })
+    .values({
+      course_id: courseId,
+      assessment_type: input.assessmentType,
+      lesson_id: input.lessonId ?? null,
+      question_text: input.text.trim(),
+      options: JSON.stringify(options),
+      correct_option_id: options[input.correctIndex]!.id,
+    })
     .returning("id")
     .executeTakeFirstOrThrow();
 }
@@ -263,7 +279,7 @@ export async function setVisibility(user: CurrentUser, courseId: string, visibil
         "c.total_duration_sec",
         sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("lessons"),
         sql<number>`(select count(*)::int from lessons l where l.course_id = c.id and l.video_status <> 'active')`.as("broken"),
-        sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.is_active)`.as("questions"),
+        sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.assessment_type = 'post' and q.is_active)`.as("questions"),
       ])
       .where("c.id", "=", courseId)
       .executeTakeFirstOrThrow();

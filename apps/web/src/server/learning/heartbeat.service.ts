@@ -130,10 +130,13 @@ export async function processHeartbeat(input: {
           "u.email",
           sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("total"),
           sql<number>`(select count(*)::int from lesson_progress p join lessons l on l.id = p.lesson_id where p.enrollment_id = e.id and l.course_id = c.id and p.is_completed)`.as("done"),
+          sql<number>`(select count(*)::int from lessons l where l.course_id = c.id
+            and exists (select 1 from quiz_questions q where q.lesson_id = l.id and q.assessment_type = 'lesson' and q.is_active)
+            and not exists (select 1 from quiz_attempts a where a.enrollment_id = e.id and a.lesson_id = l.id and a.assessment_type = 'lesson' and a.is_passed))`.as("pending_tests"),
         ])
         .where("e.id", "=", session.enrollment_id)
         .executeTakeFirstOrThrow();
-      if (progress.total > 0 && progress.done === progress.total) {
+      if (progress.total > 0 && progress.done === progress.total && progress.pending_tests === 0) {
         await addEmailToOutbox(
           trx,
           { template: "ready-for-quiz", to: progress.email, courseTitle: progress.title, quizLink: `${env.APP_ORIGIN}/courses/${progress.slug}/quiz` },
@@ -151,4 +154,43 @@ export async function processHeartbeat(input: {
       isCompleted: st.isCompleted,
     };
   });
+}
+
+export async function recordLearningFocusLoss(input: {
+  userId: string;
+  lessonId: string;
+  streamToken: string;
+  eventType: "hidden" | "pagehide";
+  positionSec: number;
+}) {
+  const { db, redis } = ctx();
+  const tokenHash = hashToken(input.streamToken);
+  const session = await db
+    .selectFrom("learning_sessions")
+    .select(["id", "user_id", "lesson_id", "enrollment_id", "ended_at"])
+    .where("token_hash", "=", tokenHash)
+    .executeTakeFirst();
+  if (!session || session.user_id !== input.userId || session.lesson_id !== input.lessonId) throw new HttpError(401, "INVALID_STREAM_TOKEN");
+  const active = await assertActiveLearningSession(redis, input.userId, session.id, tokenHash.toString("hex"));
+  if (session.ended_at || !active) throw new HttpError(409, "SESSION_SUPERSEDED");
+
+  await db.transaction().execute(async (trx) => {
+    await trx
+      .insertInto("anticheat_events")
+      .values({
+        learning_session_id: session.id,
+        user_id: input.userId,
+        lesson_id: input.lessonId,
+        reason: "PAGE_HIDDEN",
+        details: JSON.stringify({ eventType: input.eventType, positionSec: Math.max(0, Math.floor(input.positionSec)) }),
+      })
+      .execute();
+    await trx
+      .updateTable("lesson_progress")
+      .set({ cheat_flag_count: sql<number>`cheat_flag_count + 1` })
+      .where("enrollment_id", "=", session.enrollment_id)
+      .where("lesson_id", "=", input.lessonId)
+      .execute();
+  });
+  return { recorded: true };
 }

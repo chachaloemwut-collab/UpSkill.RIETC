@@ -28,6 +28,16 @@ export async function startLearningSession(input: { userId: string; lessonId: st
   if (!lesson || lesson.enrollment_status === "revoked") throw new HttpError(404, "NOT_FOUND");
   if (lesson.visibility === "suspended" || lesson.visibility === "draft") throw new HttpError(403, "COURSE_UNAVAILABLE");
   if (lesson.video_status !== "active") throw new HttpError(409, "VIDEO_BROKEN");
+  const preTest = await db
+    .selectFrom("courses as c")
+    .select([
+      sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.assessment_type = 'pre' and q.is_active)`.as("questions"),
+      sql<number>`(select count(*)::int from quiz_attempts a where a.enrollment_id = ${lesson.enrollment_id} and a.assessment_type = 'pre' and a.submitted_at is not null)`.as("attempts"),
+    ])
+    .where("c.id", "=", lesson.course_id)
+    .executeTakeFirstOrThrow();
+  if (preTest.questions > 0 && preTest.attempts === 0) throw new HttpError(403, "PRE_TEST_REQUIRED");
+
 
   if (lesson.is_sequential_locked) {
     // Require every earlier lesson to be completed (robust to gaps in sequence_order)
@@ -40,6 +50,16 @@ export async function startLearningSession(input: { userId: string; lessonId: st
       .where((eb) => eb.or([eb("p.is_completed", "is", null), eb("p.is_completed", "=", false)]))
       .executeTakeFirstOrThrow();
     if (pending.n > 0) throw new HttpError(403, "PREVIOUS_LESSON_INCOMPLETE");
+
+    const pendingTests = await db
+      .selectFrom("lessons as l")
+      .select(sql<number>`count(*)::int`.as("n"))
+      .where("l.course_id", "=", lesson.course_id)
+      .where("l.sequence_order", "<", lesson.sequence_order)
+      .where((eb) => eb.exists(eb.selectFrom("quiz_questions as q").select("q.id").whereRef("q.lesson_id", "=", "l.id").where("q.assessment_type", "=", "lesson").where("q.is_active", "=", true)))
+      .where((eb) => eb.not(eb.exists(eb.selectFrom("quiz_attempts as a").select("a.id").where("a.enrollment_id", "=", lesson.enrollment_id).whereRef("a.lesson_id", "=", "l.id").where("a.assessment_type", "=", "lesson").where("a.is_passed", "=", true))))
+      .executeTakeFirstOrThrow();
+    if (pendingTests.n > 0) throw new HttpError(403, "PREVIOUS_LESSON_TEST_REQUIRED");
   }
 
   const token = generateToken();

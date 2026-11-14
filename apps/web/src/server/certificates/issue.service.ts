@@ -56,6 +56,7 @@ export async function issueCertificate(input: { userId: string; courseId: string
     .selectFrom("quiz_attempts")
     .select(sql<string>`max(score_percentage)::text`.as("score"))
     .where("enrollment_id", "=", data.enrollment_id)
+    .where("assessment_type", "=", "post")
     .where("is_passed", "=", true)
     .executeTakeFirstOrThrow();
   if (!best.score) throw new HttpError(403, "QUIZ_NOT_PASSED");

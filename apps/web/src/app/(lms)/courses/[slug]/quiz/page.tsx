@@ -39,9 +39,14 @@ export default async function QuizPage({ params }: { params: Promise<{ slug: str
             ไปหน้าใบรับรอง
           </Link>
         </div>
-      ) : !data.allLessonsCompleted ? (
+      ) : !data.postTest.configured ? (
         <div className="grid gap-4">
-          <Alert variant="warning" title="ยังทำแบบทดสอบไม่ได้">กรุณาเรียนให้ครบทุกบทก่อนทำแบบทดสอบ</Alert>
+          <Alert variant="warning" title="ยังไม่ได้ตั้งค่า Post-test">กรุณาติดต่อผู้สอน</Alert>
+          <Link href={`/courses/${slug}`} className={buttonClass("outline", "md", "justify-self-start")}>กลับไปหน้าหลักสูตร</Link>
+        </div>
+      ) : !data.readyForPostTest ? (
+        <div className="grid gap-4">
+          <Alert variant="warning" title="ยังทำ Post-test ไม่ได้">กรุณาเรียนและผ่านแบบทดสอบประจำบทให้ครบก่อน</Alert>
           <Link href={`/courses/${slug}`} className={buttonClass("outline", "md", "justify-self-start")}>
             กลับไปหน้าหลักสูตร
           </Link>

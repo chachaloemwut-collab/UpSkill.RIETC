@@ -27,6 +27,15 @@ export type Numeric = ColumnType<string, number | string, number | string>;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface AssessmentFocusEvents {
+  attempt_id: string;
+  created_at: Generated<Timestamp>;
+  elapsed_sec: Generated<number>;
+  event_type: string;
+  id: Generated<Int8>;
+  user_id: string;
+}
+
 export interface AnticheatEvents {
   created_at: Generated<Timestamp>;
   details: Generated<Json>;
@@ -293,10 +302,13 @@ export interface PasswordResetTokens {
 }
 
 export interface QuizAttempts {
+  assessment_type: Generated<string>;
   enrollment_id: string;
   expires_at: Timestamp;
+  focus_event_count: Generated<number>;
   id: Generated<string>;
   is_passed: boolean | null;
+  lesson_id: string | null;
   questions_snapshot: Json;
   score_percentage: Numeric | null;
   started_at: Generated<Timestamp>;
@@ -305,11 +317,13 @@ export interface QuizAttempts {
 }
 
 export interface QuizQuestions {
+  assessment_type: Generated<string>;
   correct_option_id: string;
   course_id: string;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   is_active: Generated<boolean>;
+  lesson_id: string | null;
   options: Json;
   question_text: string;
 }
@@ -366,6 +380,7 @@ export interface VideoReports {
 
 export interface DB {
   anticheat_events: AnticheatEvents;
+  assessment_focus_events: AssessmentFocusEvents;
   audit_logs: AuditLogs;
   certificates: Certificates;
   course_assignment_recipients: CourseAssignmentRecipients;

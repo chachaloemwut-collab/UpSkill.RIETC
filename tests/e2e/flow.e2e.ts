@@ -168,6 +168,14 @@ describe("instructor builds and publishes a course", () => {
       const q = await instructor.req(`/api/instructor/courses/${courseId}/quiz`, { body: { question_text: `Question ${i}?`, options: ["right", "wrong 1", "wrong 2"], correct_index: 0 } });
       expect(q.status).toBe(200);
     }
+    const pre = await instructor.req(`/api/instructor/courses/${courseId}/quiz`, {
+      body: { question_text: "Pre-test question?", options: ["right", "wrong"], correct_index: 0, assessment_type: "pre" },
+    });
+    expect(pre.status).toBe(200);
+    const lesson = await instructor.req(`/api/instructor/courses/${courseId}/quiz`, {
+      body: { question_text: "Lesson checkpoint?", options: ["right", "wrong"], correct_index: 0, assessment_type: "lesson", lesson_id: lessonId },
+    });
+    expect(lesson.status).toBe(200);
     expect((await instructor.req(`/api/instructor/courses/${courseId}/publish`, { method: "PATCH", body: { visibility: "published" } })).status).toBe(200);
   });
 
@@ -183,6 +191,15 @@ describe("learning with the anti-cheat heartbeat", () => {
 
   it("enrolls and starts a learning session", async () => {
     expect((await learner.req(`/api/courses/${courseId}/enroll`, { method: "POST" })).status).toBe(200);
+    expect((await learner.req(`/api/learning/lessons/${lessonId}/start-session`, { method: "POST" })).json.error).toBe("PRE_TEST_REQUIRED");
+    const pre = await learner.req(`/api/courses/${courseId}/assessments/start`, { body: { kind: "pre" } });
+    expect(pre.status).toBe(200);
+    expect((await learner.req(`/api/courses/${courseId}/assessments/focus`, { body: { attempt_id: pre.json.attemptId, event_type: "hidden", elapsed_sec: 1 } })).json.focusEventCount).toBe(1);
+    const wrong = Object.fromEntries(pre.json.questions.map((question: any) => [question.questionId, "wrong"]));
+    const preResult = await learner.req(`/api/courses/${courseId}/assessments/submit`, { body: { attempt_id: pre.json.attemptId, answers: wrong } });
+    expect(preResult.json.kind).toBe("pre");
+    expect(preResult.json.passed).toBe(true);
+    expect(preResult.json.focusEventCount).toBe(1);
     const s = await learner.req(`/api/learning/lessons/${lessonId}/start-session`, { method: "POST" });
     expect(s.status).toBe(200);
     token = s.json.streamToken;
@@ -202,6 +219,15 @@ describe("learning with the anti-cheat heartbeat", () => {
     expect(r.json.warning).toBe("POSITION_JUMP");
     expect(r.json.maxWatchedSec).toBe(3);
     const flags = await withDb((db) => db.query("select count(*)::int n from anticheat_events a join users u on u.id = a.user_id where u.email = $1", [learnerEmail]));
+    expect(flags.rows[0].n).toBeGreaterThan(0);
+  });
+
+  it("records a hidden page and keeps the learning session valid", async () => {
+    const event = await learner.req(`/api/learning/lessons/${lessonId}/focus-event`, {
+      body: { stream_token: token, event_type: "hidden", current_second: 3 },
+    });
+    expect(event.status).toBe(200);
+    const flags = await withDb((db) => db.query("select count(*)::int n from anticheat_events where lesson_id = $1 and reason = 'PAGE_HIDDEN'", [lessonId]));
     expect(flags.rows[0].n).toBeGreaterThan(0);
   });
 
@@ -243,6 +269,17 @@ describe("quiz", () => {
         [learnerEmail, courseId],
       ),
     );
+  });
+
+  it("requires and passes the lesson checkpoint before the post-test", async () => {
+    expect((await learner.req(`/api/courses/${courseId}/quiz/start`, { method: "POST" })).json.error).toBe("LESSON_TESTS_NOT_PASSED");
+    const start = await learner.req(`/api/courses/${courseId}/assessments/start`, { body: { kind: "lesson", lesson_id: lessonId } });
+    expect(start.status).toBe(200);
+    const snapshot = await withDb((db) => db.query("select questions_snapshot from quiz_attempts where id = $1", [start.json.attemptId]));
+    const right = Object.fromEntries(snapshot.rows[0].questions_snapshot.map((item: any) => [item.questionId, item.correctOptionId]));
+    const result = await learner.req(`/api/courses/${courseId}/assessments/submit`, { body: { attempt_id: start.json.attemptId, answers: right } });
+    expect(result.json.kind).toBe("lesson");
+    expect(result.json.passed).toBe(true);
   });
 
   it("never sends the answer key and remaps option ids", async () => {

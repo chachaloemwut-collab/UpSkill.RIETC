@@ -67,14 +67,19 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
               <ArrowLeft className="h-4 w-4" /> บทก่อนหน้า
             </Link>
           )}
-          {nextLesson && (lesson.completed || nextLesson.unlocked) && !nextLesson.broken && (
+          {lesson.completed && lesson.lessonTestRequired && !lesson.lessonTestPassed && (
+            <Link href={`/courses/${slug}/lessons/${lesson.id}/test`} className={buttonClass("default")}>
+              ทำแบบทดสอบประจำบท <ArrowRight className="h-4 w-4" />
+            </Link>
+          )}
+          {nextLesson && lesson.lessonTestPassed && (lesson.completed || nextLesson.unlocked) && !nextLesson.broken && (
             <Link href={`/courses/${slug}/lessons/${nextLesson.id}`} className={buttonClass(lesson.completed ? "default" : "outline")}>
               บทถัดไป <ArrowRight className="h-4 w-4" />
             </Link>
           )}
-          {!nextLesson && data.allLessonsCompleted && (
+          {!nextLesson && data.readyForPostTest && (
             <Link href={`/courses/${slug}/quiz`} className={buttonClass("default")}>
-              ทำแบบทดสอบท้ายหลักสูตร <ArrowRight className="h-4 w-4" />
+              ทำ Post-test ท้ายหลักสูตร <ArrowRight className="h-4 w-4" />
             </Link>
           )}
         </div>

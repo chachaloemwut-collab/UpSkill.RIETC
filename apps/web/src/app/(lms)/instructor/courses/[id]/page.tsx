@@ -31,7 +31,11 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
   const editor: EditorData = {
     course: data.course,
     lessons: data.lessons,
-    questions: data.questions.map((q) => ({ ...q, options: q.options as EditorData["questions"][number]["options"] })),
+    questions: data.questions.map((q) => ({
+      ...q,
+      assessment_type: q.assessment_type as EditorData["questions"][number]["assessment_type"],
+      options: q.options as EditorData["questions"][number]["options"],
+    })),
     devManualDuration: !env.YOUTUBE_API_KEY && env.APP_ENV !== "production",
     publishRules: PUBLISH_RULES,
   };

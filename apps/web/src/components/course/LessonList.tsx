@@ -13,6 +13,8 @@ export interface LessonItem {
   completed: boolean;
   watchedPercent: number;
   unlocked: boolean;
+  lessonTestRequired: boolean;
+  lessonTestPassed: boolean;
 }
 
 /** Curriculum list: done / current / locked states, with how much of each lesson was watched. */
@@ -57,6 +59,8 @@ export function LessonList({ slug, lessons, enrolled, activeId }: { slug: string
                 <TriangleAlert className="h-3 w-3" /> วิดีโอเสีย
               </Badge>
             )}
+            {enrolled && l.completed && l.lessonTestRequired && !l.lessonTestPassed && <Badge variant="warning">รอแบบทดสอบ</Badge>}
+            {enrolled && l.lessonTestRequired && l.lessonTestPassed && <Badge variant="success">ผ่านแบบทดสอบ</Badge>}
             {enrolled && !l.unlocked && <Lock className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="ล็อก" />}
           </div>
         );

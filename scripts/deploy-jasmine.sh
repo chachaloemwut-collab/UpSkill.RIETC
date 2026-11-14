@@ -103,7 +103,7 @@ cmd_stage() {
   rsync -a \
     --exclude 'node_modules' --exclude '.next*' --exclude '.turbo' --exclude 'var' --exclude 'dist' --exclude 'coverage' --exclude 'test-results' \
     --exclude '.env*' --exclude '*.tsbuildinfo' --exclude '.DS_Store' --exclude '*.log' \
-    --exclude '*.test.ts' --exclude 'AGENTS.md' \
+    --exclude '*.test.ts' --exclude '* 2.*' --exclude 'AGENTS.md' \
     apps packages infra package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .dockerignore .nvmrc \
     "$STAGE/"
   cp deploy/jasmine/compose.yml "$STAGE/compose.yml"

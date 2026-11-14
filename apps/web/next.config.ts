@@ -33,11 +33,54 @@ const config: NextConfig = {
   outputFileTracingRoot: path.join(import.meta.dirname, "../.."),
   poweredByHeader: false,
   reactStrictMode: true,
+  // Development uses Next's default Turbopack pipeline. Production build uses
+  // the explicit webpack configuration below for native Argon2 externals.
+  turbopack: {},
   // Quick Tunnels use a second hostname in local development. Without this,
   // Next blocks its client assets and interactive forms cannot hydrate.
   allowedDevOrigins: configuredDevHosts(),
   transpilePackages: ["@upskill/core", "@upskill/infra", "@upskill/db"],
-  serverExternalPackages: ["@node-rs/argon2", "pg"],
+  // Argon2 loads a platform-specific native binary at runtime. Keep both the
+  // wrapper and every optional platform package out of webpack's JS parser so
+  // local macOS builds and Linux Docker builds use their own installed binary.
+  serverExternalPackages: [
+    "@node-rs/argon2",
+    "@node-rs/argon2-android-arm-eabi",
+    "@node-rs/argon2-android-arm64",
+    "@node-rs/argon2-darwin-arm64",
+    "@node-rs/argon2-darwin-x64",
+    "@node-rs/argon2-freebsd-x64",
+    "@node-rs/argon2-linux-arm-gnueabihf",
+    "@node-rs/argon2-linux-arm64-gnu",
+    "@node-rs/argon2-linux-arm64-musl",
+    "@node-rs/argon2-linux-x64-gnu",
+    "@node-rs/argon2-linux-x64-musl",
+    "@node-rs/argon2-win32-arm64-msvc",
+    "@node-rs/argon2-win32-ia32-msvc",
+    "@node-rs/argon2-win32-x64-msvc",
+    "bullmq",
+    "pg",
+  ],
+  webpack(webpackConfig, { isServer }) {
+    if (isServer) {
+      const nativeArgon2External = (
+        { request }: { request?: string },
+        callback: (error?: Error | null, result?: string) => void,
+      ) => {
+        if (request === "@node-rs/argon2" || request?.startsWith("@node-rs/argon2-")) {
+          callback(null, `commonjs ${request}`);
+          return;
+        }
+        callback();
+      };
+
+      const currentExternals = webpackConfig.externals ?? [];
+      webpackConfig.externals = Array.isArray(currentExternals)
+        ? [...currentExternals, nativeArgon2External]
+        : [currentExternals, nativeArgon2External];
+    }
+    return webpackConfig;
+  },
   // Course covers are YouTube thumbnails, proxied through /_next/image so browsers never call Google for them
   images: { remotePatterns: [{ protocol: "https", hostname: "i.ytimg.com", pathname: "/vi/**" }] },
   async headers() {

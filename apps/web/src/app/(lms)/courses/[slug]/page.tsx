@@ -23,18 +23,21 @@ export default async function CoursePage({ params }: Props) {
   const user = await getCurrentUser();
   const data = await getCourseForViewer(slug, user);
   if (!data) notFound();
-  const { course, enrollment, lessons, allLessonsCompleted, certificate, manager } = data;
+  const { course, enrollment, lessons, certificate, manager } = data;
   const next = lessons.find((l) => l.unlocked && !l.completed && !l.broken);
+  const pendingLessonTest = lessons.find((l) => l.completed && l.lessonTestRequired && !l.lessonTestPassed);
   const enrolled = !!enrollment && enrollment.status !== "revoked";
   const done = lessons.filter((l) => l.completed).length;
   const progress = lessons.length ? Math.round((done / lessons.length) * 100) : 0;
   const vis = VISIBILITY[course.visibility];
 
   const criteria = [
+    ...(data.preTest.required ? [{ icon: Target, text: "ทำ Pre-test ก่อนเริ่มเรียน", sub: "ใช้วัดความรู้พื้นฐานและไม่ตัดสิทธิ์การเรียน" }] : []),
     { icon: Eye, text: `ดูวิดีโอแต่ละบทอย่างน้อย ${course.min_watch_percentage}%`, sub: "ระบบนับเวลาจริง กรอข้ามหรือเร่งความเร็วไม่ได้" },
     ...(course.is_sequential_locked ? [{ icon: ListOrdered, text: "เรียนตามลำดับบท", sub: "บทถัดไปจะเปิดเมื่อเรียนบทก่อนหน้าครบ" }] : []),
     { icon: Target, text: `สอบผ่านอย่างน้อย ${course.passing_quiz_score}%`, sub: `สอบได้ ${course.max_quiz_attempts_per_day} ครั้งต่อวัน` },
     { icon: Timer, text: `เวลาทำแบบทดสอบ ${Math.round(course.quiz_time_limit_sec / 60)} นาที`, sub: "ข้อสอบและตัวเลือกสุ่มลำดับทุกครั้ง" },
+    ...(lessons.some((lesson) => lesson.lessonTestRequired) ? [{ icon: ListOrdered, text: "ผ่านแบบทดสอบระหว่างอบรม", sub: "ต้องผ่านแบบทดสอบประจำบทก่อนเปิดบทถัดไป" }] : []),
     ...(course.credential_enabled ? [{ icon: Award, text: course.credential_name_th, sub: "ตรวจสอบสถานะได้ผ่าน QR Code" }] : []),
   ];
 
@@ -133,9 +136,17 @@ export default async function CoursePage({ params }: Props) {
                     <Award className="h-4 w-4" /> {certificate ? `ดู${course.credential_name_th}` : `รับ${course.credential_name_th}`}
                   </Link>}
                 </>
-              ) : allLessonsCompleted ? (
+              ) : data.preTest.required && !data.preTest.completed ? (
+                <Link href={`/courses/${course.slug}/pre-test`} className={buttonClass("default", "lg", "w-full")}>
+                  ทำ Pre-test ก่อนเริ่มเรียน <ArrowRight className="h-4 w-4" />
+                </Link>
+              ) : pendingLessonTest ? (
+                <Link href={`/courses/${course.slug}/lessons/${pendingLessonTest.id}/test`} className={buttonClass("default", "lg", "w-full")}>
+                  ทำแบบทดสอบบทที่ {pendingLessonTest.order} <ArrowRight className="h-4 w-4" />
+                </Link>
+              ) : data.readyForPostTest ? (
                 <Link href={`/courses/${course.slug}/quiz`} className={buttonClass("default", "lg", "w-full")}>
-                  ทำแบบทดสอบท้ายหลักสูตร <ArrowRight className="h-4 w-4" />
+                  ทำ Post-test ท้ายหลักสูตร <ArrowRight className="h-4 w-4" />
                 </Link>
               ) : next ? (
                 <Link href={`/courses/${course.slug}/lessons/${next.id}`} className={buttonClass("default", "lg", "w-full")}>

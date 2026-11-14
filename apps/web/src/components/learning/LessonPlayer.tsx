@@ -19,6 +19,7 @@ type Status =
   | { kind: "idle" }
   | { kind: "recording"; watchedPercent: number; minPercent: number }
   | { kind: "paused" }
+  | { kind: "focus-paused" }
   | { kind: "superseded" }
   | { kind: "offline" }
   | { kind: "broken" }
@@ -53,6 +54,8 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
   const seqRef = useRef(0);
   const lastSentAtRef = useRef(0);
   const maxWatchedRef = useRef(initialMaxWatchedSec);
+  const focusPauseRef = useRef(false);
+  const lastFocusEventAtRef = useRef(0);
 
   const [status, setStatus] = useState<Status>(initiallyCompleted ? { kind: "completed" } : { kind: "idle" });
   const [position, setPosition] = useState(0);
@@ -113,6 +116,30 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
     }
   }, [lessonId, minWatchPercentage, router]);
 
+  const reportFocusLoss = useCallback((eventType: "hidden" | "pagehide") => {
+    const player = playerRef.current;
+    const token = tokenRef.current;
+    if (!player || player.getPlayerState() !== YT_STATE.PLAYING) return;
+    const currentSecond = player.getCurrentTime();
+    focusPauseRef.current = true;
+    player.pauseVideo();
+    setPlaying(false);
+    setStatus({ kind: "focus-paused" });
+    void sendHeartbeat();
+
+    const now = Date.now();
+    if (!token || now - lastFocusEventAtRef.current < 1_000) return;
+    lastFocusEventAtRef.current = now;
+    void fetch(`/api/learning/lessons/${lessonId}/focus-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ stream_token: token, event_type: eventType, current_second: currentSecond }),
+      credentials: "same-origin",
+      cache: "no-store",
+      keepalive: true,
+    });
+  }, [lessonId, sendHeartbeat]);
+
   // Create the player
   useEffect(() => {
     let disposed = false;
@@ -133,6 +160,7 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
           onStateChange: async (e) => {
             setPlaying(e.data === YT_STATE.PLAYING);
             if (e.data === YT_STATE.PLAYING) {
+              focusPauseRef.current = false;
               if (!tokenRef.current) {
                 try {
                   await startSession();
@@ -144,7 +172,7 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
               }
               setStatus((s) => (s.kind === "recording" ? s : { kind: "recording", watchedPercent: 0, minPercent: minWatchPercentage }));
             } else if (e.data === YT_STATE.PAUSED) {
-              setStatus({ kind: "paused" });
+              setStatus({ kind: focusPauseRef.current ? "focus-paused" : "paused" });
               void sendHeartbeat();
             } else if (e.data === YT_STATE.ENDED) {
               // Wait past MIN_INTERVAL so the final ping isn't ignored as TOO_FREQUENT
@@ -185,14 +213,20 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
     };
   }, [sendHeartbeat]);
 
-  // Spec 3.1 #3: use visibilityState (not blur) so iPad Split View keeps playing
+  // Pause immediately when the page is hidden/minimized. Do not use window.blur:
+  // focusing the YouTube iframe itself can emit blur and would make playback unusable.
   useEffect(() => {
     const onVis = () => {
-      if (document.visibilityState === "hidden") playerRef.current?.pauseVideo();
+      if (document.visibilityState === "hidden") reportFocusLoss("hidden");
     };
+    const onPageHide = () => reportFocusLoss("pagehide");
     document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, []);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [reportFocusLoss]);
 
   const seek = (targetSec: number) => {
     const p = playerRef.current;
@@ -286,6 +320,7 @@ const STATUS_TONE = {
   idle: "bg-muted-foreground/50",
   recording: "bg-success",
   paused: "bg-warning",
+  "focus-paused": "bg-destructive",
   superseded: "bg-destructive",
   offline: "bg-warning",
   broken: "bg-destructive",
@@ -297,6 +332,7 @@ function StatusBar({ status }: { status: Status }) {
     idle: "กดเล่นเพื่อเริ่มบันทึกเวลาเรียน",
     recording: status.kind === "recording" ? `กำลังบันทึกเวลาเรียน · ดูแล้ว ${status.watchedPercent}% (เกณฑ์ผ่าน ${status.minPercent}%)` : "",
     paused: "หยุดเล่นชั่วคราว — กดเล่นต่อเพื่อเก็บเวลาเรียน",
+    "focus-paused": "ระบบหยุดวิดีโอเพราะมีการสลับแท็บหรือย่อหน้าต่าง — กลับมาที่หน้านี้แล้วกดเล่นต่อ",
     superseded: "ตรวจพบการเปิดเรียนในหน้าต่างอื่น — หน้าต่างนี้หยุดนับเวลาแล้ว",
     offline: "การเชื่อมต่อขาดหาย — ระบบจะบันทึกต่อเมื่อกลับมาออนไลน์",
     broken: "วิดีโอนี้ไม่พร้อมใช้งาน ระบบแจ้งผู้สอนแล้ว",

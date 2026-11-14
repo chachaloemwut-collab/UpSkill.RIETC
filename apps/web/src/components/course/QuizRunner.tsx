@@ -15,17 +15,35 @@ interface Attempt {
   attemptId: string;
   expiresAt: string;
   questions: Question[];
+  focusEventCount: number;
+  kind: "pre" | "lesson" | "post";
 }
 interface Result {
   scorePercentage: number;
   passed: boolean;
   late?: boolean;
   passingScore?: number;
+  kind?: "pre" | "lesson" | "post";
+  focusEventCount?: number;
 }
 
 const LETTERS = "ABCDEFGH";
 
-export function QuizRunner({ courseId, slug, passingScore, timeLimitMin }: { courseId: string; slug: string; passingScore: number; timeLimitMin: number }) {
+export function QuizRunner({
+  courseId,
+  slug,
+  passingScore,
+  timeLimitMin,
+  assessmentKind = "post",
+  lessonId,
+}: {
+  courseId: string;
+  slug: string;
+  passingScore: number;
+  timeLimitMin: number;
+  assessmentKind?: "pre" | "lesson" | "post";
+  lessonId?: string | undefined;
+}) {
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [result, setResult] = useState<Result | null>(null);
@@ -34,6 +52,9 @@ export function QuizRunner({ courseId, slug, passingScore, timeLimitMin }: { cou
   const [confirming, setConfirming] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const ringRef = useRef<HTMLDivElement>(null);
+  const attemptStartedAtRef = useRef(0);
+  const lastFocusEventAtRef = useRef(0);
+  const activeAttemptId = attempt?.attemptId;
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -44,13 +65,45 @@ export function QuizRunner({ courseId, slug, passingScore, timeLimitMin }: { cou
     if (result?.passed && ringRef.current) confettiFrom(ringRef.current, { count: 140 });
   }, [result]);
 
+  useEffect(() => {
+    if (!activeAttemptId) return;
+    const record = (eventType: "hidden" | "pagehide") => {
+      const eventAt = Date.now();
+      if (eventAt - lastFocusEventAtRef.current < 1_000) return;
+      lastFocusEventAtRef.current = eventAt;
+      setAttempt((current) => current ? { ...current, focusEventCount: current.focusEventCount + 1 } : current);
+      void api<{ focusEventCount: number }>(`/api/courses/${courseId}/assessments/focus`, {
+        body: {
+          attempt_id: activeAttemptId,
+          event_type: eventType,
+          elapsed_sec: Math.max(0, Math.floor((eventAt - attemptStartedAtRef.current) / 1000)),
+        },
+      }).then((response) => {
+        if (response.ok) setAttempt((current) => current ? { ...current, focusEventCount: response.data.focusEventCount } : current);
+      });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") record("hidden");
+    };
+    const onPageHide = () => record("pagehide");
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [activeAttemptId, courseId]);
+
   async function start() {
     setBusy(true);
     setError(null);
-    const r = await api<Attempt>(`/api/courses/${courseId}/quiz/start`, { method: "POST" });
+    const r = await api<Attempt>(`/api/courses/${courseId}/assessments/start`, {
+      body: { kind: assessmentKind, ...(lessonId ? { lesson_id: lessonId } : {}) },
+    });
     setBusy(false);
     if (r.ok) {
       setAttempt(r.data);
+      attemptStartedAtRef.current = Date.now();
       setAnswers({});
       setResult(null);
       window.scrollTo({ top: 0 });
@@ -60,7 +113,7 @@ export function QuizRunner({ courseId, slug, passingScore, timeLimitMin }: { cou
   async function submit() {
     if (!attempt) return;
     setBusy(true);
-    const r = await api<Result>(`/api/courses/${courseId}/quiz/submit`, { body: { attempt_id: attempt.attemptId, answers } });
+    const r = await api<Result>(`/api/courses/${courseId}/assessments/submit`, { body: { attempt_id: attempt.attemptId, answers } });
     setBusy(false);
     if (r.ok) {
       setResult(r.data);
@@ -76,12 +129,22 @@ export function QuizRunner({ courseId, slug, passingScore, timeLimitMin }: { cou
           <ProgressRing value={Math.round(result.scorePercentage)} size={120} stroke={10} label="คะแนน" />
         </div>
         <div>
-          <h2 className="text-xl font-semibold">{result.passed ? "ยินดีด้วย คุณสอบผ่าน!" : result.late ? "ส่งคำตอบเกินเวลาที่กำหนด" : "ยังไม่ผ่านเกณฑ์"}</h2>
+          <h2 className="text-xl font-semibold">
+            {assessmentKind === "pre"
+              ? "ประเมินก่อนเรียนเรียบร้อยแล้ว"
+              : result.passed
+                ? assessmentKind === "lesson" ? "ผ่านแบบทดสอบประจำบทแล้ว" : "ยินดีด้วย คุณสอบผ่าน!"
+                : result.late ? "ส่งคำตอบเกินเวลาที่กำหนด" : "ยังไม่ผ่านเกณฑ์"}
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             คะแนน {result.scorePercentage.toFixed(2)}% · เกณฑ์ผ่าน {result.passingScore ?? passingScore}%
           </p>
         </div>
-        {result.passed ? (
+        {assessmentKind === "pre" ? (
+          <Link href={`/courses/${slug}`} className={buttonClass("default", "lg")}>เริ่มเรียน</Link>
+        ) : result.passed && assessmentKind === "lesson" ? (
+          <Link href={`/courses/${slug}`} className={buttonClass("default", "lg")}>กลับไปเรียนต่อ</Link>
+        ) : result.passed ? (
           <Link href={`/courses/${slug}/certificate`} className={buttonClass("default", "lg")}>
             <Award className="h-4 w-4" /> รับใบรับรอง
           </Link>
@@ -95,6 +158,7 @@ export function QuizRunner({ courseId, slug, passingScore, timeLimitMin }: { cou
             </Link>
           </div>
         )}
+        {(result.focusEventCount ?? 0) > 0 && <Alert variant="warning" title={`พบการสลับหน้า ${result.focusEventCount} ครั้ง`}>ระบบบันทึกเหตุการณ์ไว้ประกอบการตรวจสอบแล้ว</Alert>}
         {error && <Alert variant="destructive" title={error} />}
       </Card>
     );
@@ -121,6 +185,7 @@ export function QuizRunner({ courseId, slug, passingScore, timeLimitMin }: { cou
           ))}
         </div>
         <p className="text-sm text-muted-foreground">เมื่อกดเริ่ม ระบบจะจับเวลาทันที และส่งคำตอบไม่ได้หลังหมดเวลา</p>
+        <p className="text-sm text-muted-foreground">หากสลับแท็บหรือย่อหน้าต่าง ระบบจะบันทึกเหตุการณ์ไว้ในผลการสอบ</p>
         <Button size="lg" onClick={start} loading={busy} className="justify-self-start">
           เริ่มทำแบบทดสอบ
         </Button>
@@ -145,6 +210,7 @@ export function QuizRunner({ courseId, slug, passingScore, timeLimitMin }: { cou
         <Progress value={(answered / total) * 100} />
       </div>
       {error && <Alert variant="destructive" title={error} />}
+      {attempt.focusEventCount > 0 && <Alert variant="warning" title={`ตรวจพบการสลับหน้า ${attempt.focusEventCount} ครั้ง`}>กรุณาทำแบบทดสอบในหน้านี้จนเสร็จ ระบบได้บันทึกเหตุการณ์ไว้แล้ว</Alert>}
       {attempt.questions.map((q, i) => (
         <Card key={q.questionId} className="animate-slide-up p-5 [animation-fill-mode:both]" style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}>
           <fieldset>

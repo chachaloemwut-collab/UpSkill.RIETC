@@ -61,16 +61,31 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
     .select([
       "l.id", "l.sequence_order", "l.title", "l.youtube_video_id", "l.duration_sec", "l.video_status",
       "p.is_completed", "p.max_watched_sec", "p.watched_chunks", "p.total_chunks_required", "p.accumulated_valid_sec",
+      sql<number>`(select count(*)::int from quiz_questions q where q.lesson_id = l.id and q.assessment_type = 'lesson' and q.is_active)`.as("test_question_count"),
+      sql<number>`(select count(*)::int from quiz_attempts a where a.enrollment_id = ${enrollment?.id ?? "00000000-0000-0000-0000-000000000000"} and a.lesson_id = l.id and a.assessment_type = 'lesson' and a.is_passed)`.as("passed_test_count"),
     ])
     .where("l.course_id", "=", course.id)
     .orderBy("l.sequence_order")
     .execute();
 
-  // Sequential lock: a lesson is open when every earlier lesson is completed
-  let allPreviousDone = true;
+  const assessmentState = await db
+    .selectFrom("courses as c")
+    .select([
+      sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.assessment_type = 'pre' and q.is_active)`.as("pre_questions"),
+      sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.assessment_type = 'post' and q.is_active)`.as("post_questions"),
+      sql<number>`(select count(*)::int from quiz_attempts a where a.enrollment_id = ${enrollment?.id ?? "00000000-0000-0000-0000-000000000000"} and a.assessment_type = 'pre' and a.submitted_at is not null)`.as("pre_attempts"),
+    ])
+    .where("c.id", "=", course.id)
+    .executeTakeFirstOrThrow();
+
+  // Sequential lock: pre-test (when configured), earlier video, and its lesson test must be complete.
+  const preTestCompleted = assessmentState.pre_questions === 0 || assessmentState.pre_attempts > 0;
+  let allPreviousDone = preTestCompleted;
   const lessonViews = lessons.map((l) => {
     const unlocked = !course.is_sequential_locked || allPreviousDone;
-    allPreviousDone &&= l.is_completed === true;
+    const lessonTestRequired = l.test_question_count > 0;
+    const lessonTestPassed = !lessonTestRequired || l.passed_test_count > 0;
+    allPreviousDone &&= l.is_completed === true && lessonTestPassed;
     const watchedPercent = l.total_chunks_required ? Math.floor(((l.watched_chunks?.length ?? 0) / l.total_chunks_required) * 100) : 0;
     return {
       id: l.id,
@@ -83,6 +98,8 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
       maxWatchedSec: l.max_watched_sec ?? 0,
       watchedPercent,
       unlocked,
+      lessonTestRequired,
+      lessonTestPassed,
     };
   });
 
@@ -96,6 +113,10 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
     enrollment: enrollment ?? null,
     lessons: lessonViews,
     allLessonsCompleted: lessonViews.length > 0 && lessonViews.every((l) => l.completed),
+    allLessonTestsPassed: lessonViews.every((l) => l.lessonTestPassed),
+    readyForPostTest: lessonViews.length > 0 && lessonViews.every((l) => l.completed && l.lessonTestPassed),
+    preTest: { required: assessmentState.pre_questions > 0, completed: preTestCompleted },
+    postTest: { configured: assessmentState.post_questions > 0 },
     certificate: certificate ?? null,
   };
 }

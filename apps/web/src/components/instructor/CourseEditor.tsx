@@ -35,7 +35,14 @@ export interface EditorData {
     credential_signer_title: string | null;
   };
   lessons: Array<{ id: string; sequence_order: number; title: string; youtube_video_id: string; duration_sec: number; video_status: string }>;
-  questions: Array<{ id: string; question_text: string; options: Array<{ id: string; text: string }>; correct_option_id: string }>;
+  questions: Array<{
+    id: string;
+    question_text: string;
+    options: Array<{ id: string; text: string }>;
+    correct_option_id: string;
+    assessment_type: "pre" | "lesson" | "post";
+    lesson_id: string | null;
+  }>;
   devManualDuration: boolean;
   publishRules: { minTotalDurationSec: number; minQuestions: number };
 }
@@ -62,11 +69,12 @@ function useAction() {
 
 export function CourseEditor({ data }: { data: EditorData }) {
   const { course, lessons, questions, publishRules } = data;
+  const postQuestions = questions.filter((question) => question.assessment_type === "post");
   const base = `/api/instructor/courses/${course.id}`;
   const checks = [
     { ok: lessons.length > 0, label: "มีบทเรียนอย่างน้อย 1 บท" },
     { ok: course.total_duration_sec >= publishRules.minTotalDurationSec, label: `ความยาวรวม ≥ ${Math.round(publishRules.minTotalDurationSec / 60)} นาที (ตอนนี้ ${formatDuration(course.total_duration_sec)})` },
-    { ok: questions.length >= publishRules.minQuestions, label: `ข้อสอบ ≥ ${publishRules.minQuestions} ข้อ (ตอนนี้ ${questions.length})` },
+    { ok: postQuestions.length >= publishRules.minQuestions, label: `Post-test ≥ ${publishRules.minQuestions} ข้อ (ตอนนี้ ${postQuestions.length})` },
     { ok: lessons.length > 0 && lessons.every((l) => l.video_status === "active"), label: "วิดีโอทุกบทใช้งานได้" },
   ];
 
@@ -82,7 +90,7 @@ export function CourseEditor({ data }: { data: EditorData }) {
           <LessonsSection base={base} lessons={lessons} devManualDuration={data.devManualDuration} />
         </TabsContent>
         <TabsContent value="quiz" className="mt-4">
-          <QuizSection base={base} questions={questions} />
+          <QuizSection base={base} questions={questions} lessons={lessons} />
         </TabsContent>
         <TabsContent value="settings" className="mt-4">
           <SettingsSection base={base} course={course} />
@@ -363,10 +371,11 @@ function LessonsSection({ base, lessons, devManualDuration }: { base: string; le
   );
 }
 
-function QuizSection({ base, questions }: { base: string; questions: EditorData["questions"] }) {
+function QuizSection({ base, questions, lessons }: { base: string; questions: EditorData["questions"]; lessons: EditorData["lessons"] }) {
   const a = useAction();
   const [optionCount, setOptionCount] = useState(4);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [assessmentType, setAssessmentType] = useState<"pre" | "lesson" | "post">("post");
 
   async function onAdd(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -374,7 +383,13 @@ function QuizSection({ base, questions }: { base: string; questions: EditorData[
     const f = new FormData(form);
     const options = Array.from({ length: optionCount }, (_, i) => String(f.get(`opt${i}`) ?? "").trim());
     if (options.some((o) => !o)) return;
-    const ok = await a.run(`${base}/quiz`, { body: { question_text: f.get("q"), options, correct_index: Number(f.get("correct")) } }, "เพิ่มข้อสอบแล้ว");
+    const lessonId = assessmentType === "lesson" ? String(f.get("lesson_id") ?? "") : undefined;
+    if (assessmentType === "lesson" && !lessonId) return;
+    const ok = await a.run(
+      `${base}/quiz`,
+      { body: { question_text: f.get("q"), options, correct_index: Number(f.get("correct")), assessment_type: assessmentType, ...(lessonId ? { lesson_id: lessonId } : {}) } },
+      "เพิ่มข้อสอบแล้ว",
+    );
     if (ok) form.reset();
   }
 
@@ -388,7 +403,15 @@ function QuizSection({ base, questions }: { base: string; questions: EditorData[
             <Card key={q.id} className="p-4">
               <div className="flex items-start gap-3">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium tabular-nums">{i + 1}</span>
-                <p className="mr-auto pt-0.5 text-sm font-medium">{q.question_text}</p>
+                <div className="mr-auto min-w-0">
+                  <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                    <Badge variant={q.assessment_type === "post" ? "default" : q.assessment_type === "pre" ? "secondary" : "warning"}>
+                      {q.assessment_type === "pre" ? "Pre-test" : q.assessment_type === "post" ? "Post-test" : "ระหว่างอบรม"}
+                    </Badge>
+                    {q.lesson_id && <span className="text-xs text-muted-foreground">{lessons.find((lesson) => lesson.id === q.lesson_id)?.title ?? "บทเรียน"}</span>}
+                  </div>
+                  <p className="pt-0.5 text-sm font-medium">{q.question_text}</p>
+                </div>
                 <Button variant="ghost" size="icon" disabled={a.busy} onClick={() => setDeleting(q.id)} aria-label="ลบข้อนี้" className="text-muted-foreground hover:text-destructive">
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -412,6 +435,23 @@ function QuizSection({ base, questions }: { base: string; questions: EditorData[
       <Card className="p-5">
         <form onSubmit={onAdd} className="grid gap-4">
           <h3 className="font-semibold">เพิ่มข้อสอบ</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="ช่วงการประเมิน">
+              <Select value={assessmentType} onChange={(event) => setAssessmentType(event.target.value as "pre" | "lesson" | "post")}>
+                <option value="pre">Pre-test ก่อนเริ่มเรียน</option>
+                <option value="lesson">แบบทดสอบระหว่างอบรม</option>
+                <option value="post">Post-test ท้ายหลักสูตร</option>
+              </Select>
+            </Field>
+            {assessmentType === "lesson" && (
+              <Field label="ผูกกับบทเรียน">
+                <Select name="lesson_id" required>
+                  <option value="">เลือกบทเรียน</option>
+                  {lessons.map((lesson) => <option key={lesson.id} value={lesson.id}>บทที่ {lesson.sequence_order}: {lesson.title}</option>)}
+                </Select>
+              </Field>
+            )}
+          </div>
           <Field label="คำถาม">
             <Textarea name="q" required minLength={3} rows={2} />
           </Field>

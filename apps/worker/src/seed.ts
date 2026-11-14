@@ -56,7 +56,7 @@ if (!(await db.selectFrom("courses").select("id").where("slug", "=", slug).execu
         instructor_id: instructorId,
         title: "หลักสูตรตัวอย่าง: การเล่าเรื่องด้วยแอนิเมชัน",
         slug,
-        description: "หลักสูตรตัวอย่างสำหรับทดสอบระบบ ดูวิดีโอให้ครบ 90% แล้วทำแบบทดสอบ 3 ข้อเพื่อรับใบรับรอง",
+        description: "หลักสูตรตัวอย่างสำหรับทดสอบ Pre-test การเรียนวิดีโอ แบบทดสอบระหว่างอบรม และ Post-test ก่อนรับใบรับรอง",
         visibility: "published",
         published_at: new Date(),
         is_verified_course: true,
@@ -64,12 +64,15 @@ if (!(await db.selectFrom("courses").select("id").where("slug", "=", slug).execu
       })
       .returning("id")
       .executeTakeFirstOrThrow();
-    await trx
+    const lesson = await trx
       .insertInto("lessons")
       .values({ course_id: c.id, sequence_order: 1, title: DEMO_VIDEO.title, youtube_video_id: DEMO_VIDEO.id, duration_sec: durationSec })
-      .execute();
-    const q = (text: string, options: string[], correct: number) => ({
+      .returning("id")
+      .executeTakeFirstOrThrow();
+    const q = (text: string, options: string[], correct: number, assessmentType: "pre" | "lesson" | "post" = "post") => ({
       course_id: c.id,
+      assessment_type: assessmentType,
+      lesson_id: assessmentType === "lesson" ? lesson.id : null,
       question_text: text,
       options: JSON.stringify(options.map((t, i) => ({ id: String.fromCharCode(97 + i), text: t }))),
       correct_option_id: String.fromCharCode(97 + correct),
@@ -77,6 +80,8 @@ if (!(await db.selectFrom("courses").select("id").where("slug", "=", slug).execu
     await trx
       .insertInto("quiz_questions")
       .values([
+        q("ก่อนเรียน คุณเคยรับชมสื่อแอนิเมชันเพื่อวิเคราะห์การเล่าเรื่องหรือไม่", ["เคย", "ไม่เคย"], 0, "pre"),
+        q("หลังดูบทเรียน ตัวละครหลักของเรื่องเป็นสัตว์ชนิดใด", ["กระต่าย", "สุนัข", "แมว", "หมี"], 0, "lesson"),
         q("ตัวละครหลักของเรื่องเป็นสัตว์ชนิดใด", ["กระต่าย", "สุนัข", "แมว", "หมี"], 0),
         q("แอนิเมชันเรื่องนี้สร้างโดยใคร", ["Pixar", "Blender Foundation", "Studio Ghibli", "DreamWorks"], 1),
         q("ระบบนับเวลาเรียนจากสิ่งใด", ["นาฬิกาของเครื่องผู้เรียน", "เวลาจริงฝั่งเซิร์ฟเวอร์", "จำนวนครั้งที่กดเล่น", "ไม่ได้นับ"], 1),
