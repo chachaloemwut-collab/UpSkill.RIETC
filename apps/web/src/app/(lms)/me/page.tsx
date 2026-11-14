@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { ChangePasswordForm } from "@/components/account/ChangePasswordForm";
 import { EmailPreferencesForm } from "@/components/account/EmailPreferencesForm";
 import { DataRights } from "@/components/account/DataRights";
+import { ApiTokens } from "@/components/account/ApiTokens";
 import { LockLegalNameForm } from "@/components/course/CertificatePanel";
 import { ROLE_LABEL, formatDateTh } from "@/lib/format";
 import { ctx } from "@/server/context";
@@ -130,6 +131,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
               แต่คงใบรับรองและบันทึกการตรวจสอบที่จำเป็นต่อการยืนยันเอกสารไว้
             </p>
             <DataRights />
+          </Card>
+        </Section>
+        <Section icon={<KeyRound className="h-5 w-5" />} title="API token (MCP)" description="สร้าง token ส่วนตัวสำหรับเชื่อม AI เช่น Cursor หรือ Claude Desktop ผ่าน MCP ตามสิทธิ์บัญชีของคุณ">
+          <Card className="p-6">
+            <ApiTokens />
           </Card>
         </Section>
       </div>

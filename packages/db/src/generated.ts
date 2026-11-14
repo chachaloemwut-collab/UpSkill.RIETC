@@ -428,6 +428,16 @@ export interface QuizQuestions {
   question_text: string;
 }
 
+export interface UserApiTokens {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  last_used_at: Timestamp | null;
+  name: string;
+  revoked_at: Timestamp | null;
+  token_hash: string;
+  user_id: string;
+}
+
 export interface UserOauthAccounts {
   id: Generated<string>;
   last_used_at: Generated<Timestamp>;
@@ -536,6 +546,7 @@ export interface DB {
   programs: Programs;
   quiz_attempts: QuizAttempts;
   quiz_questions: QuizQuestions;
+  user_api_tokens: UserApiTokens;
   user_oauth_accounts: UserOauthAccounts;
   user_profiles: UserProfiles;
   user_sessions: UserSessions;
