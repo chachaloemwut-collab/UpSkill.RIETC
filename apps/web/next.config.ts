@@ -15,12 +15,27 @@ const securityHeaders = [
   },
 ];
 
+function configuredDevHosts(): string[] {
+  const configured = [process.env.APP_ORIGIN, ...(process.env.APP_ALLOWED_ORIGINS ?? "").split(",")];
+  const hosts = configured.flatMap((value) => {
+    try {
+      return value?.trim() ? [new URL(value.trim()).hostname] : [];
+    } catch {
+      return [];
+    }
+  });
+  return [...new Set(hosts)];
+}
+
 const config: NextConfig = {
   // Self-contained server bundle for the Docker image; trace files from the monorepo root
   output: "standalone",
   outputFileTracingRoot: path.join(import.meta.dirname, "../.."),
   poweredByHeader: false,
   reactStrictMode: true,
+  // Quick Tunnels use a second hostname in local development. Without this,
+  // Next blocks its client assets and interactive forms cannot hydrate.
+  allowedDevOrigins: configuredDevHosts(),
   transpilePackages: ["@upskill/core", "@upskill/infra", "@upskill/db"],
   serverExternalPackages: ["@node-rs/argon2", "pg"],
   // Course covers are YouTube thumbnails, proxied through /_next/image so browsers never call Google for them

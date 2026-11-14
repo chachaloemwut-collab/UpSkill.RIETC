@@ -82,7 +82,7 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
           <OrDivider />
         </>
       )}
-      <form onSubmit={onSubmit} className="grid gap-4">
+      <form method="post" onSubmit={onSubmit} className="grid gap-4">
         {error && <Alert variant="destructive" title={error} />}
         {unverifiedEmail && (
           <Button
@@ -164,7 +164,7 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
           <OrDivider />
         </>
       )}
-      <form onSubmit={onSubmit} className="grid gap-4">
+      <form method="post" onSubmit={onSubmit} className="grid gap-4">
         {s.error && <Alert variant="destructive" title={s.error} />}
         <Field label="อีเมล">
           <Input name="email" type="email" autoComplete="email" placeholder="you@example.com" required className="h-10" />
@@ -203,7 +203,7 @@ export function ForgotPasswordForm({ googleEnabled }: { googleEnabled: boolean }
   }
   return (
     <div className="grid gap-6">
-      <form onSubmit={onSubmit} className="grid gap-4">
+      <form method="post" onSubmit={onSubmit} className="grid gap-4">
         <p className="text-sm font-medium">รับลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล</p>
         {s.notice && <Alert variant="success" title="ส่งคำขอแล้ว">{s.notice}</Alert>}
         {s.error && <Alert variant="destructive" title={s.error} />}
@@ -250,7 +250,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   }
   if (s.notice) return <Alert variant="success" title="สำเร็จ">{s.notice}</Alert>;
   return (
-    <form onSubmit={onSubmit} className="grid gap-4">
+    <form method="post" onSubmit={onSubmit} className="grid gap-4">
       {s.error && <Alert variant="destructive" title={s.error} />}
       <Field label="รหัสผ่านใหม่" hint="อย่างน้อย 12 ตัวอักษร">
         <PasswordInput name="password" autoComplete="new-password" minLength={12} required className="h-10" />

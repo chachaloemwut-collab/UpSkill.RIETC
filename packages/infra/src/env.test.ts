@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAllowedOrigin, type Env } from "./env";
+import { isAllowedOrigin, type Env } from "./env.js";
 
 function env(allowed?: string[]): Env {
   return {
