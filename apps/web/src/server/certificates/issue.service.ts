@@ -29,7 +29,7 @@ export async function issueCertificate(input: { userId: string; courseId: string
     .innerJoin("users as ins", "ins.id", "c.instructor_id")
     .select([
       "e.id as enrollment_id", "e.status", "c.title", "c.visibility", "c.is_verified_course", "c.total_duration_sec",
-      "c.credential_enabled", "c.credential_type", "c.credential_name_th", "c.credential_name_en", "c.credential_validity_days", "c.credential_signer_name", "c.credential_signer_title", "c.credential_achievement_th", "c.credential_achievement_en",
+      "c.credential_enabled", "c.credential_type", "c.credential_name_th", "c.credential_name_en", "c.credential_validity_days", "c.credential_signer_name", "c.credential_signer_title", "c.credential_achievement_th", "c.credential_achievement_en", "c.credential_template_key", "c.credential_background_url", "c.credential_text_align",
       "u.email", "u.legal_full_name_th", "u.legal_full_name_en", "u.legal_name_locked_at",
       "ins.legal_full_name_th as ins_th", "ins.legal_full_name_en as ins_en", "ins.email as ins_email",
     ])
@@ -118,6 +118,9 @@ export async function issueCertificate(input: { userId: string; courseId: string
           signer_title_snapshot: payload.signerTitle,
           achievement_snapshot: payload.achievement,
           visual_digest: payload.visualDigest,
+          template_snapshot: data.credential_template_key,
+          background_url_snapshot: data.credential_background_url,
+          text_align_snapshot: data.credential_text_align,
         })
         .returning("id")
         .executeTakeFirstOrThrow();

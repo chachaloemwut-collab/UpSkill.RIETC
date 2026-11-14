@@ -20,6 +20,18 @@ const esc = (s: string) =>
 
 const FONT_DIR = new URL("../../assets/fonts/", import.meta.url);
 
+interface PatternStyle {
+  frame: string; inner: string; accent: string; title: string; kicker: string; sub: string; watermark: string; bg: string; ink: string; muted: string; orbs: boolean;
+}
+
+/** Certificate patterns the course editor can pick (credential_template_key). */
+const PATTERNS: Record<string, PatternStyle> = {
+  standard: { frame: "#6336c7", inner: "#14a6ca", accent: "#fa6b27", title: "#6336c7", kicker: "#14a6ca", sub: "#14a6ca", watermark: "#6336c7", bg: "#fffaf0", ink: "#17152e", muted: "#665f7a", orbs: true },
+  classic: { frame: "#14532d", inner: "#166534", accent: "#b45309", title: "#14532d", kicker: "#166534", sub: "#166534", watermark: "#14532d", bg: "#ffffff", ink: "#1c1917", muted: "#57534e", orbs: false },
+  royal: { frame: "#1e3a8a", inner: "#b8860b", accent: "#b8860b", title: "#1e3a8a", kicker: "#b8860b", sub: "#b8860b", watermark: "#1e3a8a", bg: "#fffdf5", ink: "#1c1917", muted: "#57534e", orbs: false },
+  minimal: { frame: "#334155", inner: "#94a3b8", accent: "#475569", title: "#0f172a", kicker: "#64748b", sub: "#64748b", watermark: "#334155", bg: "#ffffff", ink: "#1c1917", muted: "#57534e", orbs: false },
+};
+
 async function fontFace(file: string, weight: number): Promise<string> {
   try {
     const b64 = (await readFile(new URL(file, FONT_DIR))).toString("base64");
@@ -41,35 +53,54 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
   const achievementLine = c.achievement_snapshot ?? "ได้ผ่านการอบรมและการประเมินตามเกณฑ์";
   const signerSuffix = c.signer_title_snapshot ? ` · ${c.signer_title_snapshot}` : "";
   const coursePrefix = c.document_type_snapshot === "program" ? "หลักสูตรอบรม" : "หลักสูตร";
+  const pattern = PATTERNS[c.template_snapshot] ?? PATTERNS.standard!;
+  const align = c.text_align_snapshot === "left" ? "left" : "center";
+
+  // Optional background image: fetched once here (https only, configured by instructors/admins)
+  // and embedded as a data URL, so the Playwright context can stay fully network-blocked.
+  let backgroundUrl = "";
+  if (c.background_url_snapshot) {
+    try {
+      const res = await fetch(c.background_url_snapshot, { signal: AbortSignal.timeout(10_000) });
+      if (res.ok) {
+        const mime = res.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
+        if (mime.startsWith("image/")) backgroundUrl = `data:${mime};base64,${Buffer.from(await res.arrayBuffer()).toString("base64")}`;
+      }
+    } catch {
+      logger.warn({ code }, "certificate background image failed to load; rendering without it");
+    }
+  }
 
   const html = `<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
     ${fonts}
     @page { size: A4 landscape; margin: 0 }
     * { box-sizing: border-box }
-    body { margin: 0; font-family: "Sarabun", sans-serif; color: #17152e; }
-    .page { width: 297mm; height: 210mm; position: relative; overflow: hidden; background: #fffaf0; }
+    body { margin: 0; font-family: "Sarabun", sans-serif; color: ${pattern.ink}; }
+    .page { width: 297mm; height: 210mm; position: relative; overflow: hidden; background: ${pattern.bg}; }
+    ${backgroundUrl ? `.bgimg { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-image: url("${backgroundUrl}"); background-size: cover; background-position: center; opacity: .2; }` : ""}
     .orb { position: absolute; border-radius: 50%; opacity: .12; }
-    .orb.a { width: 115mm; height: 115mm; background: #6336c7; left: -38mm; top: -38mm; }
-    .orb.b { width: 135mm; height: 135mm; background: #14a6ca; right: -48mm; bottom: -52mm; }
-    .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-28deg); font-size: 30pt; font-weight: 700; color: #6336c7; opacity: .05; white-space: nowrap; letter-spacing: .12em; }
-    .frame { position: absolute; left: 7mm; top: 7mm; right: 7mm; bottom: 7mm; border: 1.2mm solid #6336c7; }
-    .frame-inner { position: absolute; left: 10mm; top: 10mm; right: 10mm; bottom: 10mm; border: 0.3mm solid #14a6ca; }
-    .content { position: absolute; left: 20mm; right: 20mm; top: 15mm; bottom: 15mm; }
-    .kicker { text-align: center; letter-spacing: .25em; font-size: 10pt; color: #14a6ca; text-transform: uppercase; }
-    h1 { text-align: center; font-size: 29pt; color: #6336c7; margin: 1.5mm 0 2mm; font-weight: 700; }
-    .sub { text-align: center; font-size: 8.5pt; color: #14a6ca; letter-spacing: .18em; }
-    .present { text-align: center; font-size: 13pt; color: #17152e; margin-top: 5mm; }
-    .name { text-align: center; font-size: 27pt; font-weight: 700; margin: 3mm 0 1.5mm; }
-    .name-line { width: 118mm; height: 0.5mm; background: #fa6b27; margin: 1mm auto; }
-    .achieve { text-align: center; font-size: 12.5pt; color: #17152e; margin-top: 3.5mm; }
-    .course { text-align: center; font-size: 16.5pt; font-weight: 700; color: #6336c7; margin: 2.5mm 0; }
-    .meta { text-align: center; font-size: 10.5pt; color: #665f7a; line-height: 1.85; margin-top: 5mm; }
-    .qr { position: absolute; left: 20mm; bottom: 11mm; width: 33mm; text-align: center; font-size: 7pt; color: #665f7a; }
+    .orb.a { width: 115mm; height: 115mm; background: ${pattern.frame}; left: -38mm; top: -38mm; }
+    .orb.b { width: 135mm; height: 135mm; background: ${pattern.inner}; right: -48mm; bottom: -52mm; }
+    .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-28deg); font-size: 30pt; font-weight: 700; color: ${pattern.watermark}; opacity: .05; white-space: nowrap; letter-spacing: .12em; }
+    .frame { position: absolute; left: 7mm; top: 7mm; right: 7mm; bottom: 7mm; border: 1.2mm solid ${pattern.frame}; }
+    .frame-inner { position: absolute; left: 10mm; top: 10mm; right: 10mm; bottom: 10mm; border: 0.3mm solid ${pattern.inner}; }
+    .content { position: absolute; left: 20mm; right: 20mm; top: 15mm; bottom: 15mm; text-align: ${align}; }
+    .kicker { letter-spacing: .25em; font-size: 10pt; color: ${pattern.kicker}; text-transform: uppercase; }
+    h1 { font-size: 29pt; color: ${pattern.title}; margin: 1.5mm 0 2mm; font-weight: 700; }
+    .sub { font-size: 8.5pt; color: ${pattern.sub}; letter-spacing: .18em; }
+    .present { font-size: 13pt; margin-top: 5mm; }
+    .name { font-size: 27pt; font-weight: 700; margin: 3mm 0 1.5mm; }
+    .name-line { width: 118mm; height: 0.5mm; background: ${pattern.accent}; margin: 1mm ${align === "center" ? "auto" : "0"}; }
+    .achieve { font-size: 12.5pt; margin-top: 3.5mm; }
+    .course { font-size: 16.5pt; font-weight: 700; color: ${pattern.title}; margin: 2.5mm 0; }
+    .meta { font-size: 10.5pt; color: ${pattern.muted}; line-height: 1.85; margin-top: 5mm; }
+    .qr { position: absolute; left: 20mm; bottom: 11mm; width: 33mm; text-align: center; font-size: 7pt; color: ${pattern.muted}; }
     .qr img { width: 100%; display: block; }
-    .right { position: absolute; right: 20mm; bottom: 15mm; text-align: right; font-size: 8.5pt; color: #665f7a; line-height: 1.6; }
-    .digest { font-family: ui-monospace, monospace; color: #6336c7; }
+    .right { position: absolute; right: 20mm; bottom: 15mm; text-align: right; font-size: 8.5pt; color: ${pattern.muted}; line-height: 1.6; }
+    .digest { font-family: ui-monospace, monospace; color: ${pattern.title}; }
   </style></head><body><div class="page">
-    <div class="orb a"></div><div class="orb b"></div>
+    ${backgroundUrl ? `<div class="bgimg"></div>` : ""}
+    ${pattern.orbs ? `<div class="orb a"></div><div class="orb b"></div>` : ""}
     <div class="watermark">ต้นฉบับดิจิทัล · ตรวจสอบออนไลน์</div>
     <div class="frame"></div><div class="frame-inner"></div>
     <div class="content">

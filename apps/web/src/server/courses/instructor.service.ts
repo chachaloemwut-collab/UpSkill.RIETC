@@ -161,6 +161,8 @@ export async function updateCourse(
     credential_signer_title: string | null;
     credential_achievement_th: string;
     credential_achievement_en: string | null;
+    credential_background_url: string | null;
+    credential_text_align: string;
   }>,
 ) {
   await loadOwnedCourse(user, courseId);

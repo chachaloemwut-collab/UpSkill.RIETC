@@ -35,6 +35,8 @@ export interface EditorData {
     credential_signer_title: string | null;
     credential_achievement_th: string;
     credential_achievement_en: string | null;
+    credential_background_url: string | null;
+    credential_text_align: string;
   };
   lessons: Array<{ id: string; sequence_order: number; title: string; youtube_video_id: string; duration_sec: number; video_status: string; checkpoint_question: string | null; checkpoint_options: unknown | null; checkpoint_correct_index: number | null; checkpoint_at_sec: number | null }>;
   questions: Array<{
@@ -188,6 +190,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
           credential_signer_title: String(f.get("credential_signer_title") ?? "") || null,
           credential_achievement_th: f.get("credential_achievement_th"),
           credential_achievement_en: String(f.get("credential_achievement_en") ?? "") || null,
+          credential_background_url: String(f.get("credential_background_url") ?? "") || null,
+          credential_text_align: f.get("credential_text_align"),
         },
       },
       "บันทึกการตั้งค่าแล้ว",
@@ -226,7 +230,9 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
           <Field label="ชื่อเอกสารภาษาไทย"><Input name="credential_name_th" required maxLength={120} defaultValue={course.credential_name_th} /></Field>
           <Field label="ชื่อเอกสารภาษาอังกฤษ" hint="ไม่บังคับ"><Input name="credential_name_en" maxLength={120} defaultValue={course.credential_name_en ?? ""} /></Field>
           <Field label="รหัสประเภท"><Input name="credential_type" required pattern="[a-z0-9_]+" maxLength={40} defaultValue={course.credential_type} /></Field>
-          <Field label="รูปแบบเอกสาร"><Select name="credential_template_key" defaultValue={course.credential_template_key}><option value="standard">standard</option></Select></Field>
+          <Field label="รูปแบบเอกสาร"><Select name="credential_template_key" defaultValue={course.credential_template_key}><option value="standard">standard (ม่วง–ฟ้า–ส้ม)</option><option value="classic">classic (เขียวเข้ม–ทอง)</option><option value="royal">royal (กรมท่า–ทอง)</option><option value="minimal">minimal (เทาเรียบ)</option></Select></Field>
+          <Field label="จัดข้อความ"><Select name="credential_text_align" defaultValue={course.credential_text_align}><option value="center">กึ่งกลาง</option><option value="left">ชิดซ้าย</option></Select></Field>
+          <Field label="ภาพพื้นหลัง (URL)" hint="https เท่านั้น แสดงจาง ๆ ใต้เนื้อหา"><Input name="credential_background_url" type="url" placeholder="https://..." maxLength={500} defaultValue={course.credential_background_url ?? ""} /></Field>
           <Field label="อายุเอกสาร (วัน)" hint="เว้นว่างหากไม่หมดอายุ"><Input name="credential_validity_days" type="number" min={1} max={36500} defaultValue={course.credential_validity_days ?? ""} /></Field>
           <Field label="ชื่อผู้ลงนาม" hint="เว้นว่างเพื่อใช้ชื่อผู้สอน"><Input name="credential_signer_name" maxLength={255} defaultValue={course.credential_signer_name ?? ""} /></Field>
           <Field label="ตำแหน่งผู้ลงนาม" hint="ไม่บังคับ"><Input name="credential_signer_title" maxLength={255} defaultValue={course.credential_signer_title ?? ""} /></Field>

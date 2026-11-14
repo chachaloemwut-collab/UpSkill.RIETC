@@ -82,6 +82,7 @@ export interface AuditLogs {
 
 export interface Certificates {
   achievement_snapshot: string | null;
+  background_url_snapshot: string | null;
   certificate_code: string;
   cohort_id: string | null;
   course_id: string | null;
@@ -107,6 +108,8 @@ export interface Certificates {
   signed_payload: string;
   signer_title_snapshot: string | null;
   signing_key_id: string;
+  template_snapshot: Generated<string>;
+  text_align_snapshot: Generated<string>;
   total_actual_study_sec: number;
   user_id: string;
   visual_digest: Generated<string>;
@@ -157,12 +160,14 @@ export interface Courses {
   created_at: Generated<Timestamp>;
   credential_achievement_en: string | null;
   credential_achievement_th: Generated<string>;
+  credential_background_url: string | null;
   credential_enabled: Generated<boolean>;
   credential_name_en: string | null;
   credential_name_th: Generated<string>;
   credential_signer_name: string | null;
   credential_signer_title: string | null;
   credential_template_key: Generated<string>;
+  credential_text_align: Generated<string>;
   credential_type: Generated<string>;
   credential_validity_days: number | null;
   description: string | null;
