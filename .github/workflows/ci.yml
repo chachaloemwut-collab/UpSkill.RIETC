@@ -13,7 +13,7 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# TODO(security): pin every action to a commit SHA instead of a tag (Dependabot keeps them updated)
+# Actions are pinned to commit SHAs (Dependabot keeps them updated via the trailing tag comments)
 env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
   DATABASE_MIGRATION_URL: postgres://upskill_owner:dev_owner_password@localhost:55432/upskill
@@ -31,9 +31,9 @@ jobs:
         ports: ["55432:5432"]
         options: --health-cmd "pg_isready -U upskill_owner -d upskill" --health-interval 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with: { persist-credentials: false }
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with: { node-version-file: .nvmrc, package-manager-cache: false } # pnpm comes from corepack in the next step
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
@@ -68,9 +68,9 @@ jobs:
         image: axllent/mailpit:latest
         ports: ["1025:1025", "8025:8025"]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with: { persist-credentials: false }
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with: { node-version-file: .nvmrc, package-manager-cache: false } # pnpm comes from corepack in the next step
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
@@ -93,9 +93,9 @@ jobs:
   secrets-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with: { fetch-depth: 0, persist-credentials: false }
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -106,13 +106,13 @@ jobs:
       security-events: write
       actions: read # CodeQL reads the workflow run (required on private repos)
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with: { persist-credentials: false }
-      - uses: github/codeql-action/init@v4
+      - uses: github/codeql-action/init@5895b2c9be147bc7f1c75ce72c5cb577febb1907 # v4
         with: { languages: javascript-typescript, queries: security-extended }
       # Code scanning is not enabled on this private repo (needs GitHub Code Security): keep the analysis, keep the
       # SARIF as a run artifact instead of uploading it. Switch to upload: always once code scanning is enabled.
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@5895b2c9be147bc7f1c75ce72c5cb577febb1907 # v4
         with: { upload: never, output: codeql-results }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: { name: codeql-sarif, path: codeql-results, retention-days: 30 }

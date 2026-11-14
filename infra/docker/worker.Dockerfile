@@ -20,10 +20,13 @@ RUN cd apps/worker && ./node_modules/.bin/playwright install --with-deps --only-
 FROM deps AS runtime
 COPY packages packages
 COPY apps/worker apps/worker
+COPY infra/docker/worker-healthcheck.mjs /healthcheck.mjs
 # uid/gid 10001 = same as the web image (shared certificates volume)
 RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app --create-home app \
     && mkdir -p /data/certificates && chown app:app /data/certificates
 ENV NODE_ENV=production CERT_STORAGE_DIR=/data/certificates
 USER app
 WORKDIR /repo/apps/worker
+# Redis PING: the worker is only "healthy" when it can actually reach the queue backend.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD ["node", "/healthcheck.mjs"]
 CMD ["node", "--import", "tsx", "src/index.ts"]

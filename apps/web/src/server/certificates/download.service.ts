@@ -1,6 +1,6 @@
 import "server-only";
 import { CERTIFICATE_CODE_RE } from "@upskill/core";
-import { readCertificatePdf } from "@upskill/infra/storage";
+import { createCertificateStorage } from "@upskill/infra/storage";
 import { ctx } from "../context";
 import { HttpError } from "../http";
 import type { CurrentUser } from "../auth/session";
@@ -16,7 +16,7 @@ export async function downloadCertificatePdf(user: CurrentUser, rawCode: string)
   if (!c || (c.user_id !== user.id && user.role !== "admin")) throw new HttpError(404, "NOT_FOUND");
   if (c.revoked_at) throw new HttpError(410, "CERTIFICATE_REVOKED");
 
-  const pdf = await readCertificatePdf(env.CERT_STORAGE_DIR, code);
+  const pdf = await createCertificateStorage(env).read(code);
   if (!pdf) {
     await enqueueCertificatePdf(code); // jobId dedupes repeated clicks
     return null;

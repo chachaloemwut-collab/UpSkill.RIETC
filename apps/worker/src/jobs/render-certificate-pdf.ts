@@ -12,7 +12,7 @@ import { formatStudyDurationTh } from "@upskill/core";
 import type { Database } from "@upskill/db";
 import type { Env } from "@upskill/infra/env";
 import { logger } from "@upskill/infra/logger";
-import { saveCertificatePdf } from "@upskill/infra/storage";
+import { createCertificateStorage } from "@upskill/infra/storage";
 import { addWorkerEmail } from "./process-email-outbox.ts";
 
 const esc = (s: string) =>
@@ -76,7 +76,7 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
     const page = await context.newPage();
     await page.setContent(html, { waitUntil: "load" });
     const pdf = await page.pdf({ format: "A4", landscape: true, printBackground: true });
-    await saveCertificatePdf(env.CERT_STORAGE_DIR, c.certificate_code, pdf);
+    await createCertificateStorage(env).save(c.certificate_code, pdf);
     const owner = await db.selectFrom("users").select("email").where("id", "=", c.user_id).executeTakeFirstOrThrow();
     await db.transaction().execute(async (trx) => {
       await trx.updateTable("certificates").set({ pdf_ready_at: new Date(), pdf_failed_at: null, pdf_last_error: null }).where("id", "=", c.id).execute();

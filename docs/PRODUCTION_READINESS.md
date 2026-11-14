@@ -18,6 +18,7 @@
 | BullMQ job ล้มเหลวครั้งสุดท้าย | `index.ts` failed handler ส่ง alert admin (ข้าม `certificate-pdf` ที่แจ้งเองแล้ว) | ✅ ทำแล้ว |
 | อัตรา anticheat ผิดปกติ | worker job `ops-health` ทุก 15 นาที นับ flag ใน 60 นาที เกิน `ANTICHEAT_ALERT_THRESHOLD` (default 100) → alert (dedup ต่อชั่วโมง) | ✅ ทำแล้ว |
 | Uptime / liveness | `GET /api/health` → `{ ok: true }` (ไม่แตะ DB/Redis) | ✅ ทำแล้ว |
+| Worker health | Docker HEALTHCHECK (Redis PING ผ่าน `infra/docker/worker-healthcheck.mjs`) → unhealthy ถ้า worker ต่อ Redis ไม่ได้ | ✅ ทำแล้ว |
 
 สิ่งที่ยังควรเพิ่ม (เฟสถัดไป): dashboard รวม metrics, alert ช่องทางอื่น (LINE/webhook) แทนอีเมลล้วน, log aggregation (Sentry/Prometheus) — ตอนนี้ log ยังเป็น stdout pino เท่านั้น
 
@@ -32,9 +33,9 @@
 
 ## 🟠 P1 — ควรมีทันทีหลังเปิด
 
-- [ ] Object storage (S3-compatible private bucket + signed URL) แทน disk สำหรับ PDF — interface อยู่ที่ `packages/infra/src/storage.ts`
+- [x] Object storage สำหรับ PDF — backend ฝั่ง code ทำแล้ว (`CERT_STORAGE_DRIVER=local|s3` + `s3CertificateStorage` ใน `packages/infra/src/storage.ts`) · เหลือแค่สร้าง bucket จริง + ตั้ง `CERT_S3_*` credentials
 - [ ] เปิด GitHub Code Security → CodeQL upload SARIF (ตอนนี้ `upload: never`)
-- [ ] Pin GitHub Actions เป็น commit SHA (มี TODO ใน `ci.yml`)
+- [x] Pin GitHub Actions เป็น commit SHA (ใน `ci.yml`)
 
 ## 🟡 P2 — คุณภาพ / scale
 

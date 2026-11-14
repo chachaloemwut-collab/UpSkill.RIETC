@@ -60,6 +60,11 @@ const schema = z
     }),
     /** Where rendered certificate PDFs are stored (shared by web + worker). Replace with object storage in prod. */
     CERT_STORAGE_DIR: z.string().min(1).default("./var/certificates"),
+    /** "local" writes to CERT_STORAGE_DIR; "s3" writes to an S3-compatible private bucket. */
+    CERT_STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+    CERT_S3_BUCKET: optional(z.string().min(3)),
+    CERT_S3_REGION: optional(z.string().min(3)),
+    CERT_S3_ENDPOINT: optional(z.string().url()),
 
     SMTP_URL: z.string().startsWith("smtp"),
     MAIL_FROM: z.string().min(3),
@@ -72,6 +77,10 @@ const schema = z
     }
     if (Boolean(env.GOOGLE_CLIENT_ID) !== Boolean(env.GOOGLE_CLIENT_SECRET)) {
       ctx.addIssue({ code: "custom", path: ["GOOGLE_CLIENT_ID"], message: "set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or neither" });
+    }
+    if (env.CERT_STORAGE_DRIVER === "s3") {
+      if (!env.CERT_S3_BUCKET) ctx.addIssue({ code: "custom", path: ["CERT_S3_BUCKET"], message: "required when CERT_STORAGE_DRIVER=s3" });
+      if (!env.CERT_S3_REGION) ctx.addIssue({ code: "custom", path: ["CERT_S3_REGION"], message: "required when CERT_STORAGE_DRIVER=s3" });
     }
     if (env.APP_ENV === "production") {
       if (!env.APP_ORIGIN.startsWith("https://")) ctx.addIssue({ code: "custom", path: ["APP_ORIGIN"], message: "must be https in production" });

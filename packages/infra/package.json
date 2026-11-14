@@ -19,6 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1164.0",
     "@node-rs/argon2": "2.2.2",
     "@upskill/core": "workspace:*",
     "ioredis": "6.0.0",
