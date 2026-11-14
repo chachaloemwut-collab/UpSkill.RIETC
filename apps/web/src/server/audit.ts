@@ -9,6 +9,8 @@ export type AuditAction =
   | "auth.unverified_account_taken_over"
   | "auth.password_reset"
   | "auth.account_deleted"
+  | "user.admin_updated"
+  | "user.sessions_revoked"
   | "user.legal_name_locked"
   | "user.pdpa_consent"
   | "course.published"

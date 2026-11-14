@@ -145,14 +145,19 @@ export default async function AdminPage() {
 
         <TabsContent value="users" className="mt-4">
           <Card className="max-w-xl p-6">
-            <div className="mb-5 flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <UserCog className="h-5 w-5" />
-              </span>
-              <div>
-                <h3 className="font-semibold">เปลี่ยนบทบาทหรือสถานะผู้ใช้</h3>
-                <p className="text-sm text-muted-foreground">ทุกการเปลี่ยนแปลงจะบันทึกใน audit log และผู้ใช้จะถูกออกจากระบบ</p>
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <UserCog className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="font-semibold">เปลี่ยนบทบาทหรือสถานะผู้ใช้</h3>
+                  <p className="text-sm text-muted-foreground">ทุกการเปลี่ยนแปลงจะบันทึกใน audit log และผู้ใช้จะถูกออกจากระบบ</p>
+                </div>
               </div>
+              <Link href="/admin/users" className={buttonClass("outline", "sm")}>
+                จัดการสมาชิกโดยละเอียด
+              </Link>
             </div>
             <UserAdminForm />
           </Card>
