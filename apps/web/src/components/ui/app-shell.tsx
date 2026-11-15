@@ -32,6 +32,11 @@ interface AppShellProps {
   header?: React.ReactNode;
   /** Pinned to the bottom of the sidebar (e.g. the signed-in user). */
   sidebarFooter?: (collapsed: boolean) => React.ReactNode;
+  /** Fixed mobile bottom navigation or action bar. */
+  bottomBar?: React.ReactNode;
+  /** Controlled mobile drawer open state. */
+  mobileOpen?: boolean;
+  onMobileOpenChange?: (open: boolean) => void;
   children: React.ReactNode;
 }
 
@@ -46,11 +51,25 @@ function readCollapsed() {
 }
 
 /** Admin console layout: collapsible sidebar on desktop, drawer on mobile, sticky top bar. */
-export function AppShell({ brand, brandIcon, nav, active, onNavigate, header, sidebarFooter, children }: AppShellProps) {
+export function AppShell({
+  brand,
+  brandIcon,
+  nav,
+  active,
+  onNavigate,
+  header,
+  sidebarFooter,
+  bottomBar,
+  mobileOpen: controlledMobile,
+  onMobileOpenChange: setControlledMobile,
+  children,
+}: AppShellProps) {
   const stored = React.useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
   const [override, setCollapsed] = React.useState<boolean | null>(null);
   const collapsed = override ?? stored;
-  const [mobile, setMobile] = React.useState(false);
+  const [uncontrolledMobile, setUncontrolledMobile] = React.useState(false);
+  const isMobile = controlledMobile !== undefined ? controlledMobile : uncontrolledMobile;
+  const setMobile = setControlledMobile ?? setUncontrolledMobile;
   const toggle = () => {
     const next = !collapsed;
     try {
@@ -77,7 +96,7 @@ export function AppShell({ brand, brandIcon, nav, active, onNavigate, header, si
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
           <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu" onClick={() => setMobile(true)}>
-            <MenuToggleIcon open={mobile} />
+            <MenuToggleIcon open={isMobile} />
           </Button>
           <Button variant="ghost" size="icon" className="hidden md:inline-flex" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={toggle}>
             <PanelLeftIcon />
@@ -87,7 +106,7 @@ export function AppShell({ brand, brandIcon, nav, active, onNavigate, header, si
         <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
 
-      <Sheet open={mobile} onOpenChange={setMobile} side="left" title="เมนู">
+      <Sheet open={isMobile} onOpenChange={setMobile} side="left" title="เมนู">
         <ShellNav
           nav={nav}
           active={active}
@@ -97,6 +116,7 @@ export function AppShell({ brand, brandIcon, nav, active, onNavigate, header, si
           }}
         />
       </Sheet>
+      {bottomBar}
     </div>
   );
 }
