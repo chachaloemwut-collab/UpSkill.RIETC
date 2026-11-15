@@ -51,6 +51,23 @@ while :; do
         rc=$?
         echo "== exit $rc"
         compose ps
+        if [ "$rc" -eq 0 ]; then
+          # Confirm the app actually answers before reporting ok (busybox wget is in the alpine image)
+          echo "== health check web"
+          n=0
+          while [ $n -lt 24 ]; do
+            if compose exec -T web sh -c 'wget -q -O /dev/null http://127.0.0.1:3000/api/health' >/dev/null 2>&1; then
+              echo "== web healthy after $((n*5))s"
+              break
+            fi
+            n=$((n+1))
+            sleep 5
+          done
+          if [ "$n" -ge 24 ]; then
+            echo "== web health check failed"
+            exit 1
+          fi
+        fi
         # Only this project's old images: never touches images of other sites on the host
         docker image prune -f --filter "label=com.docker.compose.project=$PROJECT" >/dev/null 2>&1
         echo "== finished $(now)"

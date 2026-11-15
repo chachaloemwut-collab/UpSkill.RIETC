@@ -157,6 +157,15 @@ cmd_upload_env() {
   load_sftp
   info "uploading .env to $REMOTE_DIR/.env (mode 600)"
   lftp_run "put '$SECRETS/.env' -o '$REMOTE_DIR/.env'; chmod 600 '$REMOTE_DIR/.env'"
+  # env_file changes only apply when the services are recreated — ask the deployer to do it
+  local release req
+  release="$(sed -n 's/^built_at=//p' "$STAGE/RELEASE" 2>/dev/null)"
+  [ -n "$release" ] || release="$(lftp_run "cat $REMOTE_DIR/RELEASE" | sed -n 's/^built_at=//p')"
+  req="$(mktemp)"
+  printf '%s\n' "$release" >"$req"
+  info "requesting service recreation for the new env"
+  lftp_run "put '$req' -o '$REMOTE_DIR/deploy-request'"
+  rm -f "$req"
 }
 
 # Upload, then drop deploy-request (= RELEASE built_at) for the deployer service and wait for deploy-status

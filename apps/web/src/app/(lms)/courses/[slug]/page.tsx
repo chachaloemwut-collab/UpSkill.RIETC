@@ -51,38 +51,117 @@ export default async function CoursePage({ params }: Props) {
         <span className="truncate text-foreground">{course.title}</span>
       </nav>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <div className="grid min-w-0 content-start gap-6">
-          <section>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {course.is_verified_course ? (
-                <Badge variant="success">
-                  <BadgeCheck className="h-3.5 w-3.5" /> Verified Course
-                </Badge>
-              ) : (
-                <Badge variant="secondary">Community Course</Badge>
-              )}
-              {course.visibility !== "published" && vis && <Badge variant={vis.variant}>{vis.label}</Badge>}
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{course.title}</h1>
-            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <UserRound className="h-4 w-4" /> {course.instructor_name}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <BookOpen className="h-4 w-4" /> {lessons.length} บทเรียน
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Clock className="h-4 w-4" /> {formatDuration(course.total_duration_sec)}
-              </span>
-            </div>
-            {course.description && <p className="mt-5 whitespace-pre-line leading-relaxed text-foreground/90">{course.description}</p>}
-            {manager && (
-              <Link href={`/instructor/courses/${course.id}`} className={buttonClass("outline", "sm", "mt-5")}>
+      {/* ---------- Course Hero Banner with Blurred Cover Backdrop ---------- */}
+      <div className="relative mb-6 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card to-primary/5 p-6 shadow-xs sm:p-8">
+        {lessons[0]?.videoId && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-16 -top-16 h-80 w-80 rounded-full bg-primary/20 blur-3xl opacity-30"
+          />
+        )}
+        <div className="relative z-10">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {course.is_verified_course ? (
+              <Badge variant="success" className="gap-1 shadow-xs">
+                <BadgeCheck className="h-3.5 w-3.5" /> Verified Course
+              </Badge>
+            ) : (
+              <Badge variant="secondary">Community Course</Badge>
+            )}
+            {course.visibility !== "published" && vis && <Badge variant={vis.variant}>{vis.label}</Badge>}
+          </div>
+
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">{course.title}</h1>
+
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 font-medium text-foreground/80">
+              <UserRound className="h-4 w-4 text-primary" /> {course.instructor_name}
+            </span>
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              <BookOpen className="h-4 w-4" /> {lessons.length} บทเรียน
+            </span>
+            <span className="inline-flex items-center gap-1.5 font-medium font-mono tabular-nums">
+              <Clock className="h-4 w-4" /> {formatDuration(course.total_duration_sec)}
+            </span>
+          </div>
+
+          {course.description && (
+            <p className="mt-4 max-w-3xl whitespace-pre-line text-sm sm:text-base leading-relaxed text-foreground/80">
+              {course.description}
+            </p>
+          )}
+
+          {manager && (
+            <div className="mt-5">
+              <Link href={`/instructor/courses/${course.id}`} className={buttonClass("outline", "sm", "gap-1.5")}>
                 <Pencil className="h-3.5 w-3.5" /> จัดการหลักสูตรนี้
               </Link>
-            )}
-          </section>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ---------- Visual Learning Path Stepper ---------- */}
+      <Card className="mb-6 p-5 sm:p-6">
+        <h2 className="text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
+          <Target className="h-4 w-4 text-primary" /> เส้นทางการเรียนรู้สู่ความสำเร็จ (Learning Path)
+        </h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-5">
+          {/* Step 1 */}
+          <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
+              1
+            </span>
+            <p className="font-semibold text-xs text-foreground">
+              {data.preTest.required ? "ทำแบบทดสอบ Pre-test" : "ลงทะเบียนเรียน"}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {data.preTest.required ? "วัดระดับก่อนเริ่ม" : "เข้าสู่บทเรียน"}
+            </p>
+          </div>
+
+          {/* Step 2 */}
+          <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
+              2
+            </span>
+            <p className="font-semibold text-xs text-foreground">เรียนวิดีโอ {lessons.length} บท</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">ผ่านเกณฑ์ ≥ {course.min_watch_percentage}%</p>
+          </div>
+
+          {/* Step 3 */}
+          <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
+              3
+            </span>
+            <p className="font-semibold text-xs text-foreground">
+              {lessons.some((l) => l.lessonTestRequired) ? "สอบระหว่างบท" : "Checkpoint ระหว่างเรียน"}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">ทบทวนความเข้าใจ</p>
+          </div>
+
+          {/* Step 4 */}
+          <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
+              4
+            </span>
+            <p className="font-semibold text-xs text-foreground">ทำแบบทดสอบ Post-test</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">ผ่านเกณฑ์ ≥ {course.passing_quiz_score}%</p>
+          </div>
+
+          {/* Step 5 */}
+          <div className="col-span-2 sm:col-span-4 lg:col-span-1 relative flex flex-col items-center text-center p-3 rounded-lg border border-primary/20 bg-primary/5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2 shadow-xs">
+              5
+            </span>
+            <p className="font-semibold text-xs text-primary">รับใบรับรองดิจิทัล</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">ลงนาม Ed25519</p>
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="grid min-w-0 content-start gap-6">
 
           <Card>
             <div className="flex items-center justify-between border-b px-5 py-4">

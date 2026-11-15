@@ -49,7 +49,11 @@ docker compose -p jasmine up -d migrate web worker redis
 docker image prune -f --filter label=com.docker.compose.project=jasmine
 ```
 
-ผลลัพธ์เขียนไว้ที่ `deploy-status` และ `deploy-log.txt` ในโฟลเดอร์เดียวกัน นักพัฒนาอ่านได้ผ่าน SFTP
+หลัง `up` แล้ว deployer จะตรวจ `/api/health` ของ web ซ้ำจนกว่าจะตอบ (สูงสุด 2 นาที) แล้วจึงเขียนผลลัพธ์
+ลง `deploy-status` และ `deploy-log.txt` ในโฟลเดอร์เดียวกัน นักพัฒนาอ่านได้ผ่าน SFTP — ผล `ok` หมายถึงเว็บตอบจริงแล้ว
+
+การแก้ค่าใน `.env` (ผ่าน `upload-env`) ก็จะถูกส่งเป็นคำขอให้ deployer รัน `up -d` เพื่อ recreate services ให้ใหม่เอง
+(Compose สร้าง container ใหม่เมื่อ env_file เปลี่ยน) — ผู้ดูแลจึงไม่ต้องสั่งอะไรอีกทั้งสำหรับโค้ดและ configuration
 
 **ข้อควรรู้ด้านความปลอดภัย:** `deployer` ต่อกับ `/var/run/docker.sock` ซึ่งมีสิทธิ์เทียบเท่า root ของเครื่อง จึงจำกัดไว้ดังนี้
 ไม่มีเครือข่าย (`network_mode: none`), ไม่เปิดพอร์ต, ระบบไฟล์อ่านอย่างเดียว และรันเฉพาะคำสั่ง compose ของโปรเจกต์ `jasmine`
