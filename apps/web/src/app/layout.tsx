@@ -6,15 +6,41 @@ import { Providers } from "@/components/providers";
 import { THEME_INIT_SCRIPT } from "@/components/ui/theme-script";
 import "./globals.css";
 
-// Self-hosted Thai UI font (SIL OFL). No Google CDN at runtime — the CSP stays closed.
+// Self-hosted fonts (SIL OFL). No Google CDN at runtime — the CSP stays closed.
+const prompt = localFont({
+  src: [
+    { path: "./fonts/Prompt-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/Prompt-Medium.ttf", weight: "500", style: "normal" },
+    { path: "./fonts/Prompt-SemiBold.ttf", weight: "600", style: "normal" },
+    { path: "./fonts/Prompt-Bold.ttf", weight: "700", style: "normal" },
+  ],
+  variable: "--font-prompt",
+  display: "swap",
+  preload: true,
+});
+
 const sarabun = localFont({
   src: [
     { path: "./fonts/Sarabun-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/Sarabun-Medium.ttf", weight: "500", style: "normal" },
+    { path: "./fonts/Sarabun-SemiBold.ttf", weight: "600", style: "normal" },
     { path: "./fonts/Sarabun-Bold.ttf", weight: "700", style: "normal" },
   ],
   variable: "--font-sarabun",
   display: "swap",
   preload: true,
+});
+
+const jetbrainsMono = localFont({
+  src: [
+    { path: "./fonts/JetBrainsMono-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/JetBrainsMono-Medium.ttf", weight: "500", style: "normal" },
+    { path: "./fonts/JetBrainsMono-SemiBold.ttf", weight: "600", style: "normal" },
+    { path: "./fonts/JetBrainsMono-Bold.ttf", weight: "700", style: "normal" },
+  ],
+  variable: "--font-mono",
+  display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -38,7 +64,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     // The theme script sets class/data-theme/--radius on <html> before React hydrates
-    <html lang="th" suppressHydrationWarning className={sarabun.variable}>
+    <html lang="th" suppressHydrationWarning className={`${prompt.variable} ${sarabun.variable} ${jetbrainsMono.variable}`}>
       <head>
         {/* Static constant (no user input), nonce-allowed by the CSP: applies the saved theme before first paint */}
         {/* eslint-disable-next-line react/no-danger */}

@@ -4,7 +4,9 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --font-sans: var(--font-sarabun), "Sarabun", "Noto Sans Thai", "Leelawadee UI", Thonburi, Tahoma, system-ui, sans-serif;
+  --font-sans: var(--font-prompt), "Prompt", var(--font-sarabun), "Sarabun", "Noto Sans Thai", "Leelawadee UI", Thonburi, Tahoma, system-ui, sans-serif;
+  --font-reading: var(--font-sarabun), "Sarabun", "Noto Sans Thai", "Leelawadee UI", Thonburi, Tahoma, system-ui, sans-serif;
+  --font-mono: var(--font-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -167,6 +169,7 @@
   html { scroll-behavior: smooth; }
   button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
   body { @apply bg-background text-foreground antialiased; font-feature-settings: "cv11", "ss01"; }
+  p { @apply leading-relaxed; }
 
   /* Touch devices: kill the double-tap-zoom delay, keep the default highlight, and make
      interactive elements comfortable targets (>=40px where the design allows). */
