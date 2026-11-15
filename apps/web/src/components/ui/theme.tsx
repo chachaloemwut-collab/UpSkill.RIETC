@@ -13,22 +13,35 @@ import { THEME_STORAGE_KEY as KEY } from "./theme-script";
 export const THEME_COLORS = [
   { id: "zinc", label: "Zinc", hsl: "240 6% 10%" },
   { id: "blue", label: "Blue", hsl: "221 83% 53%" },
+  { id: "indigo", label: "Indigo", hsl: "234 89% 60%" },
   { id: "violet", label: "Violet", hsl: "262 83% 58%" },
   { id: "green", label: "Green", hsl: "142 71% 34%" },
+  { id: "amber", label: "Amber", hsl: "38 92% 50%" },
   { id: "orange", label: "Orange", hsl: "24 95% 50%" },
   { id: "rose", label: "Rose", hsl: "346 77% 50%" },
 ] as const;
 export const THEME_RADII = [0, 0.3, 0.5, 0.625, 1];
 
 export type ThemeColor = (typeof THEME_COLORS)[number]["id"];
+export type Density = "comfortable" | "compact";
+export type FontScale = "normal" | "large";
+
 export interface ThemeSettings {
   dark: boolean;
   color: ThemeColor;
   radius: number;
+  density: Density;
+  fontScale: FontScale;
 }
 type Point = { clientX: number; clientY: number };
 
-export const DEFAULT_THEME: ThemeSettings = { dark: false, color: "zinc", radius: 0.625 };
+export const DEFAULT_THEME: ThemeSettings = {
+  dark: false,
+  color: "blue",
+  radius: 0.625,
+  density: "comfortable",
+  fontScale: "normal",
+};
 
 function load(): ThemeSettings {
   const fallback: ThemeSettings = { ...DEFAULT_THEME, dark: window.matchMedia("(prefers-color-scheme: dark)").matches };
@@ -38,6 +51,8 @@ function load(): ThemeSettings {
       dark: typeof saved.dark === "boolean" ? saved.dark : fallback.dark,
       color: THEME_COLORS.some((c) => c.id === saved.color) ? (saved.color as ThemeColor) : fallback.color,
       radius: typeof saved.radius === "number" && THEME_RADII.includes(saved.radius) ? saved.radius : fallback.radius,
+      density: saved.density === "compact" ? "compact" : "comfortable",
+      fontScale: saved.fontScale === "large" ? "large" : "normal",
     };
   } catch {
     return fallback;
@@ -48,6 +63,8 @@ function apply(s: ThemeSettings) {
   const root = document.documentElement;
   root.classList.toggle("dark", s.dark);
   root.dataset.theme = s.color;
+  root.dataset.density = s.density || "comfortable";
+  root.dataset.fontScale = s.fontScale || "normal";
   root.style.setProperty("--radius", `${s.radius}rem`);
 }
 
@@ -89,6 +106,8 @@ interface ThemeCtx {
   setDark: (dark: boolean, from?: Point) => void;
   setColor: (color: ThemeColor, from?: Point) => void;
   setRadius: (radius: number) => void;
+  setDensity: (density: Density) => void;
+  setFontScale: (fontScale: FontScale) => void;
 }
 const Ctx = React.createContext<ThemeCtx | null>(null);
 
@@ -118,30 +137,32 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setDark: (dark, from) => withReveal(() => commit({ dark }), from),
       setColor: (color, from) => withReveal(() => commit({ color }), from),
       setRadius: (radius) => commit({ radius }),
+      setDensity: (density) => commit({ density }),
+      setFontScale: (fontScale) => commit({ fontScale }),
     };
   }, [settings]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-/** Controls for mode, color and radius. Use inside a popover, a settings page or a sheet. */
+/** Controls for mode, color, radius, density, and font scale (Preference Studio). */
 export function ThemePanel({ className }: { className?: string }) {
-  const { settings, setDark, setColor, setRadius } = useThemeSettings();
+  const { settings, setDark, setColor, setRadius, setDensity, setFontScale } = useThemeSettings();
   return (
-    <div className={cn("grid gap-5", className)}>
-      <div className="grid gap-2">
-        <p className="text-xs font-medium text-muted-foreground">โหมด</p>
+    <div className={cn("grid gap-4", className)}>
+      <div className="grid gap-1.5">
+        <p className="text-xs font-medium text-muted-foreground">โหมดการแสดงผล</p>
         <div className="grid grid-cols-2 gap-2">
           {[false, true].map((dark) => (
-            <Button key={String(dark)} variant="outline" size="sm" onClick={(e) => setDark(dark, e)} className={cn(settings.dark === dark && "border-primary ring-1 ring-primary")}>
-              {dark ? <MoonIcon /> : <SunIcon />} {dark ? "มืด" : "สว่าง"}
+            <Button key={String(dark)} variant="outline" size="sm" onClick={(e) => setDark(dark, e)} className={cn(settings.dark === dark && "border-primary ring-1 ring-primary font-medium")}>
+              {dark ? <MoonIcon /> : <SunIcon />} {dark ? "โหมดมืด" : "โหมดสว่าง"}
             </Button>
           ))}
         </div>
       </div>
-      <div className="grid gap-2">
-        <p className="text-xs font-medium text-muted-foreground">สีหลัก</p>
-        <div className="grid grid-cols-3 gap-2">
+      <div className="grid gap-1.5">
+        <p className="text-xs font-medium text-muted-foreground">ชุดสีหลัก (LMS Theme)</p>
+        <div className="grid grid-cols-4 gap-1.5">
           {THEME_COLORS.map((c) => {
             const active = settings.color === c.id;
             return (
@@ -151,26 +172,50 @@ export function ThemePanel({ className }: { className?: string }) {
                 aria-pressed={active}
                 onClick={(e) => setColor(c.id, e)}
                 className={cn(
-                  "flex h-8 items-center gap-2 rounded-md border px-2 text-xs font-medium transition-[border-color,background-color,scale] hover:bg-accent active:scale-95",
+                  "flex h-8 items-center gap-1.5 rounded-md border px-2 text-xs font-medium transition-[border-color,background-color,scale] hover:bg-accent active:scale-95",
                   active && "border-primary ring-1 ring-primary"
                 )}
               >
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: `hsl(${c.hsl})` }}>
-                  {active && <CheckIcon className="h-2.5 w-2.5 animate-zoom-in" />}
+                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: `hsl(${c.hsl})` }}>
+                  {active && <CheckIcon className="h-2 w-2 animate-zoom-in" />}
                 </span>
-                {c.label}
+                <span className="truncate">{c.label}</span>
               </button>
             );
           })}
         </div>
       </div>
-      <div className="grid gap-2">
-        <p className="text-xs font-medium text-muted-foreground">ความโค้งมน</p>
+      <div className="grid gap-1.5">
+        <p className="text-xs font-medium text-muted-foreground">ความโค้งมนของปุ่มและการ์ด</p>
         <SegmentedControl
           value={String(settings.radius)}
           onValueChange={(v) => setRadius(Number(v))}
-          options={THEME_RADII.map((r) => ({ value: String(r), label: r === 0 ? "0" : r }))}
+          options={THEME_RADII.map((r) => ({ value: String(r), label: r === 0 ? "0" : `${r}rem` }))}
         />
+      </div>
+      <div className="grid grid-cols-2 gap-3 pt-1 border-t border-border/60">
+        <div className="grid gap-1.5">
+          <p className="text-xs font-medium text-muted-foreground">ความหนาแน่น</p>
+          <SegmentedControl
+            value={settings.density}
+            onValueChange={(v) => setDensity(v as Density)}
+            options={[
+              { value: "comfortable", label: "ปกติ" },
+              { value: "compact", label: "กะทัดรัด" },
+            ]}
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <p className="text-xs font-medium text-muted-foreground">ขนาดตัวอักษร</p>
+          <SegmentedControl
+            value={settings.fontScale}
+            onValueChange={(v) => setFontScale(v as FontScale)}
+            options={[
+              { value: "normal", label: "ปกติ 100%" },
+              { value: "large", label: "ใหญ่ 112%" },
+            ]}
+          />
+        </div>
       </div>
     </div>
   );
