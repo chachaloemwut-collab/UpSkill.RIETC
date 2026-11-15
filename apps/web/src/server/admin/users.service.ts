@@ -208,3 +208,13 @@ export async function adminRevokeUserSessions(adminId: string, userId: string, m
   await revokeAllSessions(user.id, "admin_revoke");
   await audit(ctx().db, { action: "user.sessions_revoked", userId: adminId, entityType: "user", entityId: user.id, ip: meta.ip });
 }
+
+/** Manual email verification: for accounts the admin created offline or when outbound email is not yet configured. */
+export async function adminVerifyEmail(adminId: string, userId: string, meta: { ip: string }) {
+  const { db } = ctx();
+  const user = await db.selectFrom("users").select(["id", "email_verified_at"]).where("id", "=", userId).executeTakeFirst();
+  if (!user) throw new HttpError(404, "NOT_FOUND");
+  if (user.email_verified_at) return;
+  await db.updateTable("users").set({ email_verified_at: new Date() }).where("id", "=", userId).execute();
+  await audit(db, { action: "user.admin_updated", userId: adminId, entityType: "user", entityId: userId, ip: meta.ip, details: { emailVerifiedManually: true } });
+}

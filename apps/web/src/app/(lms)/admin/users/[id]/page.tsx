@@ -48,7 +48,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
       <div className="grid gap-6">
         <Card className="p-6">
           <h2 className="mb-3 flex items-center gap-2 font-semibold"><UserRound className="h-5 w-5" /> การจัดการบัญชี</h2>
-          <UserAdminActions userId={u.id} currentRole={u.role} currentStatus={u.status} protectedUser={u.is_system_owner} />
+          <UserAdminActions userId={u.id} currentRole={u.role} currentStatus={u.status} protectedUser={u.is_system_owner} emailVerified={Boolean(u.email_verified_at)} />
         </Card>
 
         <div className="grid gap-6 lg:grid-cols-2">
