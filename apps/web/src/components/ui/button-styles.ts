@@ -10,10 +10,11 @@ export const buttonVariants = {
   link: "text-foreground underline-offset-4 hover:underline",
 };
 export const buttonSizes = {
-  sm: "h-8 px-3 text-xs",
-  md: "h-9 px-4 text-sm",
-  lg: "h-10 px-6 text-sm",
-  icon: "h-9 w-9",
+  // Sized for touch: every variant stays >= 36px tall and icon-only buttons are 40px taps.
+  sm: "h-9 px-3 text-sm",
+  md: "h-10 px-4 text-sm",
+  lg: "h-11 px-6 text-base",
+  icon: "h-10 w-10",
 };
 
 export function buttonClass(variant: keyof typeof buttonVariants = "default", size: keyof typeof buttonSizes = "md", className?: string) {

@@ -4,7 +4,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --font-sans: "Noto Sans Thai", "Leelawadee UI", Thonburi, Tahoma, system-ui, sans-serif;
+  --font-sans: var(--font-sarabun), "Sarabun", "Noto Sans Thai", "Leelawadee UI", Thonburi, Tahoma, system-ui, sans-serif;
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -167,6 +167,14 @@
   html { scroll-behavior: smooth; }
   button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
   body { @apply bg-background text-foreground antialiased; font-feature-settings: "cv11", "ss01"; }
+
+  /* Touch devices: kill the double-tap-zoom delay, keep the default highlight, and make
+     interactive elements comfortable targets (>=40px where the design allows). */
+  button, [role="button"], a, input, select, textarea, label { touch-action: manipulation; }
+  input, select, textarea { font-size: 16px; }
+  @supports (-webkit-touch-callout: none) {
+    input, select, textarea { font-size: 16px; } /* prevents iOS zoom-on-focus */
+  }
 }
 
 /* Theme toggle uses a circular reveal driven from JS; disable the default cross-fade. */

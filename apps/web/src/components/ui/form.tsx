@@ -12,7 +12,7 @@ import { DateField, TimeField } from "./date";
  */
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(({ className, type, ...props }, ref) => {
   if (type === "date" || type === "time") return <PickerInput type={type as "date" | "time"} className={className} {...props} />;
-  return <input ref={ref} type={type} autoComplete="off" className={cn(field, "h-9 py-1", className)} {...props} />;
+  return <input ref={ref} type={type} autoComplete="off" className={cn(field, "h-10 py-1", className)} {...props} />;
 });
 Input.displayName = "Input";
 

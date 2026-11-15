@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Search, UserCog } from "lucide-react";
-import { Badge, Card, buttonClass } from "@/components/ui";
+import { Badge, Card, Input, buttonClass } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ROLE_LABEL, formatDateTh } from "@/lib/format";
 import { listUsersAdmin } from "@/server/admin/users.service";
@@ -31,7 +31,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         <form action="/admin/users" method="get" className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-56 flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input name="q" defaultValue={sp.q ?? ""} placeholder="ค้นหาอีเมลหรือชื่อ…" className="h-10 w-full rounded-lg border bg-background pl-9 pr-3 text-sm" />
+            <Input name="q" defaultValue={sp.q ?? ""} placeholder="ค้นหาอีเมลหรือชื่อ…" className="w-full pl-9" />
           </div>
           <select name="role" defaultValue={sp.role ?? ""} className="h-10 rounded-lg border bg-background px-3 text-sm">
             <option value="">ทุกบทบาท</option>
