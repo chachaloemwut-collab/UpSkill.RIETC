@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Award, ChevronRight, ExternalLink } from "lucide-react";
-import { Alert, Card, buttonClass } from "@/components/ui";
+import { ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
-import { DownloadCertificateButton, IssueCertificateButton, LockLegalNameForm } from "@/components/course/CertificatePanel";
+import { CertificateViewerCard, IssueCertificateButton, LockLegalNameForm } from "@/components/course/CertificatePanel";
 import { ctx } from "@/server/context";
 import { getCurrentUser } from "@/server/auth/session";
 import { getCourseForViewer } from "@/server/courses/courses.service";
@@ -25,6 +24,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ sl
     .where("id", "=", user.id)
     .executeTakeFirstOrThrow();
   const cert = data.certificate;
+  const recipientName = me.legal_full_name_th || me.legal_full_name_en || user.username || user.email;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -41,28 +41,13 @@ export default async function CertificatePage({ params }: { params: Promise<{ sl
         description={data.course.title}
       />
       {cert ? (
-        <Card className="overflow-hidden">
-          <div className="relative flex flex-col items-center gap-3 bg-gradient-to-br from-primary/10 via-muted to-background px-6 py-10 text-center">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
-              <Award className="h-8 w-8" />
-            </span>
-            <p className="text-sm text-muted-foreground">รหัสใบรับรอง</p>
-            <p className="font-mono text-lg font-semibold tracking-wider">{cert.certificate_code}</p>
-          </div>
-          <div className="grid gap-4 p-6">
-            {cert.revoked_at ? (
-              <Alert variant="destructive" title="ใบรับรองนี้ถูกเพิกถอนแล้ว" />
-            ) : (
-              <Alert variant="success" title="ออกใบรับรองแล้ว">ดาวน์โหลดไฟล์ PDF หรือแชร์ลิงก์หน้าตรวจสอบสาธารณะได้</Alert>
-            )}
-            <div className="flex flex-wrap items-start gap-2">
-              {!cert.revoked_at && <DownloadCertificateButton code={cert.certificate_code} />}
-              <Link href={`/verify/${cert.certificate_code}`} className={buttonClass("outline")}>
-                <ExternalLink className="h-4 w-4" /> หน้าตรวจสอบสาธารณะ
-              </Link>
-            </div>
-          </div>
-        </Card>
+        <CertificateViewerCard
+          code={cert.certificate_code}
+          courseTitle={data.course.title}
+          recipientName={recipientName}
+          revokedAt={cert.revoked_at ? String(cert.revoked_at) : null}
+          credentialName={data.course.credential_name_th}
+        />
       ) : !me.legal_name_locked_at ? (
         <LockLegalNameForm defaultTh={me.legal_full_name_th} defaultEn={me.legal_full_name_en} />
       ) : (

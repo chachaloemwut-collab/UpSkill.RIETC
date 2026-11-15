@@ -247,7 +247,7 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
     };
   }, [reportFocusLoss]);
 
-  const seek = (targetSec: number) => {
+  const seek = useCallback((targetSec: number) => {
     const p = playerRef.current;
     if (!p) return;
     if (targetSec > maxWatchedRef.current + HEARTBEAT.POSITION_TOLERANCE_SEC) {
@@ -255,7 +255,7 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
       return;
     }
     p.seekTo(targetSec, true);
-  };
+  }, [toast]);
 
   const submitCheckpoint = async (optionIndex: number) => {
     setCheckpointBusy(true);
@@ -332,7 +332,7 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [ready, durationSec]);
+  }, [ready, durationSec, seek]);
 
   const pct = (s: number) => `${Math.min(100, (s / durationSec) * 100)}%`;
   const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
