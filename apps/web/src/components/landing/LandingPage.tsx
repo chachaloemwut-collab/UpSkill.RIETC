@@ -2,13 +2,14 @@ import Link from "next/link";
 import { ArrowRight, Award, BadgeCheck, BookOpen, CircleCheck, ClipboardCheck, PlayCircle, QrCode, ShieldCheck, Sparkles, UserPlus } from "lucide-react";
 import { AnimatedNumber, EmptyState, Reveal, SpotlightCard, buttonClass } from "@/components/ui";
 import { BRAND_NAME, BrandLogo } from "@/components/brand/BrandLogo";
-import { CourseCard, CourseCover } from "@/components/course/CourseCard";
+import { CourseCover } from "@/components/course/CourseCard";
 import { listPublishedCourses, publicStats } from "@/server/courses/courses.service";
 import { listUpcomingCohorts } from "@/server/programs/programs.service";
 import { listPublicAnnouncements } from "@/server/programs/announcements.service";
 import { AnnouncementCard } from "@/components/programs/AnnouncementCard";
 import { UpcomingCohortCard } from "@/components/programs/UpcomingCohortCard";
 import { LandingNav } from "./LandingNav";
+import { LandingCourseShowcase } from "./LandingCourseShowcase";
 
 const STEPS = [
   { icon: UserPlus, title: "สมัครและลงทะเบียน", text: "สร้างบัญชี แล้วเลือกหลักสูตรที่ต้องการเรียน" },
@@ -77,6 +78,28 @@ export async function LandingPage() {
           </div>
 
           <HeroVisual coverVideoId={featured[0]?.cover_video_id ?? null} title={featured[0]?.title ?? "บทเรียนตัวอย่าง"} />
+        </div>
+      </section>
+
+      {/* ---------- Trust Bar ---------- */}
+      <section className="border-y border-border/70 bg-card/60 py-4.5 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-around gap-6 px-4 text-xs font-medium text-muted-foreground sm:px-6">
+          <div className="flex items-center gap-2">
+            <BadgeCheck className="h-4 w-4 text-primary" />
+            <span>มาตรฐานลงนามดิจิทัล Ed25519</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <span>Server-Side Anti-Cheat ป้องกันโกงเวลาเรียน</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span>ติดตามความก้าวหน้าแบบ Telemetry เรียลไทม์</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <CircleCheck className="h-4 w-4 text-primary" />
+            <span>100% Free & Open Access เข้าถึงได้ทุกคน</span>
+          </div>
         </div>
       </section>
 
@@ -180,11 +203,7 @@ export async function LandingPage() {
             {featured.length === 0 ? (
               <EmptyState icon={<BookOpen className="h-5 w-5" />} title="ยังไม่มีหลักสูตรที่เผยแพร่" />
             ) : (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {featured.map((c, i) => (
-                  <CourseCard key={c.id} course={c} index={i} />
-                ))}
-              </div>
+              <LandingCourseShowcase courses={featured} />
             )}
           </div>
         </div>
@@ -259,41 +278,59 @@ function SectionHeading({ eyebrow, title, description, align = "center" }: { eye
   );
 }
 
-/** Illustrative product shot (decorative): a lesson window with floating result chips. */
+/** Interactive product preview: a lesson window with real-time telemetry and quick verification preview. */
 function HeroVisual({ coverVideoId, title }: { coverVideoId: string | null; title: string }) {
   return (
-    <div aria-hidden className="relative mx-auto w-full max-w-md animate-slide-up [animation-delay:200ms] [animation-fill-mode:both] lg:max-w-none">
+    <div className="relative mx-auto w-full max-w-md animate-slide-up [animation-delay:200ms] [animation-fill-mode:both] lg:max-w-none">
       <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-primary/20 via-transparent to-primary/10 blur-2xl" />
-      <div className="relative overflow-hidden rounded-2xl border bg-card shadow-2xl">
+      <div className="relative overflow-hidden rounded-2xl border bg-card shadow-2xl transition hover:shadow-primary/5">
         <div className="flex items-center gap-1.5 border-b bg-muted/40 px-4 py-3">
           <span className="h-2.5 w-2.5 rounded-full bg-destructive/60" />
           <span className="h-2.5 w-2.5 rounded-full bg-warning/60" />
           <span className="h-2.5 w-2.5 rounded-full bg-success/60" />
-          <span className="ml-3 h-5 flex-1 rounded-md bg-background/80" />
+          <span className="ml-3 h-5 flex-1 rounded-md bg-background/80 text-[10px] text-muted-foreground flex items-center px-2">
+            upskill.rietc.edu.vn / classroom
+          </span>
         </div>
         <CourseCover videoId={coverVideoId} title={title} />
         <div className="grid gap-3 p-5">
-          <p className="truncate font-semibold">{title}</p>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inset-0 animate-ping rounded-full bg-success opacity-60" />
-              <span className="relative h-2.5 w-2.5 rounded-full bg-success" />
+          <p className="truncate font-semibold text-base">{title}</p>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inset-0 animate-ping rounded-full bg-success opacity-60" />
+                <span className="relative h-2.5 w-2.5 rounded-full bg-success" />
+              </span>
+              กำลังบันทึกเวลาเรียน · ดูแล้ว 68%
             </span>
-            กำลังบันทึกเวลาเรียน · ดูแล้ว 68%
+            <span className="font-mono text-[11px] tabular-nums">08:24 / 12:20</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
             <div className="h-full w-[68%] origin-left animate-[grow-x_1.6s_var(--ease-spring-smooth)_both] rounded-full bg-primary" />
           </div>
+          <div className="mt-1 pt-2 border-t border-border/60 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">ผ่านเกณฑ์แล้ว 3 จาก 4 บท</span>
+            <Link
+              href="/verify"
+              className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
+            >
+              ทดลองดูตัวอย่างระบบตรวจสอบใบรับรอง <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
         </div>
       </div>
-      <div className="absolute -right-3 -top-5 flex animate-float items-center gap-2 rounded-xl border bg-background/95 px-3 py-2 text-sm font-medium shadow-lg backdrop-blur sm:-right-6">
-        <CircleCheck className="h-4 w-4 text-success" /> ใบรับรองถูกต้อง
-      </div>
-      <div className="absolute -bottom-5 -left-3 flex animate-float items-center gap-2 rounded-xl border bg-background/95 px-3 py-2 text-sm shadow-lg backdrop-blur [animation-delay:1.2s] sm:-left-6">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">92</span>
+      <Link
+        href="/verify"
+        className="absolute -right-3 -top-5 flex animate-float items-center gap-2 rounded-xl border bg-background/95 px-3.5 py-2.5 text-xs font-semibold shadow-lg backdrop-blur transition hover:scale-105 sm:-right-6"
+      >
+        <CircleCheck className="h-4 w-4 text-success" />
+        <span>ใบรับรองดิจิทัล Ed25519</span>
+      </Link>
+      <div className="absolute -bottom-5 -left-3 flex animate-float items-center gap-2.5 rounded-xl border bg-background/95 px-3.5 py-2.5 text-xs shadow-lg backdrop-blur [animation-delay:1.2s] sm:-left-6">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">92%</span>
         <span>
-          <span className="block text-xs text-muted-foreground">คะแนนแบบทดสอบ</span>
-          <span className="font-medium">ผ่านเกณฑ์</span>
+          <span className="block text-[10px] text-muted-foreground">คะแนน Post-test</span>
+          <span className="font-semibold text-success">ผ่านเกณฑ์มาตรฐาน</span>
         </span>
       </div>
     </div>
