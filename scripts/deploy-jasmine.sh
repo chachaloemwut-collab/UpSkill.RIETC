@@ -143,10 +143,11 @@ cmd_upload() {
   info "uploading to $SFTP_USER@$SFTP_HOST:$REMOTE_DIR (existing remote files are kept; .env is never touched)"
   # No --delete: the server keeps .env and anything the admin adds. Stale code files are harmless because the
   # images are built from the paths listed in the Dockerfiles.
-  # --ignore-time (not --only-newer): mtime is unreliable here (git checkout dates are older than a
-  # previous upload), and a skipped file left the server with a mixed old/new tree that failed to
-  # typecheck. Always upload the exact bundle contents so the server file set is consistent.
-  lftp_run "mirror --reverse --ignore-time --parallel=4 --no-perms --exclude-glob .env --verbose=1 '$STAGE' '$REMOTE_DIR'"
+  # --ignore-time --ignore-size: lftp skips files whose size matches, which silently kept the
+  # same-length RELEASE (and could keep any same-length edit) stale. Force every file up so the
+  # server file set always matches the bundle exactly. RELEASE is also put explicitly: it is the
+  # version marker the deployer compares against.
+  lftp_run "mirror --reverse --ignore-time --ignore-size --parallel=4 --no-perms --exclude-glob .env --verbose=1 '$STAGE' '$REMOTE_DIR'; put '$STAGE/RELEASE' -o '$REMOTE_DIR/RELEASE'"
   info "done. Ask the hosting admin to run in /var/www/hosting/jasmine:  docker compose up -d --build"
 }
 
