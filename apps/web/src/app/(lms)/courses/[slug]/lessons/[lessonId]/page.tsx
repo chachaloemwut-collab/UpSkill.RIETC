@@ -28,7 +28,11 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
   const progress = Math.round((done / data.lessons.length) * 100);
 
   return (
-    <div className="lg:grid lg:grid-cols-[1fr_340px] lg:gap-6">
+    <div
+      id="lesson-layout-container"
+      data-theater="false"
+      className="transition-all duration-300 lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 group/theater data-[theater=true]:lg:grid-cols-1"
+    >
       {/* Mobile: the player is sticky under the top bar while the details and lesson list scroll underneath (spec 7.3) */}
       <div className="sticky top-14 z-20 -mx-4 -mt-4 bg-black sm:-mx-6 sm:-mt-6 lg:static lg:col-start-1 lg:m-0 lg:overflow-hidden lg:rounded-lg lg:border">
         {!lesson.unlocked ? (
@@ -86,7 +90,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
         </div>
       </div>
 
-      <aside className="pb-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pb-0">
+      <aside className="pb-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pb-0 group-data-[theater=true]/theater:lg:col-start-1 group-data-[theater=true]/theater:lg:row-span-1 group-data-[theater=true]/theater:lg:mt-6">
         <Card className="lg:sticky lg:top-20">
           <div className="grid gap-2 border-b px-4 py-4">
             <div className="flex items-center justify-between">
