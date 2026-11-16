@@ -1,0 +1,62 @@
+name: Deploy Jasmine
+on:
+  workflow_dispatch:
+    inputs:
+      migration_compatible:
+        description: 'ยืนยันว่า migration ใช้ร่วมกับโค้ด Production ปัจจุบันได้'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+  packages: write
+
+concurrency:
+  group: jasmine-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main' && inputs.migration_compatible == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      IMAGE_BASE: ghcr.io/chachaloemwut-collab/upskill.rietc
+    steps:
+      - name: Require successful CI for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&head_sha=$GITHUB_SHA&per_page=20" |
+            jq -e --arg sha "$GITHUB_SHA" '.workflow_runs | any(.head_sha == $sha and .conclusion == "success")'
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Build and publish both images
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for svc in web worker; do
+            docker buildx build --platform linux/amd64 --push \
+              --file "infra/docker/$svc.Dockerfile" \
+              --tag "$IMAGE_BASE-$svc:$GITHUB_SHA" \
+              --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+              --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+              --metadata-file "$RUNNER_TEMP/jasmine-$svc.json" .
+          done
+          jq -en --arg commit "$GITHUB_SHA" \
+            --arg web "$(jq -er '."containerimage.digest"' "$RUNNER_TEMP/jasmine-web.json")" \
+            --arg worker "$(jq -er '."containerimage.digest"' "$RUNNER_TEMP/jasmine-worker.json")" \
+            '{commit:$commit, web:$web, worker:$worker, migration_compatible:true}' \
+            > "$RUNNER_TEMP/jasmine-release.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: jasmine-release
+          path: ${{ runner.temp }}/jasmine-release.json
+          if-no-files-found: error
