@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Award, BadgeCheck, Ban, BookOpen, CalendarCheck, ClipboardList, Flag, GraduationCap, Mail, Megaphone, ShieldAlert, UserCog, Users } from "lucide-react";
 import { Badge, Card, EmptyState, Table, Tabs, TabsContent, TabsList, TabsTrigger, buttonClass } from "@/components/ui";
 import { AdminCreateCourseDialog } from "@/components/admin/CourseOwnerActions";
+import { AdminInvitations } from "@/components/admin/AdminInvitations";
 import { listInstructors } from "@/server/courses/instructor.service";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
@@ -49,6 +50,7 @@ export default async function AdminPage() {
           <TabsTrigger value="courses">หลักสูตร ({courses.length})</TabsTrigger>
           <TabsTrigger value="flags">พฤติกรรมผิดปกติ</TabsTrigger>
           <TabsTrigger value="users">ผู้ใช้</TabsTrigger>
+          <TabsTrigger value="invitations">เชิญผู้สอน</TabsTrigger>
           <TabsTrigger value="certs">ใบรับรอง</TabsTrigger>
           <TabsTrigger value="email">อีเมลและ Google ({stats.emailPending}/{stats.emailFailed})</TabsTrigger>
         </TabsList>
@@ -161,6 +163,12 @@ export default async function AdminPage() {
             </div>
             <UserAdminForm />
           </Card>
+        </TabsContent>
+
+        <TabsContent value="invitations" className="mt-4">
+          <div className="max-w-2xl">
+            <AdminInvitations />
+          </div>
         </TabsContent>
 
         <TabsContent value="certs" className="mt-4">

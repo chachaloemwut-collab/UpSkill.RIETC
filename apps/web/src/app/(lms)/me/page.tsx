@@ -9,11 +9,12 @@ import { EmailPreferencesForm } from "@/components/account/EmailPreferencesForm"
 import { DataRights } from "@/components/account/DataRights";
 import { ApiTokens } from "@/components/account/ApiTokens";
 import { LockLegalNameForm } from "@/components/course/CertificatePanel";
-import { ROLE_LABEL, formatDateTh } from "@/lib/format";
+import { ROLE_LABEL, formatDateTh, formatDateTimeTh } from "@/lib/format";
 import { ctx } from "@/server/context";
 import { isGoogleEnabled } from "@/server/auth/google";
 import { getViewer } from "@/server/viewer";
 import { emailPreferenceSummary } from "@/server/email/outbox.service";
+import { getMyPendingInvitation } from "@/server/admin/invitations.service";
 
 export const metadata: Metadata = { title: "ตั้งค่าบัญชี" };
 
@@ -29,6 +30,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
     .executeTakeFirstOrThrow();
   const google = await db.selectFrom("user_oauth_accounts").select(["provider_email"]).where("user_id", "=", viewer.id).where("provider", "=", "google").executeTakeFirst();
   const emailPreferences = await emailPreferenceSummary(viewer.id);
+  const instructorInvitation = me.role === "member" ? await getMyPendingInvitation(me.email) : null;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -36,6 +38,14 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
       {linked === "google" && (
         <div className="mb-6">
           <Alert variant="success" title="ผูกบัญชี Google เรียบร้อยแล้ว" />
+        </div>
+      )}
+      {instructorInvitation && (
+        <div className="mb-6 grid gap-2">
+          <Alert variant="success" title={`คุณได้รับเชิญเป็นผู้สอนจาก ${instructorInvitation.inviterName}`}>
+            หมดอายุ {formatDateTimeTh(instructorInvitation.expiresAt)} — กดดูคำเชิญเพื่อยอมรับและเริ่มสร้างหลักสูตรได้ทันที
+          </Alert>
+          <Link href={instructorInvitation.link} className={buttonClass("default", "md")}>ดูคำเชิญ</Link>
         </div>
       )}
 

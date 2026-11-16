@@ -73,6 +73,21 @@ export async function register(input: { email: string; password: string; profile
         .executeTakeFirstOrThrow();
       await insertProfile(trx, user.id, profile);
       await addVerificationEmail(trx, user.id, email);
+      // A pending instructor invitation for this email is auto-accepted at registration:
+      // the new account starts as an instructor without any self-promotion step.
+      const invite = await trx
+        .selectFrom("instructor_invitations")
+        .select(["id"])
+        .where("email", "=", email)
+        .where("status", "=", "pending")
+        .where("expires_at", ">", new Date())
+        .orderBy("created_at", "desc")
+        .limit(1)
+        .executeTakeFirst();
+      if (invite) {
+        await trx.updateTable("users").set({ role: "instructor", updated_at: new Date() }).where("id", "=", user.id).execute();
+        await trx.updateTable("instructor_invitations").set({ status: "accepted", accepted_at: new Date(), invited_user_id: user.id, updated_at: new Date() }).where("id", "=", invite.id).execute();
+      }
       return user.id;
     });
   } catch (err) {

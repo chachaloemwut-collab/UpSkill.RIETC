@@ -30,7 +30,8 @@ type EmailJobData =
   | { template: "cohort-cancelled"; to: string; programTitle: string; cohortTitle: string }
   | { template: "cohort-starting"; to: string; programTitle: string; cohortTitle: string; startsAt: string; programLink: string }
   | { template: "cohort-registration-open"; to: string; programTitle: string; cohortTitle: string; opensAt: string; programLink: string }
-  | { template: "announcement"; to: string; title: string; summary: string; link: string };
+  | { template: "announcement"; to: string; title: string; summary: string; link: string }
+  | { template: "instructor-invitation"; to: string; link: string; inviterName: string; message?: string };
 
 export type EmailJob = EmailJobData & { locale?: "th" | "en" };
 
@@ -84,6 +85,13 @@ function renderEmailEn(job: EmailJob): { subject: string; text: string; html: st
     case "cohort-starting": return result(`Training has started: ${job.programTitle}`, `Cohort: ${job.cohortTitle}. Start: ${job.startsAt}.`, job.programLink, "Start learning");
     case "cohort-registration-open": return result(`Registration open: ${job.programTitle}`, `Cohort: ${job.cohortTitle}. Registration opens ${job.opensAt}.`, job.programLink, "Apply now");
     case "announcement": return result(job.title, job.summary, job.link, "Read more");
+    case "instructor-invitation":
+      return result(
+        "You are invited to teach on UpskillReskill.RIETC",
+        `${job.inviterName} invited you to become an instructor.${job.message ? `\nMessage: ${job.message}` : ""}\nThis link is single-use and expires in 7 days.`,
+        job.link,
+        "Accept invitation",
+      );
   }
 }
 
@@ -146,6 +154,12 @@ export function renderEmail(job: EmailJob): { subject: string; text: string; htm
       return { subject: `เปิดรับสมัครแล้ว: ${job.programTitle}`, text: `หลักสูตร "${job.programTitle}" รอบ ${job.cohortTitle} เปิดรับสมัครแล้ว (${job.opensAt})\n${job.programLink}`, html: `<p>หลักสูตร <b>${esc(job.programTitle)}</b> รอบ ${esc(job.cohortTitle)} เปิดรับสมัครแล้ว</p><p>เปิดรับ: ${esc(job.opensAt)}</p>${action(job.programLink, "สมัครเลย")}` };
     case "announcement":
       return { subject: job.title, text: `${job.summary}\n${job.link}`, html: `<p><b>${esc(job.title)}</b></p><p>${esc(job.summary)}</p>${action(job.link, "อ่านรายละเอียด")}` };
+    case "instructor-invitation":
+      return {
+        subject: "คำเชิญเป็นผู้สอนใน UpskillReskill.RIETC",
+        text: `${job.inviterName} เชิญคุณเป็นผู้สอน${job.message ? `\nข้อความ: ${job.message}` : ""}\nยืนยันภายใน 7 วัน: ${job.link}`,
+        html: `<p><b>${esc(job.inviterName)}</b> เชิญคุณเป็นผู้สอนในระบบ UpskillReskill.RIETC</p>${optionalHtml("ข้อความ", job.message)}<p>ลิงก์นี้ใช้ได้ 7 วันและใช้ได้ครั้งเดียว</p>${action(job.link, "ยอมรับคำเชิญ")}`,
+      };
   }
 }
 

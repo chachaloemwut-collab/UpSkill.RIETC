@@ -301,6 +301,23 @@ export interface GoogleOauthSettings {
   version: Generated<number>;
 }
 
+export interface InstructorInvitations {
+  accepted_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  email: string;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  invited_by: string;
+  invited_user_id: string | null;
+  message: string | null;
+  revoked_at: Timestamp | null;
+  revoked_by: string | null;
+  status: Generated<string>;
+  token: string;
+  token_hash: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface LearningGroupMembers {
   added_at: Generated<Timestamp>;
   group_id: string;
@@ -549,6 +566,7 @@ export interface DB {
   email_verification_tokens: EmailVerificationTokens;
   enrollments: Enrollments;
   google_oauth_settings: GoogleOauthSettings;
+  instructor_invitations: InstructorInvitations;
   learning_group_members: LearningGroupMembers;
   learning_groups: LearningGroups;
   learning_sessions: LearningSessions;

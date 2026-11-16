@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Search, UserCog } from "lucide-react";
+import { Search, UserCog, Download } from "lucide-react";
 import { Badge, Card, Input, buttonClass } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ROLE_LABEL, formatDateTh } from "@/lib/format";
@@ -14,6 +14,18 @@ const STATUS_LABEL: Record<string, { label: string; variant: "secondary" | "succ
   suspended: { label: "ระงับชั่วคราว", variant: "warning" },
   banned: { label: "ระงับถาวร", variant: "destructive" },
 };
+
+/** Page-number window around the current page (1 … 4 5 [6] 7 8 … 42). */
+function pageNumbers(current: number, total: number): number[] {
+  const window = 2;
+  const start = Math.max(1, current - window);
+  const end = Math.min(total, current + window);
+  const nums: number[] = [];
+  for (let p = start; p <= end; p++) nums.push(p);
+  if (nums[0]! > 1) nums.unshift(1);
+  if (nums[nums.length - 1]! < total) nums.push(total);
+  return nums;
+}
 
 export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ q?: string; role?: string; status?: string; page?: string }> }) {
   await requireAdminPage();
@@ -46,6 +58,13 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <option value="banned">ระงับถาวร</option>
           </select>
           <button type="submit" className={buttonClass("default", "md")}>ค้นหา</button>
+          <Link
+            href={`/api/admin/users/export?${new URLSearchParams({ ...(sp.q ? { q: sp.q } : {}), ...(sp.role ? { role: sp.role } : {}), ...(sp.status ? { status: sp.status } : {}) }).toString()}`}
+            className={buttonClass("outline", "md")}
+            title="ดาวน์โหลดสมาชิกที่ตรงเงื่อนไขทั้งหมดเป็น CSV"
+          >
+            <Download className="h-4 w-4" /> ส่งออก CSV
+          </Link>
         </form>
       </Card>
 
@@ -91,10 +110,17 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           </tbody>
         </table>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 text-sm">
-          <p className="text-muted-foreground">หน้า {data.page} / {totalPages}</p>
-          <div className="flex gap-2">
-            {data.page > 1 && <Link href={pageLink(data.page - 1)} className={buttonClass("outline", "sm")}>ก่อนหน้า</Link>}
-            {data.page < totalPages && <Link href={pageLink(data.page + 1)} className={buttonClass("outline", "sm")}>ถัดไป</Link>}
+          <p className="text-muted-foreground">หน้า {data.page} / {totalPages} · {data.total} คน</p>
+          <div className="flex flex-wrap items-center gap-1">
+            {data.page > 1 && <Link href={pageLink(data.page - 1)} className={buttonClass("outline", "sm")}>‹ ก่อนหน้า</Link>}
+            {pageNumbers(data.page, totalPages).map((p, i) =>
+              p === data.page ? (
+                <span key={i} className="inline-flex h-9 min-w-9 items-center justify-center rounded-md bg-primary px-2 text-sm font-semibold text-primary-foreground">{p}</span>
+              ) : (
+                <Link key={i} href={pageLink(p)} className={buttonClass("outline", "sm")}>{p}</Link>
+              ),
+            )}
+            {data.page < totalPages && <Link href={pageLink(data.page + 1)} className={buttonClass("outline", "sm")}>ถัดไป ›</Link>}
           </div>
         </div>
       </Card>

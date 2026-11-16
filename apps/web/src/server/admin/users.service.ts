@@ -69,6 +69,54 @@ export async function listUsersAdmin(input: { query?: string; role?: string; sta
   return { users, total: total.n, page, pageSize: PAGE_SIZE };
 }
 
+/**
+ * All users matching the same filters as the list (for CSV export). Fetches in chunks
+ * of 1000 rows so an export stays bounded even with a large member base.
+ */
+export async function exportUsersAdmin(input: { query?: string; role?: string; status?: string }) {
+  const { db } = ctx();
+  const q = (input.query ?? "").trim();
+  const role = input.role && ["member", "instructor", "admin"].includes(input.role) ? input.role : undefined;
+  const status = input.status && ["active", "suspended", "banned"].includes(input.status) ? input.status : undefined;
+
+  const CHUNK = 1000;
+  const rows: {
+    email: string; username: string | null; role: string; status: string; deleted_at: Date | null;
+    legal_full_name_th: string | null; legal_full_name_en: string | null; created_at: Date; email_verified_at: Date | null;
+    enrollments: number; certificates: number; last_active_at: string | null;
+  }[] = [];
+  for (let offset = 0; ; offset += CHUNK) {
+    const chunk = await db
+      .selectFrom("users as u")
+      .select([
+        "u.email", "u.username", "u.role", "u.status", "u.deleted_at",
+        "u.legal_full_name_th", "u.legal_full_name_en", "u.created_at", "u.email_verified_at",
+        sql<number>`(select count(*)::int from enrollments e where e.user_id = u.id)`.as("enrollments"),
+        sql<number>`(select count(*)::int from certificates c where c.user_id = u.id)`.as("certificates"),
+        sql<string | null>`(select to_char(max(created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from user_sessions s where s.user_id = u.id)`.as("last_active_at"),
+      ])
+      .$if(Boolean(role), (x) => x.where("u.role", "=", role!))
+      .$if(Boolean(status), (x) => x.where("u.status", "=", status!))
+      .$if(Boolean(q), (x) =>
+        x.where((eb) =>
+          eb.or([
+            eb("u.email", "ilike", `%${q}%`),
+            eb("u.username", "ilike", `%${q}%`),
+            eb("u.legal_full_name_th", "ilike", `%${q}%`),
+            eb("u.legal_full_name_en", "ilike", `%${q}%`),
+          ]),
+        ),
+      )
+      .orderBy("u.created_at", "desc")
+      .limit(CHUNK)
+      .offset(offset)
+      .execute();
+    rows.push(...chunk);
+    if (chunk.length < CHUNK) break;
+  }
+  return rows;
+}
+
 export async function getUserDetailAdmin(userId: string) {
   const { db } = ctx();
   const [user, profile, prefs, enrollments, certificates, registrations, sessions, flags, emails, auditLog, tokens] = await Promise.all([
@@ -162,6 +210,18 @@ export async function adminUpdateUserById(
   if (!user) throw new HttpError(404, "NOT_FOUND");
   if (user.id === adminId) throw new HttpError(409, "CANNOT_MODIFY_SELF");
   if (user.is_system_owner) throw new HttpError(409, "SYSTEM_OWNER_PROTECTED");
+  // Guardrail: the last remaining active admin cannot be demoted or disabled (prevents lockout)
+  if (user.role === "admin" && (patch.role !== undefined && patch.role !== "admin" || patch.status !== undefined && patch.status !== "active")) {
+    const others = await db
+      .selectFrom("users")
+      .select(sql<number>`count(*)::int`.as("n"))
+      .where("role", "=", "admin")
+      .where("status", "=", "active")
+      .where("deleted_at", "is", null)
+      .where("id", "!=", user.id)
+      .executeTakeFirstOrThrow();
+    if (others.n === 0) throw new HttpError(409, "LAST_ADMIN");
+  }
   const set = { ...(patch.role ? { role: patch.role } : {}), ...(patch.status ? { status: patch.status } : {}) };
   if (Object.keys(set).length === 0) return;
   await db.transaction().execute(async (trx) => {
