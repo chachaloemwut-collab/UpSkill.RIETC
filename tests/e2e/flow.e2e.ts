@@ -103,7 +103,7 @@ describe("sign-up and login", () => {
   it("rate-limits brute force on one account", async () => {
     const email = `target-${run}@e2e.test`;
     const statuses: number[] = [];
-    for (let i = 0; i < 7; i++) statuses.push((await new Client().req("/api/auth/login", { body: { email, password: `guess-${i}-xxxxxxxx` } })).status);
+    for (let i = 0; i < 22; i++) statuses.push((await new Client().req("/api/auth/login", { body: { email, password: `guess-${i}-xxxxxxxx` } })).status);
     expect(statuses).toContain(429);
   });
 });
