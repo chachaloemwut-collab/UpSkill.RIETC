@@ -115,6 +115,19 @@ export interface Certificates {
   visual_digest: Generated<string>;
 }
 
+export interface CheckpointAttempts {
+  attempt_count: Generated<number>;
+  correct_on_attempt: number | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  lesson_id: string;
+  locked_at: Timestamp | null;
+  passed_at: Timestamp | null;
+  score: number | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface CohortRegistrations {
   answers: Generated<Json>;
   applied_at: Generated<Timestamp>;
@@ -522,6 +535,7 @@ export interface DB {
   assessment_focus_events: AssessmentFocusEvents;
   audit_logs: AuditLogs;
   certificates: Certificates;
+  checkpoint_attempts: CheckpointAttempts;
   cohort_registrations: CohortRegistrations;
   cohort_watches: CohortWatches;
   course_assignment_recipients: CourseAssignmentRecipients;

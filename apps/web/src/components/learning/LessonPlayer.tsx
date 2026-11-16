@@ -8,7 +8,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Maximize, Minimize, CircleHelp, HelpCircle, Tv } from "lucide-react";
+import { Maximize, Minimize, CircleHelp, HelpCircle, Tv, RotateCcw } from "lucide-react";
 import { PlayPauseIcon, useToast } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { HEARTBEAT } from "@upskill/core/heartbeat";
@@ -25,6 +25,14 @@ type Status =
   | { kind: "broken" }
   | { kind: "completed" };
 
+interface CheckpointState {
+  passed: boolean;
+  locked: boolean;
+  score: number | null;
+  attemptsUsed: number;
+  attemptsLeft: number;
+}
+
 interface Props {
   lessonId: string;
   videoId: string;
@@ -33,6 +41,7 @@ interface Props {
   minWatchPercentage: number;
   initiallyCompleted: boolean;
   checkpoint: { question: string; options: string[]; atSec: number } | null;
+  checkpointState?: CheckpointState | null;
 }
 
 async function postJson(url: string, body?: unknown): Promise<Response> {
@@ -45,7 +54,7 @@ async function postJson(url: string, body?: unknown): Promise<Response> {
   });
 }
 
-export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatchedSec, minWatchPercentage, initiallyCompleted, checkpoint }: Props) {
+export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatchedSec, minWatchPercentage, initiallyCompleted, checkpoint, checkpointState }: Props) {
   const router = useRouter();
   const completedRef = useRef(initiallyCompleted);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -57,7 +66,7 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
   const maxWatchedRef = useRef(initialMaxWatchedSec);
   const focusPauseRef = useRef(false);
   const lastFocusEventAtRef = useRef(0);
-  const checkpointPassedRef = useRef(false);
+  const checkpointPassedRef = useRef(checkpointState?.passed ?? false);
   const checkpointOpenRef = useRef(false);
 
   const [status, setStatus] = useState<Status>(initiallyCompleted ? { kind: "completed" } : { kind: "idle" });
@@ -74,6 +83,9 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
   const [checkpointOpen, setCheckpointOpen] = useState(false);
   const [checkpointError, setCheckpointError] = useState<string | null>(null);
   const [checkpointBusy, setCheckpointBusy] = useState(false);
+  const [checkpointScore, setCheckpointScore] = useState<number | null>(checkpointState?.score ?? null);
+  const [checkpointAttemptsLeft, setCheckpointAttemptsLeft] = useState(checkpointState?.attemptsLeft ?? 3);
+  const [checkpointLocked, setCheckpointLocked] = useState(checkpointState?.locked ?? false);
 
   const startSession = useCallback(async () => {
     const res = await postJson(`/api/learning/lessons/${lessonId}/start-session`);
@@ -262,15 +274,24 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
     setCheckpointError(null);
     try {
       const res = await postJson(`/api/learning/lessons/${lessonId}/checkpoint`, { option_index: optionIndex });
-      const data = (await res.json()) as { correct?: boolean };
+      const data = (await res.json()) as { correct?: boolean; alreadyPassed?: boolean; score?: number | null; attemptsLeft?: number; locked?: boolean };
       if (data.correct) {
+        if (data.score !== null && data.score !== undefined) setCheckpointScore(data.score);
         checkpointPassedRef.current = true;
         checkpointOpenRef.current = false;
         setCheckpointOpen(false);
+        toast({ title: data.alreadyPassed ? "ผ่านคำถามนี้แล้ว" : `ตอบถูก! ได้ ${data.score ?? 10} คะแนน`, variant: "success" });
         playerRef.current?.playVideo();
         setPlaying(true);
+      } else if (data.locked) {
+        setCheckpointScore(0);
+        setCheckpointAttemptsLeft(0);
+        setCheckpointLocked(true);
+        setCheckpointError(null);
       } else {
-        setCheckpointError("คำตอบไม่ถูกต้อง ลองอีกครั้ง");
+        if (data.score !== null && data.score !== undefined) setCheckpointScore(data.score);
+        if (data.attemptsLeft !== undefined) setCheckpointAttemptsLeft(data.attemptsLeft);
+        setCheckpointError(`คำตอบไม่ถูกต้อง — คะแนนลดเหลือ ${data.score ?? 0} (เหลือโอกาส ${data.attemptsLeft ?? 0} ครั้ง)`);
       }
     } catch {
       setCheckpointError("ไม่สามารถตรวจคำตอบได้ กรุณาลองใหม่");
@@ -347,26 +368,54 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
           {checkpointOpen && checkpoint && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md animate-fade-in">
               <div className="w-full max-w-md rounded-2xl border border-white/20 bg-background/95 p-6 text-foreground shadow-2xl backdrop-blur-xl animate-zoom-in">
-                <div className="flex items-center gap-2 text-primary font-semibold text-base mb-1">
-                  <CircleHelp className="h-5 w-5" /> คำถามวัดความเข้าใจระหว่างเรียน
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-primary font-semibold text-base mb-1">
+                    <CircleHelp className="h-5 w-5" /> คำถามวัดความเข้าใจระหว่างเรียน
+                  </div>
+                  {!checkpointLocked && (
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                        คะแนน {checkpointScore ?? 10}/{10}
+                      </span>
+                      <span className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                        เหลือ {checkpointAttemptsLeft} ครั้ง
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <p className="mt-2 mb-4 text-sm font-medium leading-relaxed">{checkpoint.question}</p>
-                <div className="grid gap-2">
-                  {checkpoint.options.map((opt, i) => (
+                {checkpointLocked ? (
+                  <div className="grid gap-3">
+                    <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm">
+                      <p className="font-semibold text-destructive">ตอบผิดครบ 3 ครั้ง</p>
+                      <p className="mt-1 text-muted-foreground">ระบบล้างความคืบหน้าบทเรียนนี้แล้ว — ต้องเรียนใหม่ตั้งแต่ต้นเพื่อลองตอบอีกครั้ง</p>
+                    </div>
                     <button
-                      key={i}
                       type="button"
-                      disabled={checkpointBusy}
-                      onClick={() => void submitCheckpoint(i)}
-                      className="group flex items-start gap-3 rounded-xl border border-border/80 bg-card p-3 text-left text-sm transition-all hover:border-primary hover:bg-primary/5 active:scale-[0.99] disabled:opacity-50"
+                      onClick={() => window.location.reload()}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98]"
                     >
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 text-xs font-semibold group-hover:border-primary group-hover:text-primary">
-                        {String.fromCharCode(65 + i)}
-                      </span>
-                      <span className="flex-1">{opt}</span>
+                      <RotateCcw className="h-4 w-4" /> เริ่มเรียนบทนี้ใหม่
                     </button>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <div className="grid gap-2">
+                    {checkpoint.options.map((opt, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        disabled={checkpointBusy}
+                        onClick={() => void submitCheckpoint(i)}
+                        className="group flex items-start gap-3 rounded-xl border border-border/80 bg-card p-3 text-left text-sm transition-all hover:border-primary hover:bg-primary/5 active:scale-[0.99] disabled:opacity-50"
+                      >
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 text-xs font-semibold group-hover:border-primary group-hover:text-primary">
+                          {String.fromCharCode(65 + i)}
+                        </span>
+                        <span className="flex-1">{opt}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {checkpointError && <p className="mt-3 text-xs font-medium text-destructive">{checkpointError}</p>}
               </div>
             </div>

@@ -8,6 +8,7 @@ import { LessonPlayer } from "@/components/learning/LessonPlayer";
 import { formatDuration } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { getCourseForViewer } from "@/server/courses/courses.service";
+import { getCheckpointState } from "@/server/learning/checkpoint.service";
 
 export const metadata: Metadata = { title: "บทเรียน" };
 
@@ -48,6 +49,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
             minWatchPercentage={data.course.min_watch_percentage}
             initiallyCompleted={lesson.completed}
             checkpoint={lesson.checkpoint}
+            checkpointState={lesson.checkpoint ? await getCheckpointState(user.id, lesson.id) : null}
           />
         )}
       </div>

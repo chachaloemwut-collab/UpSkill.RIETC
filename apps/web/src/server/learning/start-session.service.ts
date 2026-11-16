@@ -91,6 +91,15 @@ export async function startLearningSession(input: { userId: string; lessonId: st
       .returning("id")
       .executeTakeFirstOrThrow();
 
+    // Re-arm a checkpoint that locked after 3 wrong answers: starting the lesson again gives a
+    // fresh attempt slate (passed checkpoints stay, so they are not asked again on reload).
+    await trx
+      .deleteFrom("checkpoint_attempts")
+      .where("user_id", "=", input.userId)
+      .where("lesson_id", "=", lesson.id)
+      .where("locked_at", "is not", null)
+      .execute();
+
     // Create progress if missing; reset the segment so the first ping of the new session is a resync
     const progress = await trx
       .insertInto("lesson_progress")
