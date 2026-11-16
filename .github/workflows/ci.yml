@@ -21,6 +21,39 @@ env:
   REDIS_URL: redis://localhost:6379/0
 
 jobs:
+  branch-guard:
+    # GitHub Free ไม่มี branch protection แบบเนทีฟสำหรับ repo ส่วนตัว — บังคับมาตรฐานตรงนี้แทน:
+    # ทุก commit ที่ขึ้น main ต้องผ่าน Pull Request (ไม่งั้น CI แดง → release gate ใน Deploy Jasmine ไม่ผ่าน)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify every new commit came from a merged PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.event.after }}"
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "::notice::first push — skipping PR check"
+            exit 0
+          fi
+          for sha in $(git rev-list "$BEFORE".."$AFTER"); do
+            merged_at="$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/pulls" \
+              -H "Accept: application/vnd.github+json" --jq '.[0].merged_at // empty' 2>/dev/null || true)"
+            if [ -z "$merged_at" ]; then
+              echo "::error::commit $sha ขึ้น main โดยไม่ผ่าน Pull Request — ขัดมาตรฐานใน CONTRIBUTING.md/AGENTS.md (branch protection ฟรีแพลนไม่มี API จึงบังคับตรงนี้: CI จะแดงและ release gate จะไม่ผ่าน)"
+              exit 1
+            fi
+          done
+          echo "::notice::ทุก commit ใหม่บน main ผ่าน PR — OK"
+
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 20
