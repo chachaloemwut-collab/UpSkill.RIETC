@@ -16,5 +16,5 @@ CREATE TABLE checkpoint_attempts (
 );
 CREATE INDEX idx_checkpoint_attempts_user ON checkpoint_attempts (user_id);
 
-GRANT SELECT, INSERT, UPDATE ON checkpoint_attempts TO upskill_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON checkpoint_attempts TO upskill_app;
 GRANT SELECT ON checkpoint_attempts TO upskill_readonly;
