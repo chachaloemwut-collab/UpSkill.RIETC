@@ -4,6 +4,7 @@ LMS แบบเปิดที่ใช้วิดีโอ YouTube เป็�
 ระบบกันโกงเวลาเรียนฝั่ง server + ใบรับรองดิจิทัล (Ed25519) ที่ตรวจสอบได้ผ่าน QR Code
 
 - สถาปัตยกรรม: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- **คู่มือนักพัฒนา (เริ่มที่นี่ — สภาพแวดล้อม, ข้อตกลงโค้ด, deploy, บทเรียนจากอุบัติเหตุ): [docs/DEVELOPER_HANDBOOK.md](docs/DEVELOPER_HANDBOOK.md)**
 - ความปลอดภัย และจุดที่ต่างจาก SRS: [docs/SECURITY.md](docs/SECURITY.md)
 - นำขึ้น Hosting มะลิ (Jasmine) ผ่าน SFTP: [docs/DEPLOY.md](docs/DEPLOY.md)
 - สถานะฟังก์ชันและงานที่ยังไม่พร้อม production: [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)
