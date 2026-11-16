@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { ArrowDown, ArrowUp, Check, Circle, CircleHelp, ExternalLink, Minus, Plus, RefreshCw, Rocket, Trash2, TriangleAlert, SquarePlay } from "lucide-react";
+import { Archive, ArrowDown, ArrowUp, Check, Circle, CircleHelp, ExternalLink, Minus, Plus, RefreshCw, Rocket, Trash2, TriangleAlert, SquarePlay } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { VISIBILITY, formatDuration } from "@/lib/format";
@@ -152,6 +152,11 @@ function PublishSection({ base, course, checks }: { base: string; course: Editor
           {course.visibility !== "draft" && (
             <Button variant="ghost" disabled={a.busy} onClick={() => set("draft")}>
               กลับเป็นฉบับร่าง
+            </Button>
+          )}
+          {course.visibility !== "archived" && (
+            <Button variant="outline" className="text-muted-foreground" disabled={a.busy} onClick={() => set("archived")}>
+              <Archive className="h-4 w-4" /> ปิดหลักสูตร / ย้ายเข้าคลัง
             </Button>
           )}
         </div>

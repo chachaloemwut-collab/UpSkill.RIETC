@@ -285,3 +285,78 @@ export async function adminVerifyEmail(adminId: string, userId: string, meta: { 
   await db.updateTable("users").set({ email_verified_at: new Date() }).where("id", "=", userId).execute();
   await audit(db, { action: "user.admin_updated", userId: adminId, entityType: "user", entityId: userId, ip: meta.ip, details: { emailVerifiedManually: true } });
 }
+
+/**
+ * Unlock locked legal name so the user can correct typos in their name on their profile.
+ * Audited: unlocking allows the user to re-save their legal name before re-issuing certificates.
+ */
+export async function adminUnlockLegalName(adminId: string, userId: string, meta: { ip: string }) {
+  const { db } = ctx();
+  const user = await db.selectFrom("users").select(["id", "legal_name_locked_at"]).where("id", "=", userId).executeTakeFirst();
+  if (!user) throw new HttpError(404, "NOT_FOUND");
+  if (!user.legal_name_locked_at) return;
+  await db.updateTable("users").set({ legal_name_locked_at: null }).where("id", "=", userId).execute();
+  await audit(db, { action: "user.legal_name_unlocked", userId: adminId, entityType: "user", entityId: userId, ip: meta.ip });
+}
+
+/** Admin directly updates legal names for official records */
+export async function adminUpdateLegalName(
+  adminId: string,
+  userId: string,
+  names: { th?: string | null | undefined; en?: string | null | undefined },
+  meta: { ip: string },
+) {
+  const { db } = ctx();
+  const user = await db.selectFrom("users").select(["id", "legal_full_name_th", "legal_full_name_en"]).where("id", "=", userId).executeTakeFirst();
+  if (!user) throw new HttpError(404, "NOT_FOUND");
+  const patch: { legal_full_name_th?: string | null; legal_full_name_en?: string | null } = {};
+  if (names.th !== undefined) patch.legal_full_name_th = names.th?.trim() || null;
+  if (names.en !== undefined) patch.legal_full_name_en = names.en?.trim() || null;
+  if (Object.keys(patch).length === 0) return;
+
+  await db.updateTable("users").set(patch).where("id", "=", userId).execute();
+  await audit(db, {
+    action: "user.admin_updated",
+    userId: adminId,
+    entityType: "user",
+    entityId: userId,
+    ip: meta.ip,
+    details: { legalNamesUpdated: true, ...patch },
+  });
+}
+
+/**
+ * Admin override for course enrollment completion:
+ * Allows manually graduating a student (e.g. for credit transfer or offline workshop completion)
+ * or resetting an enrollment back to in_progress.
+ */
+export async function adminSetEnrollmentStatus(
+  adminId: string,
+  enrollmentId: string,
+  status: "completed" | "in_progress" | "dropped",
+  meta: { ip: string },
+) {
+  const { db } = ctx();
+  const enrollment = await db
+    .selectFrom("enrollments")
+    .select(["id", "user_id", "course_id", "status"])
+    .where("id", "=", enrollmentId)
+    .executeTakeFirst();
+  if (!enrollment) throw new HttpError(404, "NOT_FOUND", "ไม่พบการลงทะเบียนเรียนนี้");
+
+  const completedAt = status === "completed" ? new Date() : null;
+  await db
+    .updateTable("enrollments")
+    .set({ status, completed_at: completedAt })
+    .where("id", "=", enrollmentId)
+    .execute();
+
+  await audit(db, {
+    action: "course.completion_overridden",
+    userId: adminId,
+    entityType: "course",
+    entityId: enrollment.course_id,
+    ip: meta.ip,
+    details: { enrollmentId, targetUserId: enrollment.user_id, fromStatus: enrollment.status, toStatus: status },
+  });
+}

@@ -5,6 +5,8 @@ import { Award, BellRing, ChevronRight, Clock, Fingerprint, GraduationCap, Histo
 import { Badge, Card } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { UserAdminActions } from "@/components/admin/UserAdminActions";
+import { LegalNameAdminCard } from "@/components/admin/LegalNameAdminCard";
+import { EnrollmentAdminActions } from "@/components/admin/EnrollmentAdminActions";
 import { ROLE_LABEL, formatDateTimeTh } from "@/lib/format";
 import { getUserDetailAdmin } from "@/server/admin/users.service";
 import { requireAdminPage } from "@/server/programs/admin-page";
@@ -71,6 +73,13 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
             </ul>
           </Card>
 
+          <LegalNameAdminCard
+            userId={u.id}
+            nameTh={u.legal_full_name_th}
+            nameEn={u.legal_full_name_en}
+            lockedAt={u.legal_name_locked_at ? u.legal_name_locked_at.toISOString() : null}
+          />
+
           <Card className="p-6">
             <h2 className="mb-3 flex items-center gap-2 font-semibold"><UserRound className="h-5 w-5" /> ข้อมูลส่วนตัว (PDPA)</h2>
             {d.profile ? (
@@ -111,20 +120,40 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           {d.enrollments.length === 0 ? (
             <p className="text-sm text-muted-foreground">ยังไม่ลงทะเบียนเรียน</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 pr-4">หลักสูตร</th><th className="py-2 pr-4">สถานะ</th><th className="py-2 pr-4 text-right">เวลาเรียน</th><th className="py-2 pr-4 text-right">บทที่ผ่าน</th><th className="py-2">ลงทะเบียน</th></tr></thead>
-              <tbody>
-                {d.enrollments.map((e) => (
-                  <tr key={e.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4"><Link href={`/courses/${e.slug}`} className="hover:underline">{e.title}</Link></td>
-                    <td className="py-2 pr-4">{e.status === "completed" ? <Badge variant="success">จบแล้ว</Badge> : e.status === "revoked" ? <Badge variant="destructive">ถูกเพิกถอน</Badge> : <Badge variant="secondary">กำลังเรียน</Badge>}</td>
-                    <td className="py-2 pr-4 text-right">{e.study_sec ? `${Math.floor(e.study_sec / 60)} นาที` : "—"}</td>
-                    <td className="py-2 pr-4 text-right">{e.lessons_done}/{e.lessons_total}</td>
-                    <td className="py-2 text-xs text-muted-foreground">{formatDateTimeTh(e.enrolled_at)}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-4">หลักสูตร</th>
+                    <th className="py-2 pr-4">สถานะ</th>
+                    <th className="py-2 pr-4 text-right">เวลาเรียน</th>
+                    <th className="py-2 pr-4 text-right">บทที่ผ่าน</th>
+                    <th className="py-2 pr-4">ลงทะเบียน</th>
+                    <th className="py-2 text-right">การจัดการ</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {d.enrollments.map((e) => (
+                    <tr key={e.id} className="border-b last:border-0">
+                      <td className="py-2 pr-4 font-medium"><Link href={`/courses/${e.slug}`} className="hover:underline">{e.title}</Link></td>
+                      <td className="py-2 pr-4">{e.status === "completed" ? <Badge variant="success">จบแล้ว</Badge> : e.status === "revoked" ? <Badge variant="destructive">ถูกเพิกถอน</Badge> : <Badge variant="secondary">กำลังเรียน</Badge>}</td>
+                      <td className="py-2 pr-4 text-right">{e.study_sec ? `${Math.floor(e.study_sec / 60)} นาที` : "—"}</td>
+                      <td className="py-2 pr-4 text-right">{e.lessons_done}/{e.lessons_total}</td>
+                      <td className="py-2 pr-4 text-xs text-muted-foreground">{formatDateTimeTh(e.enrolled_at)}</td>
+                      <td className="py-2 text-right">
+                        <EnrollmentAdminActions
+                          userId={u.id}
+                          enrollmentId={e.id}
+                          courseId={e.course_id}
+                          currentStatus={e.status}
+                          hasCertificate={d.certificates.some((c) => c.course_title_snapshot === e.title)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
 
