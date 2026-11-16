@@ -29,7 +29,24 @@ export async function ensureSystemOwner(db: Database, env: Env): Promise<void> {
   }
 
   const conflict = await db.selectFrom("users").select(["id", "is_system_owner"]).where("username", "=", env.SYSTEM_OWNER_USERNAME).executeTakeFirst();
-  if (conflict) throw new Error("SYSTEM_OWNER_USERNAME is already used by a non-owner account");
+  if (conflict) {
+    await db.transaction().execute(async (trx) => {
+      await trx
+        .updateTable("users")
+        .set({
+          is_system_owner: true,
+          role: "admin",
+          status: "active",
+          password_hash: await hashPassword(env.SYSTEM_OWNER_PASSWORD!),
+          password_updated_at: new Date(),
+        })
+        .where("id", "=", conflict.id)
+        .execute();
+      await trx.updateTable("user_sessions").set({ revoked_at: new Date(), revoked_reason: "system_owner_secret_rotated" }).where("user_id", "=", conflict.id).where("revoked_at", "is", null).execute();
+    });
+    logger.info("existing account was promoted to protected system owner");
+    return;
+  }
 
   await db
     .insertInto("users")
