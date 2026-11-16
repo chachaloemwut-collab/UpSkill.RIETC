@@ -1,0 +1,16 @@
+# Ownership ตามพื้นที่ — PR ที่แตะพื้นที่เหล่านี้จะถูกส่งให้เจ้าของพื้นที่ review
+# (ทีมเล็กใช้บัญชีเดียวกัน — แยกเป็นทีมเมื่อมีสมาชิกเพิ่ม)
+
+# App + ตรรกะธุรกิจ
+apps/web/          @chachaloemwut-collab
+packages/core/     @chachaloemwut-collab
+packages/infra/    @chachaloemwut-collab
+
+# ฐานข้อมูล (ต้องระวังที่สุด — migration forward-only + checksum)
+packages/db/       @chachaloemwut-collab
+
+# Deploy / CI / hosting
+.github/workflows/ @chachaloemwut-collab
+infra/docker/      @chachaloemwut-collab
+deploy/            @chachaloemwut-collab
+scripts/           @chachaloemwut-collab
