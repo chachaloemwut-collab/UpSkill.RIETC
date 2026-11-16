@@ -27,6 +27,8 @@ export default async function AdminPage() {
   return (
     <>
       <PageHeader title="ภาพรวมระบบ" description="ดูแลหลักสูตร ผู้ใช้ ใบรับรอง และพฤติกรรมผิดปกติ">
+        <Link href="/admin/users" className={buttonClass("outline")}><Users className="h-4 w-4" /> สมาชิก</Link>
+        <Link href="/admin/certificates" className={buttonClass("outline")}><Award className="h-4 w-4" /> ใบประกาศ</Link>
         <Link href="/admin/programs" className={buttonClass("outline")}><GraduationCap className="h-4 w-4" /> หลักสูตรอบรม</Link>
         <Link href="/admin/announcements" className={buttonClass("outline")}><Megaphone className="h-4 w-4" /> ประกาศ</Link>
       </PageHeader>
@@ -173,14 +175,19 @@ export default async function AdminPage() {
 
         <TabsContent value="certs" className="mt-4">
           <Card className="max-w-xl p-6">
-            <div className="mb-5 flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-                <Ban className="h-5 w-5" />
-              </span>
-              <div>
-                <h3 className="font-semibold">เพิกถอนใบรับรอง</h3>
-                <p className="text-sm text-muted-foreground">ใช้เมื่อพบการทุจริต หน้าตรวจสอบสาธารณะจะแสดงสถานะถูกเพิกถอนพร้อมเหตุผล</p>
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                  <Ban className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="font-semibold">เพิกถอนใบรับรอง</h3>
+                  <p className="text-sm text-muted-foreground">ใช้เมื่อพบการทุจริต หน้าตรวจสอบสาธารณะจะแสดงสถานะถูกเพิกถอนพร้อมเหตุผล</p>
+                </div>
               </div>
+              <Link href="/admin/certificates" className={buttonClass("outline", "sm")}>
+                ศูนย์จัดการใบประกาศ
+              </Link>
             </div>
             <RevokeCertificateForm />
           </Card>

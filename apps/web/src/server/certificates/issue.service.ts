@@ -11,7 +11,13 @@ import { HttpError } from "../http";
 import { audit } from "../audit";
 import { enqueueCertificatePdf } from "../queue";
 
-export async function issueCertificate(input: { userId: string; courseId: string; ip: string; locale: "th" | "en" }) {
+export async function issueCertificate(input: {
+  userId: string;
+  courseId: string;
+  ip: string;
+  locale: "th" | "en";
+  adminOverride?: { score?: number; studySec?: number; reason?: string } | undefined;
+}) {
   const { db, env } = ctx();
 
   const existing = await db
@@ -39,8 +45,8 @@ export async function issueCertificate(input: { userId: string; courseId: string
 
   if (!data) throw new HttpError(404, "NOT_FOUND");
   if (data.status !== "completed") throw new HttpError(403, "COURSE_NOT_COMPLETED");
-  if (data.visibility !== "published" && data.visibility !== "unlisted") throw new HttpError(403, "COURSE_UNAVAILABLE");
-  if (data.total_duration_sec < 600) throw new HttpError(403, "COURSE_NOT_ELIGIBLE");
+  if (data.visibility !== "published" && data.visibility !== "unlisted" && data.visibility !== "archived") throw new HttpError(403, "COURSE_UNAVAILABLE");
+  if (!input.adminOverride && data.total_duration_sec < 600) throw new HttpError(403, "COURSE_NOT_ELIGIBLE");
   if (!data.credential_enabled) throw new HttpError(403, "CREDENTIAL_DISABLED");
   if (!data.legal_name_locked_at) throw new HttpError(409, "LEGAL_NAME_NOT_LOCKED");
 
@@ -59,7 +65,10 @@ export async function issueCertificate(input: { userId: string; courseId: string
     .where("assessment_type", "=", "post")
     .where("is_passed", "=", true)
     .executeTakeFirstOrThrow();
-  if (!best.score) throw new HttpError(403, "QUIZ_NOT_PASSED");
+  if (!best.score && !input.adminOverride) throw new HttpError(403, "QUIZ_NOT_PASSED");
+
+  const quizScore = input.adminOverride?.score !== undefined ? input.adminOverride.score.toFixed(2) : (best.score ? Number(best.score).toFixed(2) : "100.00");
+  const studySec = input.adminOverride?.studySec !== undefined ? input.adminOverride.studySec : stats.study_sec;
 
   // JS Date is millisecond precision -> the value stored in timestamptz (microseconds) round-trips exactly
   const issuedAt = new Date();
@@ -79,8 +88,8 @@ export async function issueCertificate(input: { userId: string; courseId: string
     recipientName,
     courseTitle,
     instructorName: normalizeName(data.credential_signer_name ?? data.ins_th ?? data.ins_en ?? data.ins_email),
-    totalStudySec: stats.study_sec,
-    quizScore: Number(best.score).toFixed(2),
+    totalStudySec: studySec,
+    quizScore,
     verifiedCourse: data.is_verified_course,
     issuedAt: issuedAt.toISOString(),
     documentName: normalizeName(documentName),
@@ -136,7 +145,13 @@ export async function issueCertificate(input: { userId: string; courseId: string
     throw err;
   }
 
-  await audit(db, { action: "certificate.issued", userId: input.userId, entityType: "certificate", ip: input.ip, details: { code: payload.code } });
+  await audit(db, {
+    action: "certificate.issued",
+    userId: input.userId,
+    entityType: "certificate",
+    ip: input.ip,
+    details: { code: payload.code, ...(input.adminOverride ? { adminOverride: true, reason: input.adminOverride.reason } : {}) },
+  });
   await enqueueCertificatePdf(payload.code);
   return { code: payload.code, created: true };
 }

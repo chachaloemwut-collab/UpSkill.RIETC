@@ -37,7 +37,9 @@ describe("validateYouTubeVideo", () => {
     contentDetails: { duration: "PT10M" },
     status: { embeddable: true, privacyStatus: "public", uploadStatus: "processed" },
   };
-  it("accepts a normal public video", () => expect(validateYouTubeVideo(base)).toMatchObject({ ok: true, durationSec: 600 }));
+  it("accepts a normal public video", () => expect(validateYouTubeVideo(base)).toMatchObject({ ok: true, durationSec: 600, isPublic: true }));
+  it("accepts an unlisted video with isPublic false", () =>
+    expect(validateYouTubeVideo({ ...base, status: { ...base.status, privacyStatus: "unlisted" } })).toMatchObject({ ok: true, durationSec: 600, isPublic: false }));
   it("rejects non-embeddable", () =>
     expect(validateYouTubeVideo({ ...base, status: { ...base.status, embeddable: false } })).toMatchObject({ reason: "NOT_EMBEDDABLE" }));
   it("rejects private", () =>

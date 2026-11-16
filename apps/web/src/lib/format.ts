@@ -21,11 +21,12 @@ export function formatDateTimeTh(d: Date | string): string {
 
 export const ROLE_LABEL: Record<string, string> = { member: "ผู้เรียน", instructor: "ผู้สอน", admin: "ผู้ดูแลระบบ" };
 
-export const VISIBILITY: Record<string, { label: string; variant: "secondary" | "success" | "warning" | "destructive" }> = {
+export const VISIBILITY: Record<string, { label: string; variant: "secondary" | "success" | "warning" | "destructive" | "outline" }> = {
   draft: { label: "ฉบับร่าง", variant: "secondary" },
   published: { label: "เผยแพร่", variant: "success" },
   unlisted: { label: "เฉพาะผู้มีลิงก์", variant: "warning" },
   suspended: { label: "ถูกระงับ", variant: "destructive" },
+  archived: { label: "ปิดหลักสูตร / เข้าคลัง", variant: "outline" },
 };
 
 export function displayName(email: string): string {

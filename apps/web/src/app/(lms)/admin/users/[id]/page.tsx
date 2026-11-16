@@ -5,6 +5,8 @@ import { Award, BellRing, ChevronRight, Clock, Fingerprint, GraduationCap, Histo
 import { Badge, Card } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { UserAdminActions } from "@/components/admin/UserAdminActions";
+import { LegalNameAdminCard } from "@/components/admin/LegalNameAdminCard";
+import { EnrollmentAdminActions } from "@/components/admin/EnrollmentAdminActions";
 import { ROLE_LABEL, formatDateTimeTh } from "@/lib/format";
 import { getUserDetailAdmin } from "@/server/admin/users.service";
 import { requireAdminPage } from "@/server/programs/admin-page";
@@ -53,6 +55,32 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="p-6">
+            <h2 className="mb-3 flex items-center gap-2 font-semibold"><Mail className="h-5 w-5" /> อีเมลในระบบ ({d.linkedEmails.length})</h2>
+            <ul className="divide-y text-sm">
+              {d.linkedEmails.map((item) => (
+                <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-foreground">{item.email}</span>
+                    {item.is_primary && <Badge variant="success" className="text-[10px]">อีเมลหลัก</Badge>}
+                  </div>
+                  {item.verified_at ? (
+                    <Badge variant="outline" className="text-emerald-600 dark:text-emerald-400 text-[10px]">ยืนยันแล้ว</Badge>
+                  ) : (
+                    <Badge variant="warning" className="text-[10px]">รอยืนยัน</Badge>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          <LegalNameAdminCard
+            userId={u.id}
+            nameTh={u.legal_full_name_th}
+            nameEn={u.legal_full_name_en}
+            lockedAt={u.legal_name_locked_at ? u.legal_name_locked_at.toISOString() : null}
+          />
+
+          <Card className="p-6">
             <h2 className="mb-3 flex items-center gap-2 font-semibold"><UserRound className="h-5 w-5" /> ข้อมูลส่วนตัว (PDPA)</h2>
             {d.profile ? (
               <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
@@ -92,20 +120,40 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           {d.enrollments.length === 0 ? (
             <p className="text-sm text-muted-foreground">ยังไม่ลงทะเบียนเรียน</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 pr-4">หลักสูตร</th><th className="py-2 pr-4">สถานะ</th><th className="py-2 pr-4 text-right">เวลาเรียน</th><th className="py-2 pr-4 text-right">บทที่ผ่าน</th><th className="py-2">ลงทะเบียน</th></tr></thead>
-              <tbody>
-                {d.enrollments.map((e) => (
-                  <tr key={e.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4"><Link href={`/courses/${e.slug}`} className="hover:underline">{e.title}</Link></td>
-                    <td className="py-2 pr-4">{e.status === "completed" ? <Badge variant="success">จบแล้ว</Badge> : e.status === "revoked" ? <Badge variant="destructive">ถูกเพิกถอน</Badge> : <Badge variant="secondary">กำลังเรียน</Badge>}</td>
-                    <td className="py-2 pr-4 text-right">{e.study_sec ? `${Math.floor(e.study_sec / 60)} นาที` : "—"}</td>
-                    <td className="py-2 pr-4 text-right">{e.lessons_done}/{e.lessons_total}</td>
-                    <td className="py-2 text-xs text-muted-foreground">{formatDateTimeTh(e.enrolled_at)}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-4">หลักสูตร</th>
+                    <th className="py-2 pr-4">สถานะ</th>
+                    <th className="py-2 pr-4 text-right">เวลาเรียน</th>
+                    <th className="py-2 pr-4 text-right">บทที่ผ่าน</th>
+                    <th className="py-2 pr-4">ลงทะเบียน</th>
+                    <th className="py-2 text-right">การจัดการ</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {d.enrollments.map((e) => (
+                    <tr key={e.id} className="border-b last:border-0">
+                      <td className="py-2 pr-4 font-medium"><Link href={`/courses/${e.slug}`} className="hover:underline">{e.title}</Link></td>
+                      <td className="py-2 pr-4">{e.status === "completed" ? <Badge variant="success">จบแล้ว</Badge> : e.status === "revoked" ? <Badge variant="destructive">ถูกเพิกถอน</Badge> : <Badge variant="secondary">กำลังเรียน</Badge>}</td>
+                      <td className="py-2 pr-4 text-right">{e.study_sec ? `${Math.floor(e.study_sec / 60)} นาที` : "—"}</td>
+                      <td className="py-2 pr-4 text-right">{e.lessons_done}/{e.lessons_total}</td>
+                      <td className="py-2 pr-4 text-xs text-muted-foreground">{formatDateTimeTh(e.enrolled_at)}</td>
+                      <td className="py-2 text-right">
+                        <EnrollmentAdminActions
+                          userId={u.id}
+                          enrollmentId={e.id}
+                          courseId={e.course_id}
+                          currentStatus={e.status}
+                          hasCertificate={d.certificates.some((c) => c.course_title_snapshot === e.title)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
 

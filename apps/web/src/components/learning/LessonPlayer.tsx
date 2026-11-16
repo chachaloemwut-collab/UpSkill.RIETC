@@ -8,7 +8,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Maximize, Minimize, CircleHelp, HelpCircle, Tv, RotateCcw } from "lucide-react";
+import { Maximize, Minimize, CircleHelp, HelpCircle, Tv, RotateCcw, Share2, Lock } from "lucide-react";
 import { PlayPauseIcon, useToast } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { HEARTBEAT } from "@upskill/core/heartbeat";
@@ -42,6 +42,7 @@ interface Props {
   initiallyCompleted: boolean;
   checkpoint: { question: string; options: string[]; atSec: number } | null;
   checkpointState?: CheckpointState | null;
+  isPublic?: boolean;
 }
 
 async function postJson(url: string, body?: unknown): Promise<Response> {
@@ -54,7 +55,7 @@ async function postJson(url: string, body?: unknown): Promise<Response> {
   });
 }
 
-export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatchedSec, minWatchPercentage, initiallyCompleted, checkpoint, checkpointState }: Props) {
+export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatchedSec, minWatchPercentage, initiallyCompleted, checkpoint, checkpointState, isPublic = true }: Props) {
   const router = useRouter();
   const completedRef = useRef(initiallyCompleted);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -358,11 +359,51 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
   const pct = (s: number) => `${Math.min(100, (s / durationSec) * 100)}%`;
   const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
+  const handleCopyVideoLink = () => {
+    if (!isPublic) {
+      toast({
+        title: "ไม่อนุญาตให้คัดลอกลิงก์",
+        description: "วิดีโอนี้เป็นแบบไม่สาธารณะเพื่อการเรียนรู้เฉพาะในระบบ",
+        variant: "destructive",
+      });
+      return;
+    }
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    void navigator.clipboard.writeText(url);
+    toast({
+      title: "คัดลอกลิงก์วิดีโอแล้ว",
+      description: "คัดลอกลิงก์ YouTube ไปยังคลิปบอร์ดแล้ว",
+      variant: "success",
+    });
+  };
+
   return (
-    <div className="bg-black">
+    <div className="bg-black select-none">
       <div ref={containerRef} className={pseudoFullscreen ? "fixed inset-0 z-50 flex flex-col justify-center bg-black" : "relative"}>
         <div className="relative aspect-video w-full">
           <div ref={hostRef} className="absolute inset-0 h-full w-full" />
+
+          {/* Interactive Screen Overlay: Toggles play/pause and guards context menu for non-public videos */}
+          <div
+            className="absolute inset-0 z-10 cursor-pointer"
+            onClick={() => {
+              const p = playerRef.current;
+              if (!p || !ready) return;
+              if (p.getPlayerState() === YT_STATE.PLAYING) p.pauseVideo();
+              else p.playVideo();
+            }}
+            onContextMenu={(e) => {
+              if (!isPublic) {
+                e.preventDefault();
+                e.stopPropagation();
+                toast({
+                  title: "ไม่อนุญาตให้คัดลอกลิงก์",
+                  description: "วิดีโอนี้เป็นแบบไม่สาธารณะเพื่อการเรียนรู้เฉพาะในระบบ",
+                  variant: "destructive",
+                });
+              }
+            }}
+          />
           
           {/* Glassmorphic Checkpoint Modal */}
           {checkpointOpen && checkpoint && (
@@ -517,6 +558,22 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
           </div>
 
           <span className="hidden w-12 shrink-0 font-mono text-xs tabular-nums text-white/80 sm:block">{clock(durationSec)}</span>
+
+          {/* Copy Video Link Button (Public allows copying, Non-public prohibits copying) */}
+          <button
+            type="button"
+            className={cn(
+              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-[background-color,scale] active:scale-90",
+              isPublic
+                ? "text-white/80 hover:bg-white/10 hover:text-white"
+                : "text-white/40 opacity-60 cursor-not-allowed hover:bg-white/5",
+            )}
+            onClick={handleCopyVideoLink}
+            aria-label={isPublic ? "คัดลอกลิงก์วิดีโอ (สาธารณะ)" : "วิดีโอไม่สาธารณะ ไม่อนุญาตให้คัดลอกลิงก์"}
+            title={isPublic ? "คัดลอกลิงก์วิดีโอ (สาธารณะ)" : "วิดีโอไม่สาธารณะ (ไม่อนุญาตให้คัดลอกลิงก์)"}
+          >
+            {isPublic ? <Share2 className="h-4 w-4" /> : <Lock className="h-4 w-4 text-amber-400/80" />}
+          </button>
 
           {/* Keyboard HUD Button */}
           <button

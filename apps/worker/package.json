@@ -6,7 +6,8 @@
     "dev": "tsx watch --env-file-if-exists=../../.env.local src/index.ts",
     "start": "node --env-file-if-exists=../../.env.local --import tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "seed": "tsx --env-file-if-exists=../../.env.local src/seed.ts"
+    "seed": "tsx --env-file-if-exists=../../.env.local src/seed.ts",
+    "seed:krathong": "tsx --env-file-if-exists=../../.env.local src/complete-krathong-flow.ts"
   },
   "dependencies": {
     "@upskill/core": "workspace:*",

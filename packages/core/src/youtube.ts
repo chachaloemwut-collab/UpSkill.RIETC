@@ -44,7 +44,7 @@ export interface YouTubeVideoItem {
 }
 
 export type VideoValidation =
-  | { ok: true; videoId: string; title: string; durationSec: number }
+  | { ok: true; videoId: string; title: string; durationSec: number; isPublic: boolean }
   | { ok: false; reason: "NOT_FOUND" | "NOT_EMBEDDABLE" | "NOT_PUBLIC" | "LIVE_OR_UPCOMING" | "AGE_RESTRICTED" | "NOT_PROCESSED" | "BAD_DURATION" };
 
 export function validateYouTubeVideo(item: YouTubeVideoItem | undefined): VideoValidation {
@@ -57,7 +57,13 @@ export function validateYouTubeVideo(item: YouTubeVideoItem | undefined): VideoV
   if (item.contentDetails?.contentRating?.ytRating === "ytAgeRestricted") return { ok: false, reason: "AGE_RESTRICTED" };
   const durationSec = parseIsoDuration(item.contentDetails?.duration ?? "");
   if (!durationSec || durationSec <= 0) return { ok: false, reason: "BAD_DURATION" };
-  return { ok: true, videoId: item.id, title: item.snippet?.title ?? "", durationSec };
+  return {
+    ok: true,
+    videoId: item.id,
+    title: item.snippet?.title ?? "",
+    durationSec,
+    isPublic: item.status.privacyStatus === "public",
+  };
 }
 
 /** IFrame Player error codes that mean "the video is gone / can't be embedded" (worth reporting to the server) */

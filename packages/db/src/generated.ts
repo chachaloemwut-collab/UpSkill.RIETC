@@ -373,6 +373,7 @@ export interface Lessons {
   created_at: Generated<Timestamp>;
   duration_sec: number;
   id: Generated<string>;
+  is_public: Generated<boolean>;
   sequence_order: number;
   title: string;
   video_checked_at: Generated<Timestamp>;
@@ -466,6 +467,16 @@ export interface UserApiTokens {
   revoked_at: Timestamp | null;
   token_hash: string;
   user_id: string;
+}
+
+export interface UserEmails {
+  created_at: Generated<Timestamp>;
+  email: string;
+  id: Generated<string>;
+  is_primary: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+  verified_at: Timestamp | null;
 }
 
 export interface UserOauthAccounts {
@@ -579,6 +590,7 @@ export interface DB {
   quiz_attempts: QuizAttempts;
   quiz_questions: QuizQuestions;
   user_api_tokens: UserApiTokens;
+  user_emails: UserEmails;
   user_oauth_accounts: UserOauthAccounts;
   user_profiles: UserProfiles;
   user_sessions: UserSessions;

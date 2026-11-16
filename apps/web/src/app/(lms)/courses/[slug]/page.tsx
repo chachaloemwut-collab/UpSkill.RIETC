@@ -206,7 +206,11 @@ export default async function CoursePage({ params }: Props) {
                   <Progress value={progress} />
                 </div>
               )}
-              {!enrolled && data.programOnly ? (
+              {!enrolled && course.visibility === "archived" ? (
+                <Alert variant="warning" title="หลักสูตรสิ้นสุดแล้ว (Archived)">
+                  หลักสูตรนี้ปิดการเรียนการสอนหรือสิ้นสุดโครงการแล้ว ผู้เรียนเดิมที่จบหลักสูตรยังคงดูและดาวน์โหลดใบรับรองได้ตลอดชีพ
+                </Alert>
+              ) : !enrolled && data.programOnly ? (
                 <div className="grid gap-2">
                   <p className="text-sm text-muted-foreground">รายวิชานี้เปิดให้เรียนผ่านการสมัครหลักสูตรอบรม</p>
                   {data.programs.map((p) => (
