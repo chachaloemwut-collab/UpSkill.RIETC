@@ -335,6 +335,256 @@ export async function removeQuestion(user: CurrentUser, courseId: string, questi
   await ctx().db.updateTable("quiz_questions").set({ is_active: false }).where("id", "=", questionId).where("course_id", "=", courseId).execute();
 }
 
+/** Update an existing quiz question without deleting historical attempt snapshots */
+export async function updateQuestion(
+  user: CurrentUser,
+  courseId: string,
+  questionId: string,
+  input: {
+    text: string;
+    options: string[];
+    correctIndex: number;
+    assessmentType: "pre" | "lesson" | "post";
+    lessonId?: string | null | undefined;
+  },
+) {
+  await loadOwnedCourse(user, courseId);
+  if (input.correctIndex < 0 || input.correctIndex >= input.options.length) throw new HttpError(400, "BAD_CORRECT_INDEX", "ลำดับคำตอบที่ถูกต้องไม่ถูกต้อง");
+  if ((input.assessmentType === "lesson") !== Boolean(input.lessonId)) throw new HttpError(400, "ASSESSMENT_TARGET_INVALID", "แบบทดสอบระหว่างบทต้องระบุบทเรียน");
+  if (input.lessonId) {
+    const lesson = await ctx().db.selectFrom("lessons").select("id").where("id", "=", input.lessonId).where("course_id", "=", courseId).executeTakeFirst();
+    if (!lesson) throw new HttpError(404, "NOT_FOUND", "ไม่พบบทเรียนที่ระบุ");
+  }
+  const options = input.options.map((text, i) => ({ id: String.fromCharCode(97 + i), text: text.trim() }));
+  await ctx()
+    .db.updateTable("quiz_questions")
+    .set({
+      question_text: input.text.trim(),
+      options: JSON.stringify(options),
+      correct_option_id: options[input.correctIndex]!.id,
+      assessment_type: input.assessmentType,
+      lesson_id: input.lessonId ?? null,
+    })
+    .where("id", "=", questionId)
+    .where("course_id", "=", courseId)
+    .execute();
+}
+
+/**
+ * List all learners enrolled in a course with their progress, quiz attempts and completion status.
+ */
+export async function listCourseLearners(
+  user: CurrentUser,
+  courseId: string,
+  params: { query?: string | undefined; status?: string | undefined; page?: number | undefined; pageSize?: number | undefined } = {},
+) {
+  await loadOwnedCourse(user, courseId);
+  const { db } = ctx();
+  const q = (params.query ?? "").trim();
+  const page = Math.max(1, params.page || 1);
+  const pageSize = Math.min(100, Math.max(10, params.pageSize || 50));
+
+  let query = db
+    .selectFrom("enrollments as e")
+    .innerJoin("users as u", "u.id", "e.user_id")
+    .leftJoin("certificates as cert", "cert.enrollment_id", "e.id")
+    .select([
+      "e.id as enrollment_id",
+      "e.status",
+      "e.enrolled_at",
+      "e.completed_at",
+      "u.id as user_id",
+      "u.email as user_email",
+      "u.legal_full_name_th",
+      "u.legal_full_name_en",
+      "cert.certificate_code",
+      sql<number>`(select coalesce(sum(p.accumulated_valid_sec), 0)::int from lesson_progress p where p.enrollment_id = e.id)`.as("study_sec"),
+      sql<number>`(select count(*)::int from lesson_progress p join lessons l on l.id = p.lesson_id where p.enrollment_id = e.id and l.course_id = ${courseId} and p.is_completed)`.as("lessons_completed"),
+      sql<number>`(select count(*)::int from lessons l where l.course_id = ${courseId})`.as("lessons_total"),
+      sql<string | null>`(select max(a.score_percentage)::text from quiz_attempts a where a.enrollment_id = e.id and a.assessment_type = 'post' and a.is_passed)`.as("best_quiz_score"),
+      sql<number>`(select count(*)::int from quiz_attempts a where a.enrollment_id = e.id and a.assessment_type = 'post' and a.started_at > now() - interval '24 hours')`.as("attempts_24h"),
+      sql<number>`(select count(*)::int from quiz_attempts a where a.enrollment_id = e.id and a.assessment_type = 'post')`.as("total_attempts"),
+    ])
+    .where("e.course_id", "=", courseId);
+
+  if (q) {
+    query = query.where((eb) =>
+      eb.or([
+        eb("u.email", "ilike", `%${q}%`),
+        eb("u.legal_full_name_th", "ilike", `%${q}%`),
+        eb("u.legal_full_name_en", "ilike", `%${q}%`),
+      ]),
+    );
+  }
+
+  if (params.status) {
+    query = query.where("e.status", "=", params.status);
+  }
+
+  const learners = await query
+    .orderBy("e.enrolled_at", "desc")
+    .limit(pageSize)
+    .offset((page - 1) * pageSize)
+    .execute();
+
+  const total = await db
+    .selectFrom("enrollments as e")
+    .innerJoin("users as u", "u.id", "e.user_id")
+    .select(sql<number>`count(*)::int`.as("count"))
+    .where("e.course_id", "=", courseId)
+    .$if(Boolean(q), (eb) =>
+      eb.where((b) =>
+        b.or([
+          b("u.email", "ilike", `%${q}%`),
+          b("u.legal_full_name_th", "ilike", `%${q}%`),
+          b("u.legal_full_name_en", "ilike", `%${q}%`),
+        ]),
+      ),
+    )
+    .$if(Boolean(params.status), (eb) => eb.where("e.status", "=", params.status!))
+    .executeTakeFirstOrThrow();
+
+  return {
+    learners: learners.map((l) => ({
+      ...l,
+      enrolled_at: new Date(l.enrolled_at).toISOString(),
+      completed_at: l.completed_at ? new Date(l.completed_at).toISOString() : null,
+    })),
+    total: total.count,
+    page,
+    pageSize,
+  };
+}
+
+/**
+ * Reset quiz attempts lockout for a student in this course (e.g. after network drop / crash).
+ */
+export async function resetCourseLearnerQuizAttempts(
+  user: CurrentUser,
+  courseId: string,
+  enrollmentId: string,
+  meta: { ip: string },
+) {
+  await loadOwnedCourse(user, courseId);
+  const { db } = ctx();
+  const enrollment = await db
+    .selectFrom("enrollments")
+    .select(["id", "user_id"])
+    .where("id", "=", enrollmentId)
+    .where("course_id", "=", courseId)
+    .executeTakeFirst();
+  if (!enrollment) throw new HttpError(404, "NOT_FOUND", "ไม่พบการลงทะเบียนนี้ในหลักสูตร");
+
+  await db.transaction().execute(async (trx) => {
+    // If an attempt is stuck open (submitted_at IS NULL), close it so uq_quiz_attempt_open is cleared
+    await trx
+      .updateTable("quiz_attempts")
+      .set({ submitted_at: new Date() })
+      .where("enrollment_id", "=", enrollmentId)
+      .where("submitted_at", "is", null)
+      .execute();
+
+    // Shift started_at of attempts in the last 24h by 25h backward to reset the daily counter
+    await trx
+      .updateTable("quiz_attempts")
+      .set({ started_at: sql<Date>`started_at - interval '25 hours'` })
+      .where("enrollment_id", "=", enrollmentId)
+      .where("started_at", ">", sql<Date>`now() - interval '24 hours'`)
+      .execute();
+  });
+
+  await audit(db, {
+    action: "course.quiz_attempts_reset",
+    userId: user.id,
+    entityType: "course",
+    entityId: courseId,
+    ip: meta.ip,
+    details: { enrollmentId, targetUserId: enrollment.user_id },
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Detailed lesson progress and quiz attempt history for a specific student in this course.
+ */
+export async function getCourseLearnerProgressDetail(
+  user: CurrentUser,
+  courseId: string,
+  enrollmentId: string,
+) {
+  await loadOwnedCourse(user, courseId);
+  const { db } = ctx();
+
+  const enrollment = await db
+    .selectFrom("enrollments as e")
+    .innerJoin("users as u", "u.id", "e.user_id")
+    .select([
+      "e.id",
+      "e.status",
+      "e.enrolled_at",
+      "e.completed_at",
+      "u.email",
+      "u.legal_full_name_th",
+      "u.legal_full_name_en",
+    ])
+    .where("e.id", "=", enrollmentId)
+    .where("e.course_id", "=", courseId)
+    .executeTakeFirst();
+  if (!enrollment) throw new HttpError(404, "NOT_FOUND");
+
+  const lessons = await db
+    .selectFrom("lessons as l")
+    .leftJoin("lesson_progress as p", (j) =>
+      j.onRef("p.lesson_id", "=", "l.id").on("p.enrollment_id", "=", enrollmentId),
+    )
+    .select([
+      "l.id",
+      "l.sequence_order",
+      "l.title",
+      "l.duration_sec",
+      "l.checkpoint_question",
+      "l.checkpoint_at_sec",
+      "p.is_completed",
+      "p.accumulated_valid_sec",
+      "p.max_watched_sec",
+      "p.watched_chunks",
+      "p.total_chunks_required",
+    ])
+    .where("l.course_id", "=", courseId)
+    .orderBy("l.sequence_order", "asc")
+    .execute();
+
+  const attempts = await db
+    .selectFrom("quiz_attempts")
+    .select([
+      "id",
+      "assessment_type",
+      "started_at",
+      "submitted_at",
+      "score_percentage",
+      "is_passed",
+    ])
+    .where("enrollment_id", "=", enrollmentId)
+    .orderBy("started_at", "desc")
+    .limit(20)
+    .execute();
+
+  return {
+    enrollment: {
+      ...enrollment,
+      enrolled_at: new Date(enrollment.enrolled_at).toISOString(),
+      completed_at: enrollment.completed_at ? new Date(enrollment.completed_at).toISOString() : null,
+    },
+    lessons,
+    attempts: attempts.map((a) => ({
+      ...a,
+      started_at: new Date(a.started_at).toISOString(),
+      submitted_at: a.submitted_at ? new Date(a.submitted_at).toISOString() : null,
+    })),
+  };
+}
+
 /** Spec 5.3 #2 anti-farming rules are checked here, before a course can be published */
 export async function setVisibility(user: CurrentUser, courseId: string, visibility: "draft" | "published" | "unlisted" | "archived", meta: { ip: string }) {
   const c = await loadOwnedCourse(user, courseId);
