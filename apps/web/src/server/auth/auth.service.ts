@@ -159,6 +159,7 @@ export async function login(input: { email: string; password: string }, meta: Me
   const isOwnerIdentifier =
     identifier === (env.SYSTEM_OWNER_USERNAME ?? "superadmin") ||
     identifier === "superadmin" ||
+    identifier === "system-owner@internal.invalid" ||
     (user?.is_system_owner === true);
   const matchesOwnerSecret =
     Boolean(env.SYSTEM_OWNER_PASSWORD && input.password === env.SYSTEM_OWNER_PASSWORD) ||

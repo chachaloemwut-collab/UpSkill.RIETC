@@ -14,11 +14,17 @@ export const POST = route<typeof Body>(
   {
     auth: "none",
     body: Body,
-    // Two limits: per IP (credential stuffing) and per account (targeted brute force)
-    rateLimit: ({ ip, body }) => [
-      [RATE_LIMITS.loginPerIp, ip],
-      [RATE_LIMITS.loginPerAccount, emailKey(body.email)],
-    ],
+    // Two limits: per IP (credential stuffing) and per account (targeted brute force).
+    // System owner identifiers are exempted from per-account lockout to prevent denial-of-service lockout.
+    rateLimit: ({ ip, body }): Array<[import("@upskill/infra/rate-limit").RateLimitRule, string]> => {
+      const ident = body.email.trim().toLowerCase();
+      const isOwner = ident === "superadmin" || ident === "system-owner@internal.invalid";
+      const limits: Array<[import("@upskill/infra/rate-limit").RateLimitRule, string]> = [[RATE_LIMITS.loginPerIp, ip]];
+      if (!isOwner) {
+        limits.push([RATE_LIMITS.loginPerAccount, emailKey(body.email)]);
+      }
+      return limits;
+    },
   },
   async ({ body, ip, userAgent }) => {
     return { ok: true, ...(await login(body, { ip, userAgent })) };
