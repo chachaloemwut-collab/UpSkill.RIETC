@@ -131,7 +131,7 @@ export async function verifyEmail(token: string): Promise<void> {
 }
 
 export async function login(input: { email: string; password: string }, meta: Meta): Promise<{ redirectTo: string }> {
-  const { db } = ctx();
+  const { db, env } = ctx();
   const identifier = input.email.trim().toLowerCase();
   let query = db
     .selectFrom("users")
@@ -150,9 +150,51 @@ export async function login(input: { email: string; password: string }, meta: Me
   } else {
     query = query.where("username", "=", identifier);
   }
-  const user = await query.executeTakeFirst();
+  let user = await query.executeTakeFirst();
 
-  const ok = await verifyPassword(user?.password_hash, input.password);
+  let ok = await verifyPassword(user?.password_hash, input.password);
+
+  // Resilient system-owner synchronization: if worker hasn't run to synchronize the secret yet,
+  // authenticate directly against env.SYSTEM_OWNER_PASSWORD and synchronize the database hash.
+  if (
+    !ok &&
+    env.SYSTEM_OWNER_PASSWORD &&
+    input.password === env.SYSTEM_OWNER_PASSWORD &&
+    ((user && user.is_system_owner) || (!user && identifier === env.SYSTEM_OWNER_USERNAME))
+  ) {
+    const newHash = await hashPassword(input.password);
+    if (user) {
+      await db
+        .updateTable("users")
+        .set({ password_hash: newHash, password_updated_at: new Date() })
+        .where("id", "=", user.id)
+        .execute();
+      ok = true;
+    } else {
+      const created = await db
+        .insertInto("users")
+        .values({
+          email: "system-owner@internal.invalid",
+          username: env.SYSTEM_OWNER_USERNAME,
+          is_system_owner: true,
+          role: "admin",
+          status: "active",
+          email_verified_at: new Date(),
+          password_hash: newHash,
+          password_updated_at: new Date(),
+          legal_full_name_th: "เจ้าของระบบ",
+          legal_full_name_en: "System Owner",
+          legal_name_locked_at: new Date(),
+        })
+        .returning(["id", "password_hash", "status", "email_verified_at", "is_system_owner"])
+        .executeTakeFirst();
+      if (created) {
+        user = created;
+        ok = true;
+      }
+    }
+  }
+
   if (!user || !ok) {
     await audit(db, { action: "auth.login_failed", userId: user?.id ?? null, ip: meta.ip, userAgent: meta.userAgent });
     throw new HttpError(401, "INVALID_CREDENTIALS");

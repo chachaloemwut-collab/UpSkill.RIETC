@@ -44,3 +44,6 @@ INSERT INTO user_emails (user_id, email, is_primary, verified_at, created_at)
 SELECT id, email, true, email_verified_at, created_at
 FROM users
 ON CONFLICT (email) DO NOTHING;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON user_emails TO upskill_app;
+GRANT SELECT ON user_emails TO upskill_readonly;
