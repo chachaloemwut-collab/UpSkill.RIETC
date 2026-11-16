@@ -7,6 +7,7 @@
 #   scripts/deploy-jasmine.sh ls           test the SFTP login and list /files
 #   scripts/deploy-jasmine.sh upload       stage + push the bundle to /files (never deletes remote files)
 #   scripts/deploy-jasmine.sh upload-env   push deploy/jasmine/secrets/.env to /files/.env (only when it changed)
+#   scripts/deploy-jasmine.sh upload-manifest <file>  upload jasmine-release.json via .tmp + rename
 #   scripts/deploy-jasmine.sh deploy       upload + ask the server's deployer to rebuild, then wait for the result
 #   scripts/deploy-jasmine.sh logs         show the last deploy result and log from the server
 #   scripts/deploy-jasmine.sh status       what is on the server (RELEASE) and whether the public site answers
@@ -229,6 +230,20 @@ cmd_status() {
   fi
 }
 
+cmd_upload_manifest() {
+  local manifest="${1:-}"
+  [[ -n "$manifest" && -f "$manifest" ]] || die "usage: $0 upload-manifest <path-to-jasmine-release.json>"
+  load_sftp
+  info "uploading manifest $manifest to $REMOTE_DIR/jasmine-release.json.tmp and renaming..."
+  lftp_run "
+    rm -f '$REMOTE_DIR/jasmine-release.json'
+    put '$manifest' -o '$REMOTE_DIR/jasmine-release.json.tmp'
+    mv '$REMOTE_DIR/jasmine-release.json.tmp' '$REMOTE_DIR/jasmine-release.json'
+    chmod 644 '$REMOTE_DIR/jasmine-release.json'
+  "
+  info "manifest uploaded. Hosting will apply the release within ~1 minute."
+}
+
 case "${1:-}" in
   init) cmd_init ;;
   check) cmd_check ;;
@@ -236,8 +251,9 @@ case "${1:-}" in
   ls) cmd_ls ;;
   upload) cmd_upload ;;
   upload-env) cmd_upload_env ;;
+  upload-manifest) shift; cmd_upload_manifest "$@" ;;
   deploy) cmd_deploy ;;
   logs) cmd_logs ;;
   status) cmd_status ;;
-  *) sed -n '2,15p' "$0"; exit 1 ;;
+  *) sed -n '2,16p' "$0"; exit 1 ;;
 esac

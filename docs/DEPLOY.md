@@ -38,30 +38,21 @@
    - แจ้งโดเมนจริงกลับมา: นักพัฒนาจะตั้ง `APP_ORIGIN=https://<โดเมน>` ใน `.env` แล้วอัปโหลดใหม่ จากนั้นสั่ง `docker compose up -d` อีกครั้ง
 4. ถ้า migration ล้มเหลวด้วย `permission denied to create extension "citext"` ให้ผู้ดูแลรัน `CREATE EXTENSION IF NOT EXISTS citext;` ในฐาน `lpe1831zma9pmg` แล้วสั่ง `docker compose up -d` ใหม่
 
-## อัปเดตเวอร์ชัน: นักพัฒนาทำเองผ่าน deployer (ผู้ดูแลไม่ต้องสั่งทุกครั้ง)
+## อัปเดตเวอร์ชัน: ระบบ Self-deploy ของ Hosting (ผ่าน GitHub Actions + Release Manifest)
 
-เมื่อสั่ง `docker compose up -d --build` ครั้งแรก จะมีบริการ `deployer` เปิดขึ้นด้วย บริการนี้เฝ้าไฟล์ `deploy-request`
-ที่นักพัฒนาอัปโหลดผ่าน SFTP แล้วรันคำสั่งตายตัวต่อไปนี้ให้เอง (ไม่รันสิ่งที่อยู่ในไฟล์คำขอ เพียงเทียบค่ากับ `RELEASE`):
+Hosting เปิดระบบ Self-deploy ของ Jasmine ให้บริการโดยอัตโนมัติ ไม่ต้อง SSH หรือให้นักพัฒนารัน Docker บนเซิร์ฟเวอร์:
 
-```bash
-docker compose -p jasmine build migrate web worker
-docker compose -p jasmine up -d migrate web worker redis
-docker image prune -f --filter label=com.docker.compose.project=jasmine
-```
+1. นำโค้ดขึ้น `main` และรอ CI ผ่านสมบูรณ์
+2. ไปที่ GitHub Actions → **Deploy Jasmine** → **Run workflow** (เลือกยืนยัน migration_compatible) เพื่อ build และ publish อิมเมจ Web/Worker ไปยัง `ghcr.io`
+3. เมื่อสำเร็จ ดาวน์โหลด Artifact `jasmine-release` แล้วนำไฟล์ `jasmine-release.json` ออกมา
+4. อัปโหลดผ่าน SFTP เป็น `/files/jasmine-release.json.tmp` แล้ว rename เป็น `/files/jasmine-release.json`:
+   ```bash
+   ./scripts/deploy-jasmine.sh upload-manifest <path-to-jasmine-release.json>
+   ```
 
-หลัง `up` แล้ว deployer จะตรวจ `/api/health` ของ web ซ้ำจนกว่าจะตอบ (สูงสุด 2 นาที) แล้วจึงเขียนผลลัพธ์
-ลง `deploy-status` และ `deploy-log.txt` ในโฟลเดอร์เดียวกัน นักพัฒนาอ่านได้ผ่าน SFTP — ผล `ok` หมายถึงเว็บตอบจริงแล้ว
+Hosting จะตรวจคำขอภายในประมาณ 1 นาที ดึงอิมเมจตาม digest รัน migration และอัปเดต Web/Worker พร้อมตรวจ health check ให้อัตโนมัติ
 
-การแก้ค่าใน `.env` (ผ่าน `upload-env`) ก็จะถูกส่งเป็นคำขอให้ deployer รัน `up -d` เพื่อ recreate services ให้ใหม่เอง
-(Compose สร้าง container ใหม่เมื่อ env_file เปลี่ยน) — ผู้ดูแลจึงไม่ต้องสั่งอะไรอีกทั้งสำหรับโค้ดและ configuration
-
-**ข้อควรรู้ด้านความปลอดภัย:** `deployer` ต่อกับ `/var/run/docker.sock` ซึ่งมีสิทธิ์เทียบเท่า root ของเครื่อง จึงจำกัดไว้ดังนี้
-ไม่มีเครือข่าย (`network_mode: none`), ไม่เปิดพอร์ต, ระบบไฟล์อ่านอย่างเดียว และรันเฉพาะคำสั่ง compose ของโปรเจกต์ `jasmine`
-ผู้ที่อัปโหลดโค้ดผ่าน SFTP ได้ก็กำหนดสิ่งที่ถูก build ได้อยู่แล้ว deployer จึงไม่เพิ่มช่องทางใหม่ให้คนนอก
-หากนโยบายของ Hosting ไม่อนุญาตให้ container ใช้ Docker socket ให้ปิดด้วย `docker compose stop deployer`
-แล้วกลับไปใช้วิธีด้านล่าง
-
-ปิด deployer ถาวร: `docker compose rm -sf deployer` · ดูการทำงาน: `docker compose logs -f deployer`
+> **หมายเหตุ:** การ publish สำเร็จใน GitHub ยังไม่ถือว่า deploy Production สำเร็จ ต้องส่ง manifest ตามข้อ 4 ด้วยเสมอ หากคำขอเดิมล้มเหลว ให้นำข้อผิดพลาดมาตรวจแก้ก่อน ไม่ต้องกลับไปสั่ง build บน Production ซ้ำ และ migration ต้องรองรับแอปเวอร์ชันก่อนหน้าเสมอ
 
 ### อัปเดตด้วยมือ (กรณีไม่ใช้ deployer)
 
