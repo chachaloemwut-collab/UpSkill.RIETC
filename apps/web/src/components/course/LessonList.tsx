@@ -15,6 +15,7 @@ export interface LessonItem {
   unlocked: boolean;
   lessonTestRequired: boolean;
   lessonTestPassed: boolean;
+  isPublic?: boolean;
 }
 
 /** Timeline Stepper curriculum list with vertical connector lines and comprehensive status telemetry. */
@@ -97,6 +98,11 @@ export function LessonList({ slug, lessons, enrolled, activeId }: { slug: string
                       <span>บทเรียนถูกล็อกตามลำดับ</span>
                     )}
                   </>
+                )}
+                {l.isPublic === false && (
+                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-amber-500/30 text-amber-600 dark:text-amber-400">
+                    <Lock className="h-2.5 w-2.5 mr-0.5" /> ไม่สาธารณะ
+                  </Badge>
                 )}
                 {l.broken && (
                   <Badge variant="destructive" className="text-[10px] py-0 px-1.5 h-4">

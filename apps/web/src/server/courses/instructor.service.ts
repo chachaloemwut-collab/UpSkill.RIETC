@@ -101,7 +101,7 @@ export async function getCourseForEditing(user: CurrentUser, courseId: string) {
   const course = await db.selectFrom("courses").selectAll().where("id", "=", courseId).executeTakeFirstOrThrow();
   const lessons = await db
     .selectFrom("lessons")
-    .select(["id", "sequence_order", "title", "youtube_video_id", "duration_sec", "video_status", "checkpoint_question", "checkpoint_options", "checkpoint_correct_index", "checkpoint_at_sec"])
+    .select(["id", "sequence_order", "title", "youtube_video_id", "duration_sec", "video_status", "is_public", "checkpoint_question", "checkpoint_options", "checkpoint_correct_index", "checkpoint_at_sec"])
     .where("course_id", "=", courseId)
     .orderBy("sequence_order")
     .execute();
@@ -170,16 +170,16 @@ export async function updateCourse(
   await ctx().db.updateTable("courses").set(patch).where("id", "=", courseId).execute();
 }
 
-async function lookupVideo(videoId: string, devDurationSec?: number): Promise<{ durationSec: number; title: string }> {
+async function lookupVideo(videoId: string, devDurationSec?: number): Promise<{ durationSec: number; title: string; isPublic: boolean }> {
   const { env } = ctx();
   if (!env.YOUTUBE_API_KEY) {
     // Development without a YouTube key: accept a manual duration. Never allowed in production (env requires the key).
-    if (env.APP_ENV !== "production" && devDurationSec) return { durationSec: devDurationSec, title: "" };
+    if (env.APP_ENV !== "production" && devDurationSec) return { durationSec: devDurationSec, title: "", isPublic: true };
     throw new HttpError(503, "YOUTUBE_NOT_CONFIGURED", "ยังไม่ได้ตั้งค่า YOUTUBE_API_KEY (dev: ระบุ dev_duration_sec)");
   }
   const result = (await fetchVideos(env.YOUTUBE_API_KEY, [videoId])).get(videoId);
   if (!result?.ok) throw new HttpError(422, result?.reason ?? "NOT_FOUND", YT_ERRORS[result?.reason ?? "NOT_FOUND"]);
-  return { durationSec: result.durationSec, title: result.title };
+  return { durationSec: result.durationSec, title: result.title, isPublic: result.isPublic };
 }
 
 async function recomputeDuration(trx: Tx, courseId: string) {
@@ -190,12 +190,13 @@ async function recomputeDuration(trx: Tx, courseId: string) {
     .execute();
 }
 
-export async function addLesson(user: CurrentUser, courseId: string, input: { url: string; title?: string | undefined; devDurationSec?: number | undefined }) {
+export async function addLesson(user: CurrentUser, courseId: string, input: { url: string; title?: string | undefined; devDurationSec?: number | undefined; isPublic?: boolean | undefined }) {
   await loadOwnedCourse(user, courseId);
   const videoId = extractYouTubeVideoId(input.url);
   if (!videoId) throw new HttpError(400, "INVALID_YOUTUBE_URL", "ลิงก์ YouTube ไม่ถูกต้อง");
   const video = await lookupVideo(videoId, input.devDurationSec);
   const title = (input.title?.trim() || video.title || "บทเรียน").slice(0, 255);
+  const isPublic = input.isPublic !== undefined ? input.isPublic : (video.isPublic ?? true);
 
   return ctx()
     .db.transaction()
@@ -208,8 +209,8 @@ export async function addLesson(user: CurrentUser, courseId: string, input: { ur
         .executeTakeFirstOrThrow();
       const lesson = await trx
         .insertInto("lessons")
-        .values({ course_id: courseId, sequence_order: next.n, title, youtube_video_id: videoId, duration_sec: video.durationSec })
-        .returning(["id", "sequence_order", "duration_sec"])
+        .values({ course_id: courseId, sequence_order: next.n, title, youtube_video_id: videoId, duration_sec: video.durationSec, is_public: isPublic })
+        .returning(["id", "sequence_order", "duration_sec", "is_public"])
         .executeTakeFirstOrThrow();
       await recomputeDuration(trx, courseId);
       return lesson;
@@ -217,18 +218,19 @@ export async function addLesson(user: CurrentUser, courseId: string, input: { ur
 }
 
 /** Fix a broken lesson by pointing it at a new video (spec 3.2 #2) */
-export async function replaceLessonVideo(user: CurrentUser, courseId: string, lessonId: string, input: { url: string; devDurationSec?: number | undefined }) {
+export async function replaceLessonVideo(user: CurrentUser, courseId: string, lessonId: string, input: { url: string; devDurationSec?: number | undefined; isPublic?: boolean | undefined }) {
   await loadOwnedCourse(user, courseId);
   const videoId = extractYouTubeVideoId(input.url);
   if (!videoId) throw new HttpError(400, "INVALID_YOUTUBE_URL", "ลิงก์ YouTube ไม่ถูกต้อง");
   const video = await lookupVideo(videoId, input.devDurationSec);
+  const isPublic = input.isPublic !== undefined ? input.isPublic : (video.isPublic ?? true);
 
   await ctx()
     .db.transaction()
     .execute(async (trx) => {
       const res = await trx
         .updateTable("lessons")
-        .set({ youtube_video_id: videoId, duration_sec: video.durationSec, video_status: "active", video_checked_at: new Date() })
+        .set({ youtube_video_id: videoId, duration_sec: video.durationSec, is_public: isPublic, video_status: "active", video_checked_at: new Date() })
         .where("id", "=", lessonId)
         .where("course_id", "=", courseId)
         .executeTakeFirst();
@@ -241,6 +243,11 @@ export async function replaceLessonVideo(user: CurrentUser, courseId: string, le
       await trx.updateTable("video_reports").set({ resolved_at: new Date() }).where("lesson_id", "=", lessonId).where("resolved_at", "is", null).execute();
       await recomputeDuration(trx, courseId);
     });
+}
+
+export async function updateLessonPrivacy(user: CurrentUser, courseId: string, lessonId: string, isPublic: boolean) {
+  await loadOwnedCourse(user, courseId);
+  await ctx().db.updateTable("lessons").set({ is_public: isPublic }).where("id", "=", lessonId).where("course_id", "=", courseId).execute();
 }
 
 export async function renameLesson(user: CurrentUser, courseId: string, lessonId: string, title: string) {

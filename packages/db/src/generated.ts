@@ -373,6 +373,7 @@ export interface Lessons {
   created_at: Generated<Timestamp>;
   duration_sec: number;
   id: Generated<string>;
+  is_public: Generated<boolean>;
   sequence_order: number;
   title: string;
   video_checked_at: Generated<Timestamp>;

@@ -15,6 +15,8 @@ import {
   ExternalLink,
   Eye,
   FileQuestion,
+  Globe,
+  Lock,
   Minus,
   Pencil,
   Play,
@@ -91,6 +93,7 @@ export interface EditorData {
     youtube_video_id: string;
     duration_sec: number;
     video_status: string;
+    is_public?: boolean;
     checkpoint_question: string | null;
     checkpoint_options: unknown | null;
     checkpoint_correct_index: number | null;
@@ -642,12 +645,14 @@ function LessonsSection({
     const form = e.currentTarget;
     const f = new FormData(form);
     const dev = Number(f.get("dev_duration_sec") || 0);
+    const isPublic = f.get("is_public") !== "false";
     const ok = await a.run(
       `${base}/lessons`,
       {
         body: {
           url: f.get("url"),
           title: String(f.get("title") ?? "") || undefined,
+          is_public: isPublic,
           ...(dev ? { dev_duration_sec: dev } : {}),
         },
       },
@@ -658,6 +663,17 @@ function LessonsSection({
       setInputUrl("");
     }
   }
+
+  const togglePrivacy = async (lessonId: string, makePublic: boolean) => {
+    await a.run(
+      `${base}/lessons/${lessonId}`,
+      {
+        method: "PATCH",
+        body: { is_public: makePublic },
+      },
+      makePublic ? "เปลี่ยนเป็นวิดีโอสาธารณะแล้ว (คัดลอกลิงก์ได้)" : "เปลี่ยนเป็นวิดีโอไม่สาธารณะแล้ว (ห้ามคัดลอก)",
+    );
+  };
 
   const move = (idx: number, dir: -1 | 1) => {
     const ids = lessons.map((l) => l.id);
@@ -729,8 +745,17 @@ function LessonsSection({
                     )}
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="truncate text-sm font-medium text-foreground">{l.title}</p>
+                        {l.is_public !== false ? (
+                          <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 text-emerald-600 border-emerald-500/30 dark:text-emerald-400">
+                            <Globe className="h-3 w-3" /> สาธารณะ (คัดลอกได้)
+                          </Badge>
+                        ) : (
+                          <Badge variant="warning" className="text-[10px] gap-1 px-1.5 py-0">
+                            <Lock className="h-3 w-3" /> ไม่สาธารณะ (ห้ามคัดลอก)
+                          </Badge>
+                        )}
                         {hasCheckpoint && (
                           <Badge variant="warning" className="text-[10px] gap-1 px-1.5 py-0">
                             <CircleHelp className="h-3 w-3" /> มีคำถาม {formatDuration(l.checkpoint_at_sec ?? 0)}
@@ -790,6 +815,18 @@ function LessonsSection({
                           className={cn(hasCheckpoint && "text-amber-600 dark:text-amber-400")}
                         >
                           <CircleHelp className="h-4 w-4" />
+                        </Button>
+                      </Tooltip>
+                      <Tooltip content={l.is_public !== false ? "วิดีโอสาธารณะ (คัดลอกได้) — คลิกเพื่อเปลี่ยนเป็นไม่สาธารณะ" : "วิดีโอไม่สาธารณะ (ห้ามคัดลอก) — คลิกเพื่อเปลี่ยนเป็นสาธารณะ"}>
+                        <Button
+                          variant={l.is_public === false ? "secondary" : "ghost"}
+                          size="icon"
+                          disabled={a.busy}
+                          onClick={() => togglePrivacy(l.id, l.is_public === false)}
+                          aria-label="เปลี่ยนสิทธิ์การคัดลอกวิดีโอ"
+                          className={cn(l.is_public === false && "text-amber-600 dark:text-amber-400")}
+                        >
+                          {l.is_public !== false ? <Globe className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : <Lock className="h-4 w-4" />}
                         </Button>
                       </Tooltip>
                       <Tooltip content="ลบบทเรียนนี้">
@@ -927,6 +964,23 @@ function LessonsSection({
                 <Input name="dev_duration_sec" type="number" min={1} required />
               </Field>
             )}
+          </div>
+
+          <div className="flex flex-col gap-2 rounded-lg border border-border/80 bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-medium text-foreground">การเข้าถึงและการคัดลอกลิงก์วิดีโอ</p>
+              <p className="text-[11px] text-muted-foreground">
+                วิดีโอสาธารณะจะอนุญาตให้ผู้เรียนคัดลอกลิงก์ได้ ส่วนวิดีโอไม่สาธารณะจะปิดกั้นการคัดลอกลิงก์
+              </p>
+            </div>
+            <select
+              name="is_public"
+              defaultValue="true"
+              className="h-8 rounded-md border border-input bg-background px-2.5 text-xs font-medium text-foreground"
+            >
+              <option value="true">สาธารณะ (Public — คัดลอกลิงก์ได้)</option>
+              <option value="false">ไม่สาธารณะ (Unlisted / Private — ห้ามคัดลอก)</option>
+            </select>
           </div>
 
           <Button type="submit" loading={a.busy} className="justify-self-start font-medium">

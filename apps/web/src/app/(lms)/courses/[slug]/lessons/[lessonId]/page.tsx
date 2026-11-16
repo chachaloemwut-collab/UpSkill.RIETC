@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, ChevronRight, Lock, TriangleAlert } from "lucide
 import { Card, Progress, buttonClass } from "@/components/ui";
 import { LessonList } from "@/components/course/LessonList";
 import { LessonPlayer } from "@/components/learning/LessonPlayer";
+import { LessonVideoShareButton } from "@/components/learning/LessonVideoShareButton";
 import { formatDuration } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { getCourseForViewer } from "@/server/courses/courses.service";
@@ -50,6 +51,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
             initiallyCompleted={lesson.completed}
             checkpoint={lesson.checkpoint}
             checkpointState={lesson.checkpoint ? await getCheckpointState(user.id, lesson.id) : null}
+            isPublic={lesson.isPublic}
           />
         )}
       </div>
@@ -62,11 +64,16 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
           <ChevronRight className="h-3.5 w-3.5 shrink-0" />
           <span className="shrink-0">บทที่ {lesson.order}</span>
         </nav>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{lesson.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            ความยาว {formatDuration(lesson.durationSec)} · ต้องดูอย่างน้อย {data.course.min_watch_percentage}%
-          </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{lesson.title}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              ความยาว {formatDuration(lesson.durationSec)} · ต้องดูอย่างน้อย {data.course.min_watch_percentage}%
+            </p>
+          </div>
+          <div className="shrink-0 pt-1">
+            <LessonVideoShareButton videoId={lesson.videoId} isPublic={lesson.isPublic} />
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {prevLesson && (
