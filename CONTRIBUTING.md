@@ -17,7 +17,7 @@ main (protected: PR-only + CI ต้องเขียว)          ← สา�
 ```
 
 - **1 สาขา = 1 งาน = 1 เจ้าของ** — ไม่มีใคร push ข้ามสาขาคนอื่น
-- งานทุกชิ้นเข้า `main` ผ่าน **Pull Request** เท่านั้น (branch protection บังคับ)
+- งานทุกชิ้นเข้า `main` ผ่าน **Pull Request** เท่านั้น — บังคับด้วย job `branch-guard` ใน CI (GitHub Free ไม่มี branch-protection API สำหรับ repo ส่วนตัว): commit ใดบน main ที่ไม่ได้มาจาก merged PR จะทำให้ **CI แดง และ release gate ใน Deploy Jasmine ไม่ผ่าน** จึงเท่ากับบังคับมาตรฐานในทางปฏิบัติ
 - เริ่มงานใหญ่ด้วย Issue ก่อน → แตกสาขาจาก main ล่าสุด (`git pull` ก่อนสร้างสาขาเสมอ)
 - PR เปิดได้ตั้งแต่ draft เพื่อประกาศว่ากำลังทำอะไร (กันไฟล์ชนกัน)
 
