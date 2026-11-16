@@ -17,13 +17,13 @@ export interface RateLimitRule {
 /** Presets matching spec section 8, plus extra endpoints */
 export const RATE_LIMITS = {
   heartbeatPerUser: { name: "hb:user", limit: 10, windowMs: 60_000 },
-  loginPerIp: { name: "login:ip", limit: 20, windowMs: 15 * 60_000 },
-  loginPerAccount: { name: "login:acct", limit: 5, windowMs: 15 * 60_000 },
-  forgotPasswordPerAccount: { name: "forgot:acct", limit: 3, windowMs: 60 * 60_000 },
-  registerPerIp: { name: "register:ip", limit: 5, windowMs: 60 * 60_000 },
+  loginPerIp: { name: "login:ip", limit: 50, windowMs: 5 * 60_000 },
+  loginPerAccount: { name: "login:acct", limit: 20, windowMs: 5 * 60_000 },
+  forgotPasswordPerAccount: { name: "forgot:acct", limit: 10, windowMs: 15 * 60_000 },
+  registerPerIp: { name: "register:ip", limit: 20, windowMs: 15 * 60_000 },
   verifyPublicPerIp: { name: "verify:ip", limit: 60, windowMs: 60_000 },
-  videoReportPerUser: { name: "vreport:user", limit: 5, windowMs: 60 * 60_000 },
-  cohortApplyPerUser: { name: "cohort-apply:user", limit: 10, windowMs: 60 * 60_000 },
+  videoReportPerUser: { name: "vreport:user", limit: 10, windowMs: 15 * 60_000 },
+  cohortApplyPerUser: { name: "cohort-apply:user", limit: 20, windowMs: 15 * 60_000 },
 } satisfies Record<string, RateLimitRule>;
 
 export interface RateLimitResult {

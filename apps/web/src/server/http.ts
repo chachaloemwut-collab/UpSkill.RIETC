@@ -110,7 +110,11 @@ export function route<TBody extends z.ZodType = z.ZodNever, TParams = Record<str
       if (err instanceof HttpError) {
         // err.message is only ever a user-facing text we wrote ourselves (never an internal error)
         const message = err.message !== err.code ? { message: err.message } : {};
-        return NextResponse.json({ error: err.code, ...message, requestId }, { status: err.status, ...(err.headers ? { headers: err.headers } : {}) });
+        const retryAfter = err.headers?.["Retry-After"] ? parseInt(err.headers["Retry-After"], 10) : undefined;
+        return NextResponse.json(
+          { error: err.code, ...message, requestId, ...(retryAfter !== undefined ? { retryAfter } : {}) },
+          { status: err.status, ...(err.headers ? { headers: err.headers } : {}) },
+        );
       }
       logger.error({ err, requestId, path: req.nextUrl.pathname }, "unhandled error");
       return NextResponse.json({ error: "INTERNAL", requestId }, { status: 500 });
