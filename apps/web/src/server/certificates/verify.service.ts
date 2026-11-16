@@ -56,6 +56,9 @@ export async function verifyPublicCertificate(rawCode: string): Promise<PublicVe
       documentName: c.document_name_snapshot,
       documentType: c.document_type_snapshot,
       expiresAt: c.expires_at ? new Date(c.expires_at).toISOString() : null,
+      signerTitle: c.signer_title_snapshot,
+      achievement: c.achievement_snapshot,
+      visualDigest: c.visual_digest,
     },
   );
   if (!result.ok) {
