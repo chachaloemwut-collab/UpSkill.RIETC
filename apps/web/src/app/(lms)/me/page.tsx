@@ -9,10 +9,12 @@ import { EmailPreferencesForm } from "@/components/account/EmailPreferencesForm"
 import { DataRights } from "@/components/account/DataRights";
 import { ApiTokens } from "@/components/account/ApiTokens";
 import { LockLegalNameForm } from "@/components/course/CertificatePanel";
+import { UserEmailsManager } from "@/components/account/UserEmailsManager";
 import { ROLE_LABEL, formatDateTh, formatDateTimeTh } from "@/lib/format";
 import { ctx } from "@/server/context";
 import { isGoogleEnabled } from "@/server/auth/google";
 import { getViewer } from "@/server/viewer";
+import { listUserEmails } from "@/server/auth/user-emails.service";
 import { emailPreferenceSummary } from "@/server/email/outbox.service";
 import { getMyPendingInvitation } from "@/server/admin/invitations.service";
 
@@ -31,6 +33,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const google = await db.selectFrom("user_oauth_accounts").select(["provider_email"]).where("user_id", "=", viewer.id).where("provider", "=", "google").executeTakeFirst();
   const emailPreferences = await emailPreferenceSummary(viewer.id);
   const instructorInvitation = me.role === "member" ? await getMyPendingInvitation(me.email) : null;
+  const userEmails = await listUserEmails(viewer.id);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -69,6 +72,10 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             </div>
           </div>
         </Card>
+
+        <Section icon={<Mail className="h-4 w-4" />} title="อีเมลของบัญชี" description="จัดการอีเมลหลักและอีเมลสำรองสำหรับเข้าสู่ระบบและรับการแจ้งเตือน (ต้องมีอย่างน้อยหนึ่งอีเมลเสมอ)">
+          <UserEmailsManager initialEmails={userEmails} />
+        </Section>
 
         <Section icon={<IdCard className="h-4 w-4" />} title="ข้อมูลผู้เรียน" description="ชื่อ-นามสกุล ไทย/อังกฤษ เลขประจำตัวประชาชน วันเกิด เบอร์โทรศัพท์ และที่อยู่">
           <Card className="flex flex-wrap items-center gap-3 p-5">

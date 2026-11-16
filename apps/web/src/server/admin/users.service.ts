@@ -119,7 +119,7 @@ export async function exportUsersAdmin(input: { query?: string; role?: string; s
 
 export async function getUserDetailAdmin(userId: string) {
   const { db } = ctx();
-  const [user, profile, prefs, enrollments, certificates, registrations, sessions, flags, emails, auditLog, tokens] = await Promise.all([
+  const [user, profile, prefs, enrollments, certificates, registrations, sessions, flags, emails, auditLog, tokens, linkedEmails] = await Promise.all([
     db
       .selectFrom("users")
       .select([
@@ -194,9 +194,16 @@ export async function getUserDetailAdmin(userId: string) {
       .limit(30)
       .execute(),
     db.selectFrom("user_api_tokens").select(["id", "name", "last_used_at", "created_at", "revoked_at"]).where("user_id", "=", userId).orderBy("created_at", "desc").execute(),
+    db
+      .selectFrom("user_emails")
+      .select(["id", "email", "is_primary", "verified_at", "created_at"])
+      .where("user_id", "=", userId)
+      .orderBy("is_primary", "desc")
+      .orderBy("created_at", "asc")
+      .execute(),
   ]);
   if (!user) throw new HttpError(404, "NOT_FOUND");
-  return { user, profile, prefs, enrollments, certificates, registrations, sessions, flags, emails, auditLog, tokens };
+  return { user, profile, prefs, enrollments, certificates, registrations, sessions, flags, emails, auditLog, tokens, linkedEmails };
 }
 
 export async function adminUpdateUserById(

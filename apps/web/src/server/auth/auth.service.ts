@@ -27,7 +27,7 @@ function assertPassword(pw: string) {
   if (problem) throw new HttpError(400, "WEAK_PASSWORD", problem);
 }
 
-async function addVerificationEmail(db: Database | Tx, userId: string, email: string) {
+export async function addVerificationEmail(db: Database | Tx, userId: string, email: string) {
   const { env } = ctx();
   const token = generateToken();
   const row = await db
@@ -69,8 +69,12 @@ export async function register(input: { email: string; password: string; profile
       const user = await trx
         .insertInto("users")
         .values({ email, password_hash: passwordHash, password_updated_at: new Date() })
-        .returning("id")
+        .returning(["id", "created_at"])
         .executeTakeFirstOrThrow();
+      await trx
+        .insertInto("user_emails")
+        .values({ user_id: user.id, email, is_primary: true, verified_at: null, created_at: user.created_at })
+        .execute();
       await insertProfile(trx, user.id, profile);
       await addVerificationEmail(trx, user.id, email);
       // A pending instructor invitation for this email is auto-accepted at registration:
@@ -116,10 +120,13 @@ export async function verifyEmail(token: string): Promise<void> {
       .where("t.expires_at", ">", new Date())
       .forUpdate("t")
       .executeTakeFirst();
-    // The link only verifies the address it was sent to (protects against verifying a changed email)
-    if (!t || t.token_email.toLowerCase() !== t.user_email.toLowerCase()) throw new HttpError(400, "INVALID_OR_EXPIRED_TOKEN");
+    // The link verifies the token and marks the corresponding email as verified
+    if (!t) throw new HttpError(400, "INVALID_OR_EXPIRED_TOKEN");
     await trx.updateTable("email_verification_tokens").set({ used_at: new Date() }).where("id", "=", t.id).execute();
-    await trx.updateTable("users").set({ email_verified_at: new Date() }).where("id", "=", t.user_id).where("email_verified_at", "is", null).execute();
+    await trx.updateTable("user_emails").set({ verified_at: new Date() }).where("user_id", "=", t.user_id).where("email", "=", t.token_email).execute();
+    if (t.token_email.toLowerCase() === t.user_email.toLowerCase()) {
+      await trx.updateTable("users").set({ email_verified_at: new Date() }).where("id", "=", t.user_id).where("email_verified_at", "is", null).execute();
+    }
   });
 }
 
@@ -129,7 +136,20 @@ export async function login(input: { email: string; password: string }, meta: Me
   let query = db
     .selectFrom("users")
     .select(["id", "password_hash", "status", "email_verified_at", "is_system_owner"]);
-  query = identifier.includes("@") ? query.where("email", "=", identifier) : query.where("username", "=", identifier);
+  if (identifier.includes("@")) {
+    const matchedEmail = await db
+      .selectFrom("user_emails")
+      .select(["user_id"])
+      .where("email", "=", identifier)
+      .executeTakeFirst();
+    if (matchedEmail) {
+      query = query.where("id", "=", matchedEmail.user_id);
+    } else {
+      query = query.where("email", "=", identifier);
+    }
+  } else {
+    query = query.where("username", "=", identifier);
+  }
   const user = await query.executeTakeFirst();
 
   const ok = await verifyPassword(user?.password_hash, input.password);
@@ -156,7 +176,16 @@ export async function login(input: { email: string; password: string }, meta: Me
 export async function forgotPassword(emailRaw: string): Promise<void> {
   const { db, env } = ctx();
   const email = emailRaw.trim().toLowerCase();
-  const user = await db.selectFrom("users").select(["id", "status"]).where("email", "=", email).executeTakeFirst();
+  const matched = await db
+    .selectFrom("user_emails")
+    .select(["user_id"])
+    .where("email", "=", email)
+    .where("verified_at", "is not", null)
+    .executeTakeFirst();
+  const userId = matched ? matched.user_id : null;
+  const user = userId
+    ? await db.selectFrom("users").select(["id", "status"]).where("id", "=", userId).executeTakeFirst()
+    : await db.selectFrom("users").select(["id", "status"]).where("email", "=", email).executeTakeFirst();
   if (!user || user.status !== "active") return;
 
   // Spec: 32 random bytes; only the SHA-256 is stored
@@ -302,7 +331,8 @@ export async function applyGoogleSignIn(
       break;
     case "CREATE_USER_AND_LOGIN": {
       const created = await db.transaction().execute(async (trx) => {
-        const u = await trx.insertInto("users").values({ email: claims.email, email_verified_at: new Date() }).returning("id").executeTakeFirstOrThrow();
+        const u = await trx.insertInto("users").values({ email: claims.email, email_verified_at: new Date() }).returning(["id", "created_at"]).executeTakeFirstOrThrow();
+        await trx.insertInto("user_emails").values({ user_id: u.id, email: claims.email, is_primary: true, verified_at: new Date(), created_at: u.created_at }).execute();
         // Google gives no profile: the member completes it (with the privacy notice) on the profile page
         await trx.insertInto("user_oauth_accounts").values({ user_id: u.id, provider_user_id: claims.sub, provider_email: claims.email }).execute();
         return u;

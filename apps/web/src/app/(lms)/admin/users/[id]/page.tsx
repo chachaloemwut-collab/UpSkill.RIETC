@@ -53,6 +53,25 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="p-6">
+            <h2 className="mb-3 flex items-center gap-2 font-semibold"><Mail className="h-5 w-5" /> อีเมลในระบบ ({d.linkedEmails.length})</h2>
+            <ul className="divide-y text-sm">
+              {d.linkedEmails.map((item) => (
+                <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-foreground">{item.email}</span>
+                    {item.is_primary && <Badge variant="success" className="text-[10px]">อีเมลหลัก</Badge>}
+                  </div>
+                  {item.verified_at ? (
+                    <Badge variant="outline" className="text-emerald-600 dark:text-emerald-400 text-[10px]">ยืนยันแล้ว</Badge>
+                  ) : (
+                    <Badge variant="warning" className="text-[10px]">รอยืนยัน</Badge>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          <Card className="p-6">
             <h2 className="mb-3 flex items-center gap-2 font-semibold"><UserRound className="h-5 w-5" /> ข้อมูลส่วนตัว (PDPA)</h2>
             {d.profile ? (
               <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2">

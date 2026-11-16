@@ -468,6 +468,16 @@ export interface UserApiTokens {
   user_id: string;
 }
 
+export interface UserEmails {
+  created_at: Generated<Timestamp>;
+  email: string;
+  id: Generated<string>;
+  is_primary: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+  verified_at: Timestamp | null;
+}
+
 export interface UserOauthAccounts {
   id: Generated<string>;
   last_used_at: Generated<Timestamp>;
@@ -579,6 +589,7 @@ export interface DB {
   quiz_attempts: QuizAttempts;
   quiz_questions: QuizQuestions;
   user_api_tokens: UserApiTokens;
+  user_emails: UserEmails;
   user_oauth_accounts: UserOauthAccounts;
   user_profiles: UserProfiles;
   user_sessions: UserSessions;
