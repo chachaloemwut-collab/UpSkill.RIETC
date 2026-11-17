@@ -44,3 +44,10 @@
 - ต้องใช้ **Node.js 24**: `export PATH="/opt/homebrew/opt/node@24/bin:$PATH"` ทุกคำสั่ง (default ของเครื่องอาจเป็น v16)
 - พอร์ต 3000 มี dev server เดิมรันอยู่ — อย่าเปิดซ้ำ
 - secret ทั้งหมดอยู่ใน `.env.local`/`deploy/jasmine/secrets/` (gitignored) — ห้าม commit ห้ามแชร์ในข้อความสาธารณะ
+
+## 7. กติกากลางตามเวลาและการส่งต่อ (Antigravity / DeepSeek / ChatGPT)
+
+ก่อนทุกงานต้องอ่าน `docs/AI_COLLABORATION.md` และ `docs/AI_HANDOFF.md` แล้วรัน
+`python3 scripts/agent-work.py status` และจองสิทธิ์ก่อนเขียน ห้ามแก้ซ้อนกับผู้ถือสิทธิ์
+อัปเดต heartbeat ทุก 10 นาที; stale 30 นาทีไม่อนุญาตให้ยึดงานอัตโนมัติ
+บันทึกผลพร้อมเวลาและ commit แล้ว finish ก่อนส่งต่อ ห้าม deploy เปลี่ยนรหัสผ่านบัญชีผู้ดูแล
