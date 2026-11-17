@@ -2,10 +2,13 @@ import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   CERTIFICATE_CODE_RE,
+  DEVELOPER_TEST_DOCUMENT_TYPE,
   canonicalJson,
   computeVisualDigest,
   formatStudyDurationTh,
   generateCertificateCode,
+  isDeveloperTestCertificate,
+  isDeveloperTestEmail,
   signCertificate,
   verifyCertificate,
   type CertificatePayload,
@@ -94,6 +97,37 @@ describe("certificate", () => {
   it("rejects unknown key ids", () => {
     const signed = signCertificate(payload, "k1", priv);
     expect(verifyCertificate(signed, {}, record)).toEqual({ ok: false, reason: "UNKNOWN_KEY" });
+  });
+
+  it("identifies developer test certificates and developer email correctly", () => {
+    expect(isDeveloperTestEmail("cha.chaloemwut@gmail.com")).toBe(true);
+    expect(isDeveloperTestEmail("CHA.CHALOEMWUT@GMAIL.COM")).toBe(true);
+    expect(isDeveloperTestEmail("  cha.chaloemwut@gmail.com  ")).toBe(true);
+    expect(isDeveloperTestEmail("other@example.com")).toBe(false);
+    expect(isDeveloperTestEmail(null)).toBe(false);
+
+    expect(isDeveloperTestCertificate(DEVELOPER_TEST_DOCUMENT_TYPE)).toBe(true);
+    expect(isDeveloperTestCertificate("completion")).toBe(false);
+    expect(isDeveloperTestCertificate(null)).toBe(false);
+  });
+
+  it("round-trips a developer test certificate with test document type", () => {
+    const testCert = {
+      ...payload,
+      v: 3 as const,
+      documentName: "ใบประกาศนียบัตร (DEVELOPMENT TEST)",
+      documentType: DEVELOPER_TEST_DOCUMENT_TYPE,
+      expiresAt: null,
+      signerTitle: "ผู้ดูแลระบบทดสอบ (Development / Integration Test)",
+      achievement: "เอกสารทดสอบระบบ (TEST / DEVELOPMENT) — สำหรับทดสอบการออกและตรวจสอบใบประกาศนียบัตรเท่านั้น มิใช่การสำเร็จการศึกษาจริง",
+      visualDigest: "test123dev45",
+    };
+    const { v: _version, ...testRecord } = testCert;
+    const signed = signCertificate(testCert, "k1", priv);
+    expect(verifyCertificate(signed, { k1: pub }, testRecord)).toMatchObject({
+      ok: true,
+      payload: { v: 3, documentType: "development_test", documentName: "ใบประกาศนียบัตร (DEVELOPMENT TEST)" },
+    });
   });
 
   it("formats Thai durations", () => {

@@ -16,6 +16,7 @@ import {
 import { enqueueCohortOpenEmails, enqueueCohortStartingEmails } from "./jobs/cohort-notifications.ts";
 import { checkAnticheatAnomaly } from "./jobs/anticheat-anomaly.ts";
 import { ensureSystemOwner } from "./system-owner.ts";
+import { ensureDeveloperTestCertificate } from "./developer-test.ts";
 import { configuredEmailSender } from "./email-transport.ts";
 
 const env = getEnv();
@@ -23,6 +24,7 @@ const db = createDb(env.DATABASE_URL);
 // BullMQ requires maxRetriesPerRequest = null on its connection
 const connection = createRedis(env.REDIS_URL, { maxRetriesPerRequest: null });
 await ensureSystemOwner(db, env);
+await ensureDeveloperTestCertificate(db, env);
 const getEmailSender = configuredEmailSender(db, env);
 // Scheduler (repeat) jobs must be removed once completed; otherwise BullMQ retains
 // every iteration forever (e.g. outbox-poll fires every second → ~86k jobs/day).

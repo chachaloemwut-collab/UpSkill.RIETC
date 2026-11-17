@@ -55,6 +55,7 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
   const coursePrefix = c.document_type_snapshot === "program" ? "หลักสูตรอบรม" : "หลักสูตร";
   const pattern = PATTERNS[c.template_snapshot] ?? PATTERNS.standard!;
   const align = c.text_align_snapshot === "left" ? "left" : "center";
+  const isTest = c.document_type_snapshot === "development_test";
 
   // Optional background image: fetched once here (https only, configured by instructors/admins)
   // and embedded as a data URL, so the Playwright context can stay fully network-blocked.
@@ -101,7 +102,8 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
   </style></head><body><div class="page">
     ${backgroundUrl ? `<div class="bgimg"></div>` : ""}
     ${pattern.orbs ? `<div class="orb a"></div><div class="orb b"></div>` : ""}
-    <div class="watermark">ต้นฉบับดิจิทัล · ตรวจสอบออนไลน์</div>
+    <div class="watermark" style="${isTest ? "color: #b91c1c; opacity: .14; font-size: 24pt;" : ""}">${isTest ? "TEST / DEVELOPMENT · สำหรับทดสอบระบบเท่านั้น · มิใช่การสำเร็จการศึกษาจริง" : "ต้นฉบับดิจิทัล · ตรวจสอบออนไลน์"}</div>
+    ${isTest ? `<div style="position: absolute; top: 13mm; right: 18mm; border: 2px dashed #b91c1c; background: rgba(254, 242, 242, 0.95); color: #b91c1c; padding: 4px 14px; font-weight: 700; font-size: 11pt; border-radius: 4px; text-align: center; line-height: 1.25; z-index: 10;">TEST / DEVELOPMENT<br><span style="font-size: 7.5pt; font-weight: 400;">สำหรับทดสอบระบบเท่านั้น · มิใช่การสำเร็จการศึกษาจริง</span></div>` : ""}
     <div class="frame"></div><div class="frame-inner"></div>
     <div class="content">
       <div class="kicker">${esc(c.document_type_snapshot)}</div>
@@ -114,12 +116,15 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
       <div class="course">${esc(coursePrefix)} ${esc(c.course_title_snapshot)}</div>
       <div class="meta">
         ผู้สอน ${esc(c.instructor_name_snapshot)}${esc(signerSuffix)}<br>
-        เวลาเรียนสะสมจริง ${esc(formatStudyDurationTh(c.total_actual_study_sec))} · คะแนนสอบ ${esc(Number(c.quiz_score_snapshot).toFixed(2))}%<br>
-        ออกให้เมื่อ ${esc(issued)}${expiry ? ` · ใช้ได้ถึง ${esc(expiry)}` : ""}
+        ${isTest
+          ? `เวลาเรียน: 0 นาที (ทดสอบระบบ) · ผลคะแนน: ทดสอบระบบ (TEST)<br>`
+          : `เวลาเรียนสะสมจริง ${esc(formatStudyDurationTh(c.total_actual_study_sec))} · คะแนนสอบ ${esc(Number(c.quiz_score_snapshot).toFixed(2))}%<br>`}
+        ออกให้เมื่อ ${esc(issued)}${expiry ? ` · ใช้ได้ถึง ${esc(expiry)}` : ""}${isTest ? " · เอกสารสำหรับทดสอบระบบ" : ""}
       </div>
     </div>
     <div class="qr"><img src="${qr}" alt=""><div>สแกนเพื่อตรวจสอบ</div><div>${esc(c.certificate_code)}</div></div>
     <div class="right">
+      ${isTest ? `<span style="color: #b91c1c; font-weight: 700; font-size: 9pt;">[TEST / DEVELOPMENT]</span><br>` : ""}
       ลายนิ้วมือภาพ<br><span class="digest">${esc(c.visual_digest || "-")}</span><br><br>
       เอกสารต้นฉบับดิจิทัล<br>ลงนาม Ed25519 · ตรวจสอบออนไลน์ได้
     </div>
