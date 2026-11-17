@@ -69,7 +69,18 @@ export function computeVisualDigest(recipientName: string, courseTitle: string, 
   return createHash("sha256").update(`${recipientName}\n${courseTitle}\n${code}`).digest("hex").slice(0, 12);
 }
 
-const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+export const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+export const DEVELOPER_TEST_EMAIL = "cha.chaloemwut@gmail.com";
+export const DEVELOPER_TEST_DOCUMENT_TYPE = "development_test";
+
+export function isDeveloperTestEmail(email: string | null | undefined): boolean {
+  return typeof email === "string" && email.trim().toLowerCase() === DEVELOPER_TEST_EMAIL;
+}
+
+export function isDeveloperTestCertificate(documentType: string | null | undefined): boolean {
+  return documentType === DEVELOPER_TEST_DOCUMENT_TYPE;
+}
 
 /** CERT-2026-XXXX-XXXX-XXXX : 60 bits (spec used 32 bits = easy to enumerate the public verify page) */
 export function generateCertificateCode(year: number): string {

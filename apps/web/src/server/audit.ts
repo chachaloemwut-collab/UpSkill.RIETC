@@ -42,6 +42,7 @@ export type AuditAction =
   | "announcement.published"
   | "announcement.broadcast"
   | "certificate.issued"
+  | "certificate.test_issued"
   | "certificate.revoked"
   | "learning.session_superseded"
   | "learning.cheat_flag"

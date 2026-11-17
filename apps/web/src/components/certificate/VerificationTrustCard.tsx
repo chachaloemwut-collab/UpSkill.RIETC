@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
+  AlertTriangle,
   BadgeCheck,
   Check,
   Clock,
@@ -38,6 +39,8 @@ interface VerificationData {
   expiresAt?: string;
   revokedAt?: string;
   revokedReason?: string;
+  isDevelopmentTest?: boolean;
+  testNotice?: string;
 }
 
 export function DigitalSeal({ valid }: { valid: boolean }) {
@@ -165,6 +168,19 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
   return (
     <div className="mx-auto max-w-2xl pt-2 sm:pt-6">
       <Card className="overflow-hidden border-border/80 shadow-md">
+        {data.isDevelopmentTest && (
+          <div className="border-b-2 border-dashed border-amber-500/80 bg-amber-500/15 p-4 text-amber-900 dark:text-amber-200">
+            <div className="flex items-center gap-2 font-bold text-sm sm:text-base text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>[TEST / DEVELOPMENT] เอกสารสำหรับทดสอบระบบ</span>
+            </div>
+            <p className="mt-1 text-xs sm:text-sm text-amber-800/90 dark:text-amber-200/90">
+              {data.testNotice ??
+                "ใบประกาศนียบัตรฉบับนี้ออกเพื่อการทดสอบทางเทคนิคของระบบ UpSkill.RIETC สำหรับบัญชีผู้พัฒนา โดยไม่มีผลรับรองการเรียนหรือการสอบผ่านจริง"}
+            </p>
+          </div>
+        )}
+
         {/* Banner with Digital Seal */}
         <div
           className={cn(
@@ -182,6 +198,11 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
                 <Badge variant={valid ? "success" : expired ? "warning" : "destructive"} className="text-xs font-semibold">
                   {valid ? "✓ ตรวจสอบแล้ว ถูกต้อง 100%" : expired ? "หมดอายุการรับรอง" : "ถูกเพิกถอน"}
                 </Badge>
+                {data.isDevelopmentTest && (
+                  <Badge variant="warning" className="text-xs font-semibold">
+                    TEST / DEVELOPMENT
+                  </Badge>
+                )}
                 {valid && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-mono font-medium text-emerald-700 dark:text-emerald-300">
                     Ed25519 Verified

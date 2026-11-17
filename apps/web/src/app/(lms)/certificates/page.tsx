@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Award, ExternalLink } from "lucide-react";
+import { isDeveloperTestEmail } from "@upskill/core";
 import { Badge, Card, EmptyState, buttonClass } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { DownloadCertificateButton } from "@/components/course/CertificatePanel";
+import { DeveloperTestCertificateButton } from "@/components/certificate/DeveloperTestCertificateButton";
 import { formatDateTh } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { learnerOverview } from "@/server/courses/courses.service";
@@ -14,6 +16,7 @@ export const metadata: Metadata = { title: "ใบรับรองของฉ
 export default async function MyCertificatesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const isDev = isDeveloperTestEmail(user.email);
   const { enrollments } = await learnerOverview(user.id);
   const certs = enrollments.filter((e) => e.certificate_code);
   const claimable = enrollments.filter((e) => e.status === "completed" && !e.certificate_code);
@@ -21,6 +24,7 @@ export default async function MyCertificatesPage() {
   return (
     <>
       <PageHeader title="ใบรับรองของฉัน" description="ใบรับรองทุกใบลงนามดิจิทัล ตรวจสอบได้ผ่านหน้าสาธารณะและ QR Code" />
+      {isDev && certs.length === 0 && <DeveloperTestCertificateButton />}
       {claimable.length > 0 && (
         <Card className="mb-6 flex flex-wrap items-center gap-3 border-success/30 p-4">
           <Award className="h-5 w-5 text-success" />
