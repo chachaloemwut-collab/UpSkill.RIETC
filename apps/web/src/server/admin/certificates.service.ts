@@ -42,7 +42,8 @@ export async function listCertificatesAdmin(input: {
   let query = db
     .selectFrom("certificates as cert")
     .innerJoin("users as u", "u.id", "cert.user_id")
-    .innerJoin("courses as c", "c.id", "cert.course_id")
+    // A06: program-level certificates have course_id = null; use leftJoin so they appear in the list
+    .leftJoin("courses as c", "c.id", "cert.course_id")
     .select([
       "cert.id",
       "cert.certificate_code",

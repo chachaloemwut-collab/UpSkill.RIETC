@@ -48,8 +48,8 @@ export interface CertificateRow {
   document_type_snapshot: string;
   user_id: string;
   user_email: string;
-  course_id: string;
-  course_slug: string;
+  course_id: string | null;    // null for program-level certificates
+  course_slug: string | null;
   status: "valid" | "expired" | "revoked";
 }
 
