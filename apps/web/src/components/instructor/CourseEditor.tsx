@@ -58,6 +58,7 @@ import {
 import { CheckpointEditorDialog } from "./CheckpointEditorDialog";
 import { QuestionEditDialog, type QuestionData } from "./QuestionEditDialog";
 import { CourseLearnersRoster } from "./CourseLearnersRoster";
+import { LessonDetailsForm, UnitBadge, UnitsManager, type EditorUnit } from "./UnitsManager";
 
 export interface EditorData {
   course: {
@@ -85,7 +86,10 @@ export interface EditorData {
     credential_achievement_en: string | null;
     credential_background_url: string | null;
     credential_text_align: string;
+    navigation_mode: string;
+    completion_rule: string;
   };
+  units: EditorUnit[];
   lessons: Array<{
     id: string;
     sequence_order: number;
@@ -98,6 +102,9 @@ export interface EditorData {
     checkpoint_options: unknown | null;
     checkpoint_correct_index: number | null;
     checkpoint_at_sec: number | null;
+    unit_id: string | null;
+    description: string | null;
+    learner_note: string | null;
   }>;
   questions: Array<{
     id: string;
@@ -140,8 +147,10 @@ function useAction() {
 }
 
 export function CourseEditor({ data }: { data: EditorData }) {
-  const { course, lessons, questions, publishRules } = data;
+  const { course, lessons, questions, publishRules, units } = data;
   const postQuestions = questions.filter((question) => question.assessment_type === "post");
+  const lessonQuestions = questions.filter((question) => question.assessment_type === "lesson");
+  const averageRule = course.completion_rule === "lesson_tests_average";
   const base = `/api/instructor/courses/${course.id}`;
   const checks = [
     { ok: lessons.length > 0, label: "มีบทเรียนอย่างน้อย 1 บท" },
@@ -149,10 +158,15 @@ export function CourseEditor({ data }: { data: EditorData }) {
       ok: course.total_duration_sec >= publishRules.minTotalDurationSec,
       label: `ความยาวรวม ≥ ${Math.round(publishRules.minTotalDurationSec / 60)} นาที (ตอนนี้ ${formatDuration(course.total_duration_sec)})`,
     },
-    {
-      ok: postQuestions.length >= publishRules.minQuestions,
-      label: `Post-test ≥ ${publishRules.minQuestions} ข้อ (ตอนนี้ ${postQuestions.length})`,
-    },
+    averageRule
+      ? {
+          ok: lessonQuestions.length >= publishRules.minQuestions,
+          label: `ข้อสอบท้ายคลิปรวม ≥ ${publishRules.minQuestions} ข้อ (ตอนนี้ ${lessonQuestions.length})`,
+        }
+      : {
+          ok: postQuestions.length >= publishRules.minQuestions,
+          label: `Post-test ≥ ${publishRules.minQuestions} ข้อ (ตอนนี้ ${postQuestions.length})`,
+        },
     {
       ok: lessons.length > 0 && lessons.every((l) => l.video_status === "active"),
       label: "วิดีโอทุกบทใช้งานได้",
@@ -189,8 +203,9 @@ export function CourseEditor({ data }: { data: EditorData }) {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="lessons" className="mt-4">
-          <LessonsSection base={base} lessons={lessons} devManualDuration={data.devManualDuration} />
+        <TabsContent value="lessons" className="mt-4 grid gap-5">
+          <UnitsManager base={base} units={units} lessons={lessons} />
+          <LessonsSection base={base} lessons={lessons} units={units} devManualDuration={data.devManualDuration} />
         </TabsContent>
 
         <TabsContent value="quiz" className="mt-4">
@@ -329,6 +344,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
           max_quiz_attempts_per_day: Number(f.get("max_quiz_attempts_per_day")),
           quiz_time_limit_sec: Number(f.get("quiz_time_limit_min")) * 60,
           is_sequential_locked: f.get("is_sequential_locked") === "on",
+          navigation_mode: f.get("navigation_mode"),
+          completion_rule: f.get("completion_rule"),
           credential_enabled: f.get("credential_enabled") === "on",
           credential_type: f.get("credential_type"),
           credential_name_th: f.get("credential_name_th"),
@@ -416,10 +433,25 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
             </Field>
           </div>
 
+          <div className="grid items-start gap-4 sm:grid-cols-2">
+            <Field label="การดูวิดีโอ" hint="เลือกได้ว่าผู้เรียนเลื่อนดูช่วงไหนก่อนได้หรือไม่">
+              <Select name="navigation_mode" defaultValue={course.navigation_mode}>
+                <option value="free_complete">เลื่อนดูได้อิสระ แต่ต้องดูครบทุกช่วง</option>
+                <option value="linear">ดูต่อเนื่องตามลำดับ (กรอข้ามไปข้างหน้าไม่ได้)</option>
+              </Select>
+            </Field>
+            <Field label="เกณฑ์ผ่านหลักสูตร" hint="คะแนนผ่านใช้ค่า ‘คะแนนสอบที่ผ่าน (%)’ ด้านบน">
+              <Select name="completion_rule" defaultValue={course.completion_rule}>
+                <option value="post_test">สอบ Post-test ท้ายหลักสูตรผ่าน</option>
+                <option value="lesson_tests_average">คะแนนแบบทดสอบท้ายคลิปรวมกัน (ไม่มี Post-test)</option>
+              </Select>
+            </Field>
+          </div>
+
           <Checkbox
             name="is_sequential_locked"
             defaultChecked={course.is_sequential_locked}
-            label="บังคับเรียนตามลำดับบท (ห้ามข้ามบทเรียน)"
+            label="บังคับเรียนตามลำดับคลิป (คลิปถัดไปเปิดเมื่อเรียนคลิปก่อนหน้าครบ)"
           />
 
           {/* Certificate Configuration */}
@@ -621,14 +653,17 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
 function LessonsSection({
   base,
   lessons,
+  units,
   devManualDuration,
 }: {
   base: string;
   lessons: EditorData["lessons"];
+  units: EditorUnit[];
   devManualDuration: boolean;
 }) {
   const a = useAction();
   const [replacing, setReplacing] = useState<string | null>(null);
+  const [detailsFor, setDetailsFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<EditorData["lessons"][number] | null>(null);
 
   // Checkpoint Dialog state
@@ -761,6 +796,12 @@ function LessonsSection({
                             <CircleHelp className="h-3 w-3" /> มีคำถาม {formatDuration(l.checkpoint_at_sec ?? 0)}
                           </Badge>
                         )}
+                        <UnitBadge unit={units.find((u) => u.id === l.unit_id)} index={units.findIndex((u) => u.id === l.unit_id)} />
+                        {l.learner_note && (
+                          <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0">
+                            <TriangleAlert className="h-3 w-3" /> มีข้อควรระวัง
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {formatDuration(l.duration_sec)} · youtu.be/{l.youtube_video_id}
@@ -794,6 +835,16 @@ function LessonsSection({
                           aria-label="เลื่อนลง"
                         >
                           <ArrowDown className="h-4 w-4" />
+                        </Button>
+                      </Tooltip>
+                      <Tooltip content="แก้ไขชื่อ หน่วย คำอธิบาย และข้อควรระวัง">
+                        <Button
+                          variant={detailsFor === l.id ? "secondary" : "ghost"}
+                          size="icon"
+                          onClick={() => setDetailsFor(detailsFor === l.id ? null : l.id)}
+                          aria-label="แก้ไขรายละเอียดคลิป"
+                        >
+                          <Pencil className="h-4 w-4" />
                         </Button>
                       </Tooltip>
                       <Tooltip content="เปลี่ยนวิดีโอ YouTube">
@@ -843,6 +894,10 @@ function LessonsSection({
                       </Tooltip>
                     </div>
                   </div>
+
+                  {detailsFor === l.id && (
+                    <LessonDetailsForm base={base} lesson={l} units={units} onDone={() => setDetailsFor(null)} />
+                  )}
 
                   {replacing === l.id && (
                     <form

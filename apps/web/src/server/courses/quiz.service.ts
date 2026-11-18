@@ -1,6 +1,7 @@
 /** Multi-stage assessment flow: pre-test, per-lesson checks, and post-test. */
 import "server-only";
 import {
+  type CompletionRule,
   buildAttemptSnapshot,
   gradeAttempt,
   toClientQuestions,
@@ -11,6 +12,7 @@ import { sql, type Database, type Tx } from "@upskill/db";
 import { ctx } from "../context";
 import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
+import { asCompletionRule, lessonTestsSummaryFor, tryCompleteByLessonTests } from "./completion.service";
 
 const SUBMIT_GRACE_MS = 30_000;
 export type AssessmentKind = "pre" | "lesson" | "post";
@@ -35,7 +37,7 @@ async function loadEnrollment(userId: string, courseId: string) {
     .innerJoin("users as u", "u.id", "e.user_id")
     .select([
       "e.id", "e.status", "c.passing_quiz_score", "c.max_quiz_attempts_per_day", "c.quiz_time_limit_sec",
-      "c.visibility", "c.title", "c.slug", "u.email", "u.legal_name_locked_at",
+      "c.visibility", "c.title", "c.slug", "c.completion_rule", "u.email", "u.legal_name_locked_at",
     ])
     .where("e.user_id", "=", userId)
     .where("e.course_id", "=", courseId)
@@ -57,7 +59,7 @@ async function requirePreTestIfConfigured(db: Database | Tx, enrollmentId: strin
   if (state.questions > 0 && state.attempts === 0) throw new HttpError(403, "PRE_TEST_REQUIRED");
 }
 
-async function assertAssessmentGate(db: Database, enrollmentId: string, courseId: string, target: AssessmentTarget, lessonId: string | null) {
+async function assertAssessmentGate(db: Database, enrollmentId: string, courseId: string, target: AssessmentTarget, lessonId: string | null, rule: CompletionRule) {
   if (target.kind === "pre") {
     const done = await db
       .selectFrom("quiz_attempts")
@@ -71,6 +73,10 @@ async function assertAssessmentGate(db: Database, enrollmentId: string, courseId
   }
 
   await requirePreTestIfConfigured(db, enrollmentId, courseId);
+
+  if (target.kind === "post" && rule === "lesson_tests_average") {
+    throw new HttpError(409, "POST_TEST_NOT_USED", "หลักสูตรนี้วัดผลจากแบบทดสอบท้ายคลิปรวมกัน ไม่มีแบบทดสอบท้ายหลักสูตร");
+  }
 
   if (target.kind === "lesson") {
     const lesson = await db
@@ -108,7 +114,7 @@ export async function startAssessment(userId: string, courseId: string, target: 
   const lessonId = targetLesson(target);
   const e = await loadEnrollment(userId, courseId);
   if (e.status === "completed") throw new HttpError(409, "ALREADY_PASSED");
-  await assertAssessmentGate(db, e.id, courseId, target, lessonId);
+  await assertAssessmentGate(db, e.id, courseId, target, lessonId, asCompletionRule(e.completion_rule));
 
   return db.transaction().execute(async (trx) => {
     await trx.selectFrom("enrollments").select("id").where("id", "=", e.id).forUpdate().execute();
@@ -196,7 +202,10 @@ export async function submitAssessment(userId: string, courseId: string, attempt
       .where("id", "=", a.id)
       .execute();
 
+    const rule = asCompletionRule(e.completion_rule);
+    let courseCompleted = false;
     if (kind === "post" && passed) {
+      courseCompleted = true;
       await trx.updateTable("enrollments").set({ status: "completed", completed_at: new Date() }).where("id", "=", e.id).where("status", "=", "in_progress").execute();
     }
 
@@ -228,6 +237,8 @@ export async function submitAssessment(userId: string, courseId: string, attempt
         },
         { userId, deduplicationKey: `assessment-not-passed:${a.id}` },
       );
+    } else if (kind === "lesson" && rule === "lesson_tests_average") {
+      courseCompleted = await tryCompleteByLessonTests(trx, e.id);
     } else if (kind === "lesson" && passed) {
       const readiness = await trx
         .selectFrom("enrollments as enrollment")
@@ -248,7 +259,8 @@ export async function submitAssessment(userId: string, courseId: string, attempt
         );
       }
     }
-    return { scorePercentage, passed, late, passingScore: e.passing_quiz_score, kind, focusEventCount: a.focus_event_count };
+    const lessonTests = kind === "lesson" && rule === "lesson_tests_average" ? await lessonTestsSummaryFor(trx, e.id, courseId, e.passing_quiz_score) : null;
+    return { scorePercentage, passed, late, passingScore: e.passing_quiz_score, kind, focusEventCount: a.focus_event_count, courseCompleted, lessonTests };
   });
 }
 

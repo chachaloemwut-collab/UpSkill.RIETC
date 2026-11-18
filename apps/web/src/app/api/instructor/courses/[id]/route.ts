@@ -23,6 +23,8 @@ const Body = z.strictObject({
   credential_signer_title: z.string().trim().max(255).nullable().optional(),
   credential_achievement_th: z.string().trim().min(1).max(255).optional(),
   credential_achievement_en: z.string().trim().max(255).nullable().optional(),
+  navigation_mode: z.enum(["linear", "free_complete"]).optional(),
+  completion_rule: z.enum(["post_test", "lesson_tests_average"]).optional(),
 });
 
 export const PATCH = route<typeof Body, { id: string }>({ auth: "required", roles: ["instructor", "admin"], body: Body }, async ({ params, body, user }) => {

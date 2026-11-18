@@ -39,6 +39,11 @@ export default async function QuizPage({ params }: { params: Promise<{ slug: str
             ไปหน้าใบรับรอง
           </Link>
         </div>
+      ) : data.completionRule === "lesson_tests_average" ? (
+        <div className="grid gap-4">
+          <Alert variant="default" title="หลักสูตรนี้ไม่มีแบบทดสอบท้ายหลักสูตร">ผลการเรียนคิดจากคะแนนแบบทดสอบท้ายคลิปรวมกัน</Alert>
+          <Link href={`/courses/${slug}`} className={buttonClass("outline", "md", "justify-self-start")}>กลับไปหน้าหลักสูตร</Link>
+        </div>
       ) : !data.postTest.configured ? (
         <div className="grid gap-4">
           <Alert variant="warning" title="ยังไม่ได้ตั้งค่า Post-test">กรุณาติดต่อผู้สอน</Alert>
@@ -46,7 +51,7 @@ export default async function QuizPage({ params }: { params: Promise<{ slug: str
         </div>
       ) : !data.readyForPostTest ? (
         <div className="grid gap-4">
-          <Alert variant="warning" title="ยังทำ Post-test ไม่ได้">กรุณาเรียนและผ่านแบบทดสอบประจำบทให้ครบก่อน</Alert>
+          <Alert variant="warning" title="ยังทำ Post-test ไม่ได้">กรุณาเรียนและผ่านแบบทดสอบท้ายคลิปให้ครบก่อน</Alert>
           <Link href={`/courses/${slug}`} className={buttonClass("outline", "md", "justify-self-start")}>
             กลับไปหน้าหลักสูตร
           </Link>

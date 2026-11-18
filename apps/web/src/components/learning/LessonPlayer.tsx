@@ -3,21 +3,25 @@
  * Custom YouTube player (spec 5.2 frontend)
  *
  * Important: everything here is "UX guidance", not "security". Users can open DevTools and bypass it all.
- * The real security lives in the server's evaluateHeartbeat(), which bounds credit by wall-clock time
- * and credits only content contiguous with the frontier.
+ * The real security lives in the server's evaluateHeartbeat(), which bounds credit by wall-clock time.
+ * - linear mode: credit only content contiguous with the furthest point watched (no skipping ahead)
+ * - free_complete mode: seek anywhere; every part must still be watched in real time to complete
  */
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Maximize, Minimize, CircleHelp, HelpCircle, Tv, RotateCcw, Share2, Lock } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowRight, CheckCircle2, Circle, CircleHelp, FastForward, HelpCircle, Lock, Maximize, Minimize, RotateCcw, Share2, Snail, Tv, Volume2, VolumeX,
+} from "lucide-react";
 import { PlayPauseIcon, useToast } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { HEARTBEAT } from "@upskill/core/heartbeat";
+import { HEARTBEAT, nextUnwatchedSec, totalChunksFor, unwatchedRanges, watchedRanges, type NavigationMode } from "@upskill/core/heartbeat";
 import { REPORTABLE_PLAYER_ERRORS } from "@upskill/core/youtube";
 import { loadYouTubeIframeApi, YT_STATE, type YTPlayer } from "./youtube-iframe-api";
 
 type Status =
   | { kind: "idle" }
-  | { kind: "recording"; watchedPercent: number; minPercent: number }
+  | { kind: "recording" }
   | { kind: "paused" }
   | { kind: "focus-paused" }
   | { kind: "superseded" }
@@ -33,15 +37,28 @@ interface CheckpointState {
   attemptsLeft: number;
 }
 
+export interface PlayerAction {
+  href: string;
+  label: string;
+}
+
 interface Props {
   lessonId: string;
   videoId: string;
   durationSec: number;
   initialMaxWatchedSec: number;
+  initialWatchedChunks: number[];
+  /** Where the learner stopped last time (resume point). */
+  initialPositionSec: number;
   minWatchPercentage: number;
+  navigationMode: NavigationMode;
   initiallyCompleted: boolean;
   checkpoint: { question: string; options: string[]; atSec: number } | null;
   checkpointState?: CheckpointState | null;
+  /** End-of-lesson test status for the checklist (null = this lesson has no test). */
+  lessonTest: { done: boolean; bestScore: number | null; href: string; available: boolean } | null;
+  /** What to do next once the video is complete (shown over the player at the end). */
+  nextAction: PlayerAction | null;
   isPublic?: boolean;
 }
 
@@ -55,8 +72,20 @@ async function postJson(url: string, body?: unknown): Promise<Response> {
   });
 }
 
-export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatchedSec, minWatchPercentage, initiallyCompleted, checkpoint, checkpointState, isPublic = true }: Props) {
+const clock = (sec: number) => {
+  const s = Math.max(0, Math.floor(sec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = String(s % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${r}` : `${m}:${r}`;
+};
+
+export function LessonPlayer({
+  lessonId, videoId, durationSec, initialMaxWatchedSec, initialWatchedChunks, initialPositionSec, minWatchPercentage, navigationMode,
+  initiallyCompleted, checkpoint, checkpointState, lessonTest, nextAction, isPublic = true,
+}: Props) {
   const router = useRouter();
+  const free = navigationMode === "free_complete";
   const completedRef = useRef(initiallyCompleted);
   const hostRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,12 +98,21 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
   const lastFocusEventAtRef = useRef(0);
   const checkpointPassedRef = useRef(checkpointState?.passed ?? false);
   const checkpointOpenRef = useRef(false);
+  const prevTimeRef = useRef(0);
+  // Resume where the learner stopped (unless the lesson is done or they were at the very start/end)
+  const resumeAt = !initiallyCompleted && initialPositionSec > 5 && initialPositionSec < durationSec - 5 ? Math.floor(initialPositionSec) : 0;
 
   const [status, setStatus] = useState<Status>(initiallyCompleted ? { kind: "completed" } : { kind: "idle" });
-  const [position, setPosition] = useState(0);
+  const [completed, setCompleted] = useState(initiallyCompleted);
+  const [position, setPosition] = useState(resumeAt);
   const [maxWatched, setMaxWatched] = useState(initialMaxWatchedSec);
+  const [watchedChunks, setWatchedChunks] = useState<number[]>(initialWatchedChunks);
+  const [showResume, setShowResume] = useState(resumeAt > 0);
   const toast = useToast();
   const [playing, setPlaying] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [slow, setSlow] = useState(false);
   const [pseudoFullscreen, setPseudoFullscreen] = useState(false);
   const [theaterMode, setTheaterMode] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -82,21 +120,45 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
   const [hoverX, setHoverX] = useState<number>(0);
   const [ready, setReady] = useState(false);
   const [checkpointOpen, setCheckpointOpen] = useState(false);
+  const [checkpointPassed, setCheckpointPassed] = useState(checkpointState?.passed ?? false);
   const [checkpointError, setCheckpointError] = useState<string | null>(null);
   const [checkpointBusy, setCheckpointBusy] = useState(false);
   const [checkpointScore, setCheckpointScore] = useState<number | null>(checkpointState?.score ?? null);
   const [checkpointAttemptsLeft, setCheckpointAttemptsLeft] = useState(checkpointState?.attemptsLeft ?? 3);
   const [checkpointLocked, setCheckpointLocked] = useState(checkpointState?.locked ?? false);
+  const [rewatch, setRewatch] = useState<{ fromSec: number; toSec: number } | null>(null);
+
+  const totalChunks = totalChunksFor(durationSec);
+  const watchedCount = Math.min(totalChunks, watchedChunks.length);
+  const watchedPercent = totalChunks ? Math.floor((watchedCount / totalChunks) * 100) : 0;
+  const gaps = useMemo(() => unwatchedRanges(watchedChunks, durationSec), [watchedChunks, durationSec]);
+  const seen = useMemo(() => watchedRanges(watchedChunks, durationSec), [watchedChunks, durationSec]);
+
+  const applyCoverage = useCallback((chunks: number[] | undefined, max: number | undefined) => {
+    if (Array.isArray(chunks)) setWatchedChunks(chunks);
+    if (typeof max === "number") {
+      maxWatchedRef.current = Math.max(maxWatchedRef.current, max);
+      setMaxWatched(maxWatchedRef.current);
+    }
+  }, []);
 
   const startSession = useCallback(async () => {
     const res = await postJson(`/api/learning/lessons/${lessonId}/start-session`);
     if (!res.ok) throw new Error(`start-session ${res.status}`);
-    const data = (await res.json()) as { streamToken: string; maxWatchedSec: number };
+    const data = (await res.json()) as { streamToken: string; maxWatchedSec: number; watchedChunks?: number[] };
     tokenRef.current = data.streamToken;
     seqRef.current = 0;
-    maxWatchedRef.current = Math.max(maxWatchedRef.current, data.maxWatchedSec);
-    setMaxWatched(maxWatchedRef.current);
-  }, [lessonId]);
+    applyCoverage(data.watchedChunks, data.maxWatchedSec);
+  }, [lessonId, applyCoverage]);
+
+  const markCompleted = useCallback(() => {
+    setStatus({ kind: "completed" });
+    setCompleted(true);
+    if (!completedRef.current) {
+      completedRef.current = true;
+      router.refresh(); // re-render the server parts (lesson list, next step)
+    }
+  }, [router]);
 
   /** Sends the latest position only (no backlog queue needed: the server credits by range, bounded by the grace window) */
   const sendHeartbeat = useCallback(async () => {
@@ -120,24 +182,14 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
         return;
       }
       if (!res.ok) return; // 429 etc. -> the next tick carries the latest state
-      const data = (await res.json()) as { maxWatchedSec?: number; watchedPercent?: number; isCompleted?: boolean };
-      if (typeof data.maxWatchedSec === "number") {
-        maxWatchedRef.current = data.maxWatchedSec;
-        setMaxWatched(data.maxWatchedSec);
-      }
-      setStatus(
-        data.isCompleted
-          ? { kind: "completed" }
-          : { kind: "recording", watchedPercent: data.watchedPercent ?? 0, minPercent: minWatchPercentage },
-      );
-      if (data.isCompleted && !completedRef.current) {
-        completedRef.current = true;
-        router.refresh(); // re-render the server parts (lesson list, "next lesson" button)
-      }
+      const data = (await res.json()) as { maxWatchedSec?: number; watchedChunks?: number[]; isCompleted?: boolean };
+      applyCoverage(data.watchedChunks, data.maxWatchedSec);
+      if (data.isCompleted) markCompleted();
+      else setStatus((s) => (s.kind === "offline" || s.kind === "idle" ? { kind: p.getPlayerState() === YT_STATE.PLAYING ? "recording" : "paused" } : s));
     } catch {
       setStatus({ kind: "offline" }); // network dropped: the next ping catches up within GRACE_SEC
     }
-  }, [lessonId, minWatchPercentage, router]);
+  }, [lessonId, applyCoverage, markCompleted]);
 
   const reportFocusLoss = useCallback((eventType: "hidden" | "pagehide") => {
     const player = playerRef.current;
@@ -173,17 +225,20 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
       created = new YT.Player(hostRef.current, {
         host: "https://www.youtube-nocookie.com",
         videoId,
-        playerVars: { controls: 0, disablekb: 1, rel: 0, playsinline: 1, fs: 0, iv_load_policy: 3, origin: window.location.origin },
+        playerVars: { controls: 0, disablekb: 1, rel: 0, playsinline: 1, fs: 0, iv_load_policy: 3, origin: window.location.origin, ...(resumeAt > 0 ? { start: resumeAt } : {}) },
         events: {
           onReady: (e) => {
             if (disposed) return;
             playerRef.current = e.target;
+            prevTimeRef.current = resumeAt;
             setReady(true);
           },
           onStateChange: async (e) => {
             setPlaying(e.data === YT_STATE.PLAYING);
             if (e.data === YT_STATE.PLAYING) {
               focusPauseRef.current = false;
+              setEnded(false);
+              setShowResume(false);
               if (!tokenRef.current) {
                 try {
                   await startSession();
@@ -193,17 +248,19 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
                   return;
                 }
               }
-              setStatus((s) => (s.kind === "recording" ? s : { kind: "recording", watchedPercent: 0, minPercent: minWatchPercentage }));
+              setStatus((s) => (s.kind === "completed" ? s : { kind: "recording" }));
             } else if (e.data === YT_STATE.PAUSED) {
-              setStatus({ kind: focusPauseRef.current ? "focus-paused" : "paused" });
+              setStatus((s) => (s.kind === "completed" || s.kind === "superseded" ? s : { kind: focusPauseRef.current ? "focus-paused" : "paused" }));
               void sendHeartbeat();
             } else if (e.data === YT_STATE.ENDED) {
+              setEnded(true);
               // Wait past MIN_INTERVAL so the final ping isn't ignored as TOO_FREQUENT
               setTimeout(() => void sendHeartbeat(), HEARTBEAT.MIN_INTERVAL_SEC * 1000 + 100);
             }
           },
           onPlaybackRateChange: (e) => {
-            if (e.data !== 1) e.target.setPlaybackRate(1);
+            // Slower than normal is fine (time still counts); faster is not
+            if (e.data > 1) e.target.setPlaybackRate(1);
           },
           onError: (e) => {
             if (REPORTABLE_PLAYER_ERRORS.has(e.data)) {
@@ -219,7 +276,9 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
       created?.destroy();
       playerRef.current = null;
     };
-  }, [videoId, lessonId, startSession, sendHeartbeat, minWatchPercentage, toast]);
+    // resumeAt is fixed for the life of the page
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoId, lessonId, startSession, sendHeartbeat, toast]);
 
   // Heartbeat every 10s while PLAYING + update the progress bar
   useEffect(() => {
@@ -230,9 +289,13 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
       const p = playerRef.current;
       if (!p) return;
       const t = p.getCurrentTime();
+      const prev = prevTimeRef.current;
+      prevTimeRef.current = t;
       setPosition(t);
-      // In-video checkpoint: pause and ask once the playhead reaches it (until answered correctly).
-      if (checkpoint && !checkpointPassedRef.current && !checkpointOpenRef.current && t >= checkpoint.atSec) {
+      // In-video checkpoint: ask when playback runs through its position (a seek past it doesn't count —
+      // that part stays unwatched, so the learner meets the question when they come back to watch it).
+      const crossed = prev < (checkpoint?.atSec ?? 0) && t >= (checkpoint?.atSec ?? 0) && t - prev < 3;
+      if (checkpoint && !checkpointPassedRef.current && !checkpointOpenRef.current && crossed && p.getPlayerState() === YT_STATE.PLAYING) {
         checkpointOpenRef.current = true;
         p.pauseVideo();
         setPlaying(false);
@@ -260,39 +323,65 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
     };
   }, [reportFocusLoss]);
 
-  const seek = useCallback((targetSec: number) => {
+  const seek = useCallback((targetSec: number, play = false) => {
     const p = playerRef.current;
     if (!p) return;
-    if (targetSec > maxWatchedRef.current + HEARTBEAT.POSITION_TOLERANCE_SEC) {
-      toast({ title: "ไม่สามารถกรอข้ามเนื้อหาที่ยังไม่เคยรับชมได้", description: "กรอย้อนกลับไปดูส่วนที่ดูแล้วได้ตามต้องการ" });
+    const target = Math.max(0, Math.min(durationSec - 1, targetSec));
+    if (!free && target > maxWatchedRef.current + HEARTBEAT.POSITION_TOLERANCE_SEC) {
+      toast({ title: "หลักสูตรนี้ต้องเรียนต่อเนื่องตามลำดับ", description: "กรอย้อนกลับไปดูส่วนที่ดูแล้วได้ตามต้องการ" });
       return;
     }
-    p.seekTo(targetSec, true);
-  }, [toast]);
+    prevTimeRef.current = target;
+    p.seekTo(target, true);
+    setPosition(target);
+    setEnded(false);
+    if (play) p.playVideo();
+  }, [toast, free, durationSec]);
+
+  const jumpToUnwatched = useCallback(() => {
+    const target = nextUnwatchedSec(watchedChunks, durationSec, playerRef.current?.getCurrentTime() ?? position);
+    if (target === null) {
+      toast({ title: "ดูครบทุกช่วงแล้ว", variant: "success" });
+      return;
+    }
+    seek(target, true);
+  }, [watchedChunks, durationSec, position, seek, toast]);
+
+  const takeOver = () => {
+    tokenRef.current = null;
+    setStatus({ kind: "idle" });
+    playerRef.current?.playVideo(); // PLAYING starts a fresh session, which supersedes the other window
+  };
 
   const submitCheckpoint = async (optionIndex: number) => {
     setCheckpointBusy(true);
     setCheckpointError(null);
     try {
       const res = await postJson(`/api/learning/lessons/${lessonId}/checkpoint`, { option_index: optionIndex });
-      const data = (await res.json()) as { correct?: boolean; alreadyPassed?: boolean; score?: number | null; attemptsLeft?: number; locked?: boolean };
+      const data = (await res.json()) as {
+        correct?: boolean; alreadyPassed?: boolean; score?: number | null; attemptsLeft?: number; locked?: boolean;
+        rewatch?: { fromSec: number; toSec: number }; lessonCompleted?: boolean;
+      };
       if (data.correct) {
         if (data.score !== null && data.score !== undefined) setCheckpointScore(data.score);
         checkpointPassedRef.current = true;
         checkpointOpenRef.current = false;
+        setCheckpointPassed(true);
         setCheckpointOpen(false);
         toast({ title: data.alreadyPassed ? "ผ่านคำถามนี้แล้ว" : `ตอบถูก! ได้ ${data.score ?? 10} คะแนน`, variant: "success" });
+        if (data.lessonCompleted) markCompleted();
         playerRef.current?.playVideo();
         setPlaying(true);
       } else if (data.locked) {
         setCheckpointScore(0);
         setCheckpointAttemptsLeft(0);
         setCheckpointLocked(true);
+        setRewatch(data.rewatch ?? null);
         setCheckpointError(null);
       } else {
         if (data.score !== null && data.score !== undefined) setCheckpointScore(data.score);
         if (data.attemptsLeft !== undefined) setCheckpointAttemptsLeft(data.attemptsLeft);
-        setCheckpointError(`คำตอบไม่ถูกต้อง — คะแนนลดเหลือ ${data.score ?? 0} (เหลือโอกาส ${data.attemptsLeft ?? 0} ครั้ง)`);
+        setCheckpointError(`คำตอบยังไม่ถูก — คะแนนเหลือ ${data.score ?? 0} (ตอบได้อีก ${data.attemptsLeft ?? 0} ครั้ง)`);
       }
     } catch {
       setCheckpointError("ไม่สามารถตรวจคำตอบได้ กรุณาลองใหม่");
@@ -321,32 +410,58 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
     const next = !theaterMode;
     setTheaterMode(next);
     const root = document.getElementById("lesson-layout-container");
-    if (root) {
-      root.dataset.theater = next ? "true" : "false";
-    }
+    if (root) root.dataset.theater = next ? "true" : "false";
   };
 
-  // Keyboard Shortcuts HUD (UI-only, routing through existing seek and player methods)
+  const toggleMute = () => {
+    const p = playerRef.current;
+    if (!p) return;
+    if (p.isMuted()) p.unMute();
+    else p.mute();
+    setMuted(!muted);
+  };
+
+  const toggleSpeed = () => {
+    const p = playerRef.current;
+    if (!p) return;
+    const next = !slow;
+    p.setPlaybackRate(next ? 0.75 : 1);
+    setSlow(next);
+  };
+
+  const togglePlay = () => {
+    const p = playerRef.current;
+    if (!p || !ready) return;
+    if (p.getPlayerState() === YT_STATE.PLAYING) p.pauseVideo();
+    else p.playVideo();
+  };
+
+  // Keyboard shortcuts (UI-only, routed through the same seek/player methods)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable) return;
+      if (tag === "input" || tag === "textarea" || tag === "select" || (e.target as HTMLElement)?.isContentEditable) return;
       const p = playerRef.current;
-      if (!p || !ready) return;
-
-      if (e.code === "Space" || e.key.toLowerCase() === "k") {
+      if (!p || !ready || checkpointOpenRef.current) return;
+      const key = e.key.toLowerCase();
+      if (e.code === "Space" || key === "k") {
         e.preventDefault();
-        if (p.getPlayerState() === YT_STATE.PLAYING) p.pauseVideo();
-        else p.playVideo();
-      } else if (e.key.toLowerCase() === "f") {
+        togglePlay();
+      } else if (key === "f") {
         e.preventDefault();
         void toggleFullscreen();
-      } else if (e.key.toLowerCase() === "j" || e.key === "ArrowLeft") {
+      } else if (key === "m") {
         e.preventDefault();
-        seek(Math.max(0, p.getCurrentTime() - 10));
-      } else if (e.key.toLowerCase() === "l" || e.key === "ArrowRight") {
+        toggleMute();
+      } else if (key === "j" || e.key === "ArrowLeft") {
         e.preventDefault();
-        seek(Math.min(durationSec, p.getCurrentTime() + 10));
+        seek(p.getCurrentTime() - 10);
+      } else if (key === "l" || e.key === "ArrowRight") {
+        e.preventDefault();
+        seek(p.getCurrentTime() + 10);
+      } else if (key === "n" && free) {
+        e.preventDefault();
+        jumpToUnwatched();
       } else if (e.key === "?") {
         e.preventDefault();
         setShortcutsOpen((v) => !v);
@@ -354,28 +469,22 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [ready, durationSec, seek]);
+  });
 
-  const pct = (s: number) => `${Math.min(100, (s / durationSec) * 100)}%`;
-  const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+  const pct = (s: number) => `${Math.min(100, Math.max(0, (s / durationSec) * 100))}%`;
 
   const handleCopyVideoLink = () => {
     if (!isPublic) {
-      toast({
-        title: "ไม่อนุญาตให้คัดลอกลิงก์",
-        description: "วิดีโอนี้เป็นแบบไม่สาธารณะเพื่อการเรียนรู้เฉพาะในระบบ",
-        variant: "destructive",
-      });
+      toast({ title: "ไม่อนุญาตให้คัดลอกลิงก์", description: "วิดีโอนี้เป็นแบบไม่สาธารณะเพื่อการเรียนรู้เฉพาะในระบบ", variant: "destructive" });
       return;
     }
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
-    void navigator.clipboard.writeText(url);
-    toast({
-      title: "คัดลอกลิงก์วิดีโอแล้ว",
-      description: "คัดลอกลิงก์ YouTube ไปยังคลิปบอร์ดแล้ว",
-      variant: "success",
-    });
+    void navigator.clipboard.writeText(`https://www.youtube.com/watch?v=${videoId}`);
+    toast({ title: "คัดลอกลิงก์วิดีโอแล้ว", description: "คัดลอกลิงก์ YouTube ไปยังคลิปบอร์ดแล้ว", variant: "success" });
   };
+
+  const iconButton = "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white/80 transition-[background-color,scale] hover:bg-white/10 hover:text-white active:scale-90";
+  const checkpointPending = !!checkpoint && !checkpointPassed;
+  const watchedEnough = free ? gaps.length === 0 : watchedPercent >= minWatchPercentage;
 
   return (
     <div className="bg-black select-none">
@@ -383,60 +492,111 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
         <div className="relative aspect-video w-full">
           <div ref={hostRef} className="absolute inset-0 h-full w-full" />
 
-          {/* Interactive Screen Overlay: Toggles play/pause and guards context menu for non-public videos */}
+          {/* Click to play/pause; guards the context menu for non-public videos */}
           <div
             className="absolute inset-0 z-10 cursor-pointer"
-            onClick={() => {
-              const p = playerRef.current;
-              if (!p || !ready) return;
-              if (p.getPlayerState() === YT_STATE.PLAYING) p.pauseVideo();
-              else p.playVideo();
-            }}
+            onClick={togglePlay}
             onContextMenu={(e) => {
               if (!isPublic) {
                 e.preventDefault();
                 e.stopPropagation();
-                toast({
-                  title: "ไม่อนุญาตให้คัดลอกลิงก์",
-                  description: "วิดีโอนี้เป็นแบบไม่สาธารณะเพื่อการเรียนรู้เฉพาะในระบบ",
-                  variant: "destructive",
-                });
+                toast({ title: "ไม่อนุญาตให้คัดลอกลิงก์", description: "วิดีโอนี้เป็นแบบไม่สาธารณะเพื่อการเรียนรู้เฉพาะในระบบ", variant: "destructive" });
               }
             }}
           />
-          
-          {/* Glassmorphic Checkpoint Modal */}
+
+          {/* Resume prompt */}
+          {showResume && !playing && (
+            <div className="absolute inset-x-0 bottom-3 z-20 flex justify-center px-3">
+              <div className="flex flex-wrap items-center gap-2 rounded-full border border-white/15 bg-zinc-950/90 px-4 py-2 text-xs text-white shadow-lg backdrop-blur">
+                <span>เรียนต่อจาก <strong className="font-mono tabular-nums">{clock(resumeAt)}</strong></span>
+                <button type="button" onClick={() => playerRef.current?.playVideo()} className="rounded-full bg-primary px-3 py-1 font-medium text-primary-foreground hover:bg-primary/90">
+                  เล่นต่อ
+                </button>
+                <button type="button" onClick={() => { seek(0, true); setShowResume(false); }} className="rounded-full px-3 py-1 text-white/80 hover:bg-white/10 hover:text-white">
+                  เริ่มใหม่ตั้งแต่ต้น
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* End of video: next step, or what is still missing */}
+          {ended && !checkpointOpen && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fade-in">
+              <div className="grid w-full max-w-sm gap-3 rounded-2xl border border-white/15 bg-background/95 p-6 text-center text-foreground shadow-2xl">
+                {completed ? (
+                  <>
+                    <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
+                    <p className="font-semibold">ดูคลิปนี้ครบแล้ว</p>
+                    {nextAction ? (
+                      <Link href={nextAction.href} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                        {nextAction.label} <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">กำลังอัปเดตขั้นตอนถัดไป…</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold">ยังดูไม่ครบ</p>
+                    <p className="text-sm text-muted-foreground">
+                      {checkpointPending && watchedEnough
+                        ? "ยังไม่ได้ตอบคำถามระหว่างคลิป"
+                        : free
+                          ? `ยังเหลือ ${gaps.length} ช่วงที่ยังไม่ได้ดู`
+                          : `ดูแล้ว ${watchedPercent}% (ต้องดูอย่างน้อย ${minWatchPercentage}%)`}
+                    </p>
+                    {checkpointPending && watchedEnough && checkpoint ? (
+                      <button type="button" onClick={() => seek(Math.max(0, checkpoint.atSec - 5), true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                        <CircleHelp className="h-4 w-4" /> ไปที่คำถาม ({clock(checkpoint.atSec)})
+                      </button>
+                    ) : free ? (
+                      <button type="button" onClick={jumpToUnwatched} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                        <FastForward className="h-4 w-4" /> ไปยังช่วงที่ยังไม่ได้ดู
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => seek(0, true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                        <RotateCcw className="h-4 w-4" /> ดูอีกครั้ง
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Checkpoint question */}
           {checkpointOpen && checkpoint && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md animate-fade-in">
-              <div className="w-full max-w-md rounded-2xl border border-white/20 bg-background/95 p-6 text-foreground shadow-2xl backdrop-blur-xl animate-zoom-in">
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md animate-fade-in">
+              <div className="max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-white/20 bg-background/95 p-6 text-foreground shadow-2xl backdrop-blur-xl animate-zoom-in">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-primary font-semibold text-base mb-1">
-                    <CircleHelp className="h-5 w-5" /> คำถามวัดความเข้าใจระหว่างเรียน
+                  <div className="mb-1 flex items-center gap-2 text-base font-semibold text-primary">
+                    <CircleHelp className="h-5 w-5" /> คำถามระหว่างคลิป
                   </div>
                   {!checkpointLocked && (
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                        คะแนน {checkpointScore ?? 10}/{10}
-                      </span>
-                      <span className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                        เหลือ {checkpointAttemptsLeft} ครั้ง
-                      </span>
+                      <span className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground">คะแนน {checkpointScore ?? 10}/10</span>
+                      <span className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground">ตอบได้อีก {checkpointAttemptsLeft} ครั้ง</span>
                     </div>
                   )}
                 </div>
-                <p className="mt-2 mb-4 text-sm font-medium leading-relaxed">{checkpoint.question}</p>
+                <p className="mb-4 mt-2 text-sm font-medium leading-relaxed">{checkpoint.question}</p>
                 {checkpointLocked ? (
                   <div className="grid gap-3">
                     <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm">
-                      <p className="font-semibold text-destructive">ตอบผิดครบ 3 ครั้ง</p>
-                      <p className="mt-1 text-muted-foreground">ระบบล้างความคืบหน้าบทเรียนนี้แล้ว — ต้องเรียนใหม่ตั้งแต่ต้นเพื่อลองตอบอีกครั้ง</p>
+                      <p className="font-semibold text-destructive">ตอบไม่ถูกครบ 3 ครั้ง</p>
+                      <p className="mt-1 text-muted-foreground">
+                        {rewatch
+                          ? `ลองดูช่วง ${clock(rewatch.fromSec)}–${clock(rewatch.toSec)} อีกครั้ง แล้วตอบใหม่ได้ ส่วนอื่นที่ดูแล้วยังนับอยู่ครบ`
+                          : "ลองดูช่วงก่อนคำถามอีกครั้ง แล้วตอบใหม่ได้ ส่วนอื่นที่ดูแล้วยังนับอยู่ครบ"}
+                      </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => window.location.reload()}
                       className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98]"
                     >
-                      <RotateCcw className="h-4 w-4" /> เริ่มเรียนบทนี้ใหม่
+                      <RotateCcw className="h-4 w-4" /> ดูช่วงนี้อีกครั้ง
                     </button>
                   </div>
                 ) : (
@@ -462,157 +622,133 @@ export function LessonPlayer({ lessonId, videoId, durationSec, initialMaxWatched
             </div>
           )}
 
-          {/* Keyboard Shortcuts Popover Modal */}
+          {/* Keyboard shortcuts */}
           {shortcutsOpen && (
-            <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs animate-fade-in" onClick={() => setShortcutsOpen(false)}>
+            <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs animate-fade-in" onClick={() => setShortcutsOpen(false)}>
               <div className="w-full max-w-sm rounded-xl border border-white/20 bg-zinc-950/95 p-5 text-white shadow-2xl backdrop-blur-md animate-zoom-in" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                  <p className="text-sm font-semibold flex items-center gap-1.5">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold">
                     <HelpCircle className="h-4 w-4 text-primary" /> คีย์ลัดเครื่องเล่นวิดีโอ
                   </p>
-                  <button type="button" onClick={() => setShortcutsOpen(false)} className="text-xs text-white/60 hover:text-white">✕</button>
+                  <button type="button" onClick={() => setShortcutsOpen(false)} className="text-xs text-white/60 hover:text-white" aria-label="ปิด">✕</button>
                 </div>
                 <div className="grid gap-2.5 pt-3 text-xs">
-                  <div className="flex justify-between items-center"><span className="text-white/70">เล่น / หยุดชั่วคราว</span><span className="font-mono bg-white/10 px-2 py-0.5 rounded">Space / K</span></div>
-                  <div className="flex justify-between items-center"><span className="text-white/70">เต็มจอ</span><span className="font-mono bg-white/10 px-2 py-0.5 rounded">F</span></div>
-                  <div className="flex justify-between items-center"><span className="text-white/70">ถอยหลัง 10 วินาที</span><span className="font-mono bg-white/10 px-2 py-0.5 rounded">J / ←</span></div>
-                  <div className="flex justify-between items-center"><span className="text-white/70">เดินหน้า 10 วินาที</span><span className="font-mono bg-white/10 px-2 py-0.5 rounded">L / →</span></div>
-                  <div className="flex justify-between items-center"><span className="text-white/70">เปิด/ปิด คู่มือคีย์ลัด</span><span className="font-mono bg-white/10 px-2 py-0.5 rounded">?</span></div>
+                  {[
+                    ["เล่น / หยุดชั่วคราว", "Space / K"],
+                    ["ถอยหลัง 10 วินาที", "J / ←"],
+                    ["เดินหน้า 10 วินาที", "L / →"],
+                    ...(free ? [["ไปยังช่วงที่ยังไม่ได้ดู", "N"]] : []),
+                    ["ปิด/เปิดเสียง", "M"],
+                    ["เต็มจอ", "F"],
+                    ["เปิด/ปิด คู่มือคีย์ลัด", "?"],
+                  ].map(([label, keys]) => (
+                    <div key={label} className="flex items-center justify-between">
+                      <span className="text-white/70">{label}</span>
+                      <span className="rounded bg-white/10 px-2 py-0.5 font-mono">{keys}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Player Controls Bar */}
-        <div className="flex items-center gap-3 bg-zinc-950 px-3 py-2 text-white">
-          <button
-            type="button"
-            disabled={!ready}
-            aria-label={!ready ? "กำลังโหลดวิดีโอ" : playing ? "หยุดชั่วคราว" : "เล่น"}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-[background-color,scale] hover:bg-white/10 active:scale-90 disabled:opacity-40"
-            onClick={() => {
-              const p = playerRef.current;
-              if (!p) return;
-              if (p.getPlayerState() === YT_STATE.PLAYING) p.pauseVideo();
-              else p.playVideo();
-            }}
-          >
+        {/* Controls */}
+        <div className="flex items-center gap-1.5 bg-zinc-950 px-2 py-2 text-white sm:gap-3 sm:px-3">
+          <button type="button" disabled={!ready} aria-label={!ready ? "กำลังโหลดวิดีโอ" : playing ? "หยุดชั่วคราว" : "เล่น"} className={cn(iconButton, "disabled:opacity-40")} onClick={togglePlay}>
             <PlayPauseIcon playing={playing} className="h-5 w-5" />
           </button>
 
-          <span className="hidden w-12 shrink-0 text-right font-mono text-xs tabular-nums text-white/80 sm:block">{clock(position)}</span>
+          <span className="hidden w-14 shrink-0 text-right font-mono text-xs tabular-nums text-white/80 sm:block">{clock(position)}</span>
 
-          {/* 3-Layer Interactive Scrubber with Checkpoint Markers and Hover Tooltip */}
+          {/* Scrubber: watched parts, playhead, checkpoint marker */}
           <div
             role="slider"
             aria-label="ตำแหน่งวิดีโอ"
             aria-valuemin={0}
             aria-valuemax={durationSec}
             aria-valuenow={Math.floor(position)}
+            aria-valuetext={`${clock(position)} จาก ${clock(durationSec)} · ดูแล้ว ${watchedPercent}%`}
             tabIndex={0}
-            className="group relative h-2 flex-1 cursor-pointer rounded-full bg-white/20 transition-[height] hover:h-3"
+            className="group relative h-2 flex-1 cursor-pointer rounded-full bg-white/15 transition-[height] hover:h-3"
             onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect();
               seek(((e.clientX - r.left) / r.width) * durationSec);
             }}
             onMouseMove={(e) => {
               const r = e.currentTarget.getBoundingClientRect();
-              const sec = Math.max(0, Math.min(durationSec, ((e.clientX - r.left) / r.width) * durationSec));
-              setHoverTime(sec);
+              setHoverTime(Math.max(0, Math.min(durationSec, ((e.clientX - r.left) / r.width) * durationSec)));
               setHoverX(e.clientX - r.left);
             }}
             onMouseLeave={() => setHoverTime(null)}
           >
-            {/* Layer 1: Allowed seek frontier band (maxWatched) */}
-            <div className="absolute inset-y-0 left-0 rounded-full bg-white/40 transition-[width] duration-300" style={{ width: pct(maxWatched) }} />
-            {/* Layer 2: Current playback head bar */}
-            <div className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ width: pct(position) }} />
-            
-            {/* Layer 3: Interactive Thumb */}
-            <div
-              className="absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 -ml-1.75 rounded-full bg-primary border-2 border-white shadow-md transition-transform scale-0 group-hover:scale-100"
-              style={{ left: pct(position) }}
-            />
-
-            {/* Checkpoint pin marker on timeline */}
+            {/* Parts already watched (free mode: any order) */}
+            {seen.map((r) => (
+              <div key={r.fromSec} className="absolute inset-y-0 bg-white/45" style={{ left: pct(r.fromSec), width: pct(r.toSec - r.fromSec) }} />
+            ))}
+            {!free && <div className="absolute inset-y-0 left-0 rounded-full border-r border-white/60" style={{ width: pct(maxWatched) }} />}
+            <div className="absolute inset-y-0 left-0 rounded-full bg-primary/90" style={{ width: pct(position) }} />
+            <div className="absolute top-1/2 -ml-1.75 h-3.5 w-3.5 -translate-y-1/2 scale-0 rounded-full border-2 border-white bg-primary shadow-md transition-transform group-hover:scale-100" style={{ left: pct(position) }} />
             {checkpoint && (
-              <div
-                title={`คำถามระหว่างเรียน ณ นาทีที่ ${clock(checkpoint.atSec)}`}
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 flex items-center justify-center"
-                style={{ left: pct(checkpoint.atSec) }}
-              >
-                <span className="h-3 w-3 rounded-full bg-amber-400 border-2 border-zinc-950 shadow-xs transition-transform hover:scale-125" />
+              <div title={`คำถามระหว่างคลิป นาทีที่ ${clock(checkpoint.atSec)}`} className="absolute top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center" style={{ left: pct(checkpoint.atSec) }}>
+                <span className={cn("h-3 w-3 rounded-full border-2 border-zinc-950 shadow-xs", checkpointPassed ? "bg-success" : "bg-amber-400")} />
               </div>
             )}
-
-            {/* Floating time tooltip on hover */}
             {hoverTime !== null && (
-              <div
-                className="pointer-events-none absolute -top-8 -translate-x-1/2 rounded bg-zinc-900 border border-white/20 px-1.5 py-0.5 font-mono text-[10px] text-white shadow-md tabular-nums backdrop-blur"
-                style={{ left: hoverX }}
-              >
+              <div className="pointer-events-none absolute -top-8 -translate-x-1/2 rounded border border-white/20 bg-zinc-900 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-white shadow-md" style={{ left: hoverX }}>
                 {clock(hoverTime)}
               </div>
             )}
           </div>
 
-          <span className="hidden w-12 shrink-0 font-mono text-xs tabular-nums text-white/80 sm:block">{clock(durationSec)}</span>
+          <span className="hidden w-14 shrink-0 font-mono text-xs tabular-nums text-white/80 sm:block">{clock(durationSec)}</span>
 
-          {/* Copy Video Link Button (Public allows copying, Non-public prohibits copying) */}
+          {free && gaps.length > 0 && (
+            <button type="button" className={cn(iconButton, "w-auto gap-1 px-2 text-xs")} onClick={jumpToUnwatched} title="ไปยังช่วงที่ยังไม่ได้ดู (N)" aria-label="ไปยังช่วงที่ยังไม่ได้ดู">
+              <FastForward className="h-4 w-4" /> <span className="hidden md:inline">ช่วงที่ยังไม่ดู</span>
+            </button>
+          )}
+          <button type="button" className={iconButton} onClick={toggleMute} aria-label={muted ? "เปิดเสียง" : "ปิดเสียง"} title={muted ? "เปิดเสียง (M)" : "ปิดเสียง (M)"}>
+            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+          <button type="button" className={cn(iconButton, "hidden sm:inline-flex", slow && "text-primary")} onClick={toggleSpeed} aria-label={slow ? "ความเร็วปกติ" : "เล่นช้าลง 0.75 เท่า"} title={slow ? "ความเร็ว 0.75x (กดเพื่อกลับเป็นปกติ)" : "เล่นช้าลง 0.75x"}>
+            <Snail className="h-4 w-4" />
+          </button>
           <button
             type="button"
-            className={cn(
-              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-[background-color,scale] active:scale-90",
-              isPublic
-                ? "text-white/80 hover:bg-white/10 hover:text-white"
-                : "text-white/40 opacity-60 cursor-not-allowed hover:bg-white/5",
-            )}
+            className={cn(iconButton, "hidden sm:inline-flex", !isPublic && "cursor-not-allowed opacity-60")}
             onClick={handleCopyVideoLink}
-            aria-label={isPublic ? "คัดลอกลิงก์วิดีโอ (สาธารณะ)" : "วิดีโอไม่สาธารณะ ไม่อนุญาตให้คัดลอกลิงก์"}
-            title={isPublic ? "คัดลอกลิงก์วิดีโอ (สาธารณะ)" : "วิดีโอไม่สาธารณะ (ไม่อนุญาตให้คัดลอกลิงก์)"}
+            aria-label={isPublic ? "คัดลอกลิงก์วิดีโอ" : "วิดีโอไม่สาธารณะ ไม่อนุญาตให้คัดลอกลิงก์"}
+            title={isPublic ? "คัดลอกลิงก์วิดีโอ" : "วิดีโอไม่สาธารณะ (ไม่อนุญาตให้คัดลอกลิงก์)"}
           >
             {isPublic ? <Share2 className="h-4 w-4" /> : <Lock className="h-4 w-4 text-amber-400/80" />}
           </button>
-
-          {/* Keyboard HUD Button */}
-          <button
-            type="button"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-[background-color,scale] hover:bg-white/10 active:scale-90 text-white/80 hover:text-white"
-            onClick={() => setShortcutsOpen((v) => !v)}
-            aria-label="คู่มือคีย์ลัด (?)"
-            title="คู่มือคีย์ลัด (?)"
-          >
+          <button type="button" className={cn(iconButton, "hidden sm:inline-flex")} onClick={() => setShortcutsOpen((v) => !v)} aria-label="คู่มือคีย์ลัด (?)" title="คู่มือคีย์ลัด (?)">
             <HelpCircle className="h-4 w-4" />
           </button>
-
-          {/* Theater Mode Button */}
-          <button
-            type="button"
-            className={cn(
-              "hidden lg:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-[background-color,scale] hover:bg-white/10 active:scale-90 text-white/80 hover:text-white",
-              theaterMode && "text-primary"
-            )}
-            onClick={toggleTheater}
-            aria-label={theaterMode ? "ออกจากโหมดโรงภาพยนตร์" : "โหมดโรงภาพยนตร์ (Theater Mode)"}
-            title={theaterMode ? "ขนาดปกติ" : "โหมดโรงภาพยนตร์"}
-          >
+          <button type="button" className={cn(iconButton, "hidden lg:inline-flex", theaterMode && "text-primary")} onClick={toggleTheater} aria-label={theaterMode ? "ขนาดปกติ" : "โหมดจอกว้าง"} title={theaterMode ? "ขนาดปกติ" : "โหมดจอกว้าง"}>
             <Tv className="h-4 w-4" />
           </button>
-
-          {/* Fullscreen Button */}
-          <button
-            type="button"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-[background-color,scale] hover:bg-white/10 active:scale-90 text-white/80 hover:text-white"
-            onClick={toggleFullscreen}
-            aria-label="เต็มจอ"
-          >
+          <button type="button" className={iconButton} onClick={toggleFullscreen} aria-label="เต็มจอ">
             {pseudoFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
-      <StatusBar status={status} />
+      <StatusBar status={status} free={free} watchedCount={watchedCount} totalChunks={totalChunks} watchedPercent={watchedPercent} minPercent={minWatchPercentage} onTakeOver={takeOver} />
+
+      <LessonChecklist
+        free={free}
+        completed={completed}
+        watchedPercent={watchedPercent}
+        minPercent={minWatchPercentage}
+        gapsLeft={gaps.length}
+        watchedEnough={watchedEnough}
+        onJump={jumpToUnwatched}
+        checkpoint={checkpoint ? { atSec: checkpoint.atSec, passed: checkpointPassed } : null}
+        onGoToCheckpoint={() => checkpoint && seek(Math.max(0, checkpoint.atSec - 5), true)}
+        lessonTest={lessonTest}
+      />
     </div>
   );
 }
@@ -621,38 +757,109 @@ const STATUS_TONE = {
   idle: "bg-muted-foreground/50",
   recording: "bg-success",
   paused: "bg-warning",
-  "focus-paused": "bg-destructive",
+  "focus-paused": "bg-warning",
   superseded: "bg-destructive",
   offline: "bg-warning",
   broken: "bg-destructive",
   completed: "bg-success",
 } as const;
 
-function StatusBar({ status }: { status: Status }) {
+function StatusBar({
+  status, free, watchedCount, totalChunks, watchedPercent, minPercent, onTakeOver,
+}: {
+  status: Status; free: boolean; watchedCount: number; totalChunks: number; watchedPercent: number; minPercent: number; onTakeOver: () => void;
+}) {
+  const progress = free ? `ดูแล้ว ${watchedCount}/${totalChunks} ช่วง` : `ดูแล้ว ${watchedPercent}% (เกณฑ์ ${minPercent}%)`;
   const text: Record<Status["kind"], string> = {
-    idle: "กดเล่นเพื่อเริ่มบันทึกเวลาเรียนแบบเรียลไทม์",
-    recording: status.kind === "recording" ? `กำลังบันทึกเวลาเรียนจริง · ดูแล้ว ${status.watchedPercent}% (เกณฑ์ผ่าน ${status.minPercent}%)` : "",
-    paused: "หยุดเล่นชั่วคราว — กดเล่นต่อเพื่อสะสมเวลาเรียน",
-    "focus-paused": "ระบบหยุดชั่วคราวเนื่องจากสลับแท็บหรือลดขนาดหน้าต่าง — กลับมาที่หน้านี้แล้วกดเล่นต่อ",
-    superseded: "ตรวจพบการเปิดเรียนในหน้าต่างอื่น — หน้าต่างนี้หยุดนับเวลาแล้ว",
-    offline: "การเชื่อมต่อขาดหาย — ระบบจะกลับมาบันทึกต่อเมื่อออนไลน์",
+    idle: "กดเล่นเพื่อเริ่มนับเวลาเรียน",
+    recording: `กำลังนับเวลาเรียน · ${progress}`,
+    paused: `หยุดชั่วคราว · ${progress}`,
+    "focus-paused": "หยุดให้อัตโนมัติเพราะสลับไปหน้าอื่น — กดเล่นเพื่อเรียนต่อ",
+    superseded: "มีการเปิดบทเรียนในหน้าต่างอื่น หน้านี้จึงหยุดนับเวลา",
+    offline: "การเชื่อมต่อขาดหาย — ระบบจะนับต่อให้เมื่อกลับมาออนไลน์",
     broken: "วิดีโอนี้ไม่พร้อมใช้งาน ระบบแจ้งผู้สอนแล้ว",
-    completed: "เรียนบทนี้ครบตามเกณฑ์มาตรฐานแล้ว",
+    completed: "ดูคลิปนี้ครบตามเกณฑ์แล้ว",
   };
   return (
-    <div aria-live="polite" className="flex items-center justify-between border-b bg-card px-4 py-2.5 text-xs text-foreground lg:border-b-0 lg:border-t">
-      <div className="flex items-center gap-2.5 min-w-0">
+    <div aria-live="polite" className="flex items-center justify-between gap-3 border-b bg-card px-4 py-2.5 text-xs text-foreground lg:border-b-0 lg:border-t">
+      <div className="flex min-w-0 items-center gap-2.5">
         <span className="relative flex h-2.5 w-2.5 shrink-0">
           {status.kind === "recording" && <span className="absolute inset-0 animate-ping rounded-full bg-success opacity-75" />}
           <span className={cn("relative h-2.5 w-2.5 rounded-full", STATUS_TONE[status.kind])} />
         </span>
         <span className="truncate font-medium">{text[status.kind]}</span>
       </div>
-      {status.kind === "recording" && (
-        <span className="hidden sm:inline-flex items-center rounded-full bg-success/15 px-2.5 py-0.5 text-[11px] font-semibold text-success font-mono tabular-nums shrink-0">
-          ● Live Telemetry
-        </span>
+      {status.kind === "superseded" && (
+        <button type="button" onClick={onTakeOver} className="shrink-0 rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+          เรียนต่อที่หน้าต่างนี้
+        </button>
       )}
+    </div>
+  );
+}
+
+function LessonChecklist({
+  free, completed, watchedPercent, minPercent, gapsLeft, watchedEnough, onJump, checkpoint, onGoToCheckpoint, lessonTest,
+}: {
+  free: boolean;
+  completed: boolean;
+  watchedPercent: number;
+  minPercent: number;
+  gapsLeft: number;
+  watchedEnough: boolean;
+  onJump: () => void;
+  checkpoint: { atSec: number; passed: boolean } | null;
+  onGoToCheckpoint: () => void;
+  lessonTest: Props["lessonTest"];
+}) {
+  const videoDone = completed || watchedEnough;
+  const items: Array<{ done: boolean; label: string; detail: string; action?: React.ReactNode }> = [
+    {
+      done: videoDone,
+      label: free ? "ดูคลิปให้ครบทุกช่วง" : `ดูคลิปอย่างน้อย ${minPercent}%`,
+      detail: videoDone ? "ครบแล้ว" : free ? `ดูแล้ว ${watchedPercent}% · เหลือ ${gapsLeft} ช่วง` : `ดูแล้ว ${watchedPercent}%`,
+      action: free && !videoDone ? (
+        <button type="button" onClick={onJump} className="text-xs font-medium text-primary hover:underline">ไปยังช่วงที่ยังไม่ได้ดู</button>
+      ) : undefined,
+    },
+  ];
+  if (checkpoint) {
+    items.push({
+      done: checkpoint.passed,
+      label: "ตอบคำถามระหว่างคลิป",
+      detail: checkpoint.passed ? "ตอบถูกแล้ว" : `อยู่ที่นาที ${clock(checkpoint.atSec)}`,
+      action: !checkpoint.passed ? (
+        <button type="button" onClick={onGoToCheckpoint} className="text-xs font-medium text-primary hover:underline">ไปที่คำถาม</button>
+      ) : undefined,
+    });
+  }
+  if (lessonTest) {
+    items.push({
+      done: lessonTest.done,
+      label: "ทำแบบทดสอบท้ายคลิป",
+      detail: lessonTest.done
+        ? lessonTest.bestScore !== null ? `ทำแล้ว · คะแนน ${Math.round(lessonTest.bestScore)}%` : "ทำแล้ว"
+        : lessonTest.available ? "พร้อมให้ทำ" : "เปิดเมื่อดูคลิปครบ",
+      action: lessonTest.available && !lessonTest.done ? (
+        <Link href={lessonTest.href} className="text-xs font-medium text-primary hover:underline">ทำแบบทดสอบ</Link>
+      ) : undefined,
+    });
+  }
+  return (
+    <div className="border-b bg-card px-4 py-3 lg:border-b-0 lg:border-t">
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">สิ่งที่ต้องทำในคลิปนี้</p>
+      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((item) => (
+          <li key={item.label} className="flex items-start gap-2 text-sm">
+            {item.done ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" /> : <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />}
+            <span className="min-w-0">
+              <span className={cn("block font-medium", item.done && "text-muted-foreground")}>{item.label}</span>
+              <span className="block text-xs text-muted-foreground">{item.detail}</span>
+              {item.action}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

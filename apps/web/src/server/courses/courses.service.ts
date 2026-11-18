@@ -7,6 +7,11 @@ import { HttpError } from "../http";
 import type { CurrentUser } from "../auth/session";
 import { programsForCourse } from "../programs/programs.service";
 import { assertProfileComplete } from "../auth/profile.service";
+import { lessonTestSatisfied, summarizeLessonTests } from "@upskill/core";
+import { asCompletionRule } from "./completion.service";
+import { asNavigationMode } from "../learning/heartbeat.service";
+
+const NO_ID = "00000000-0000-0000-0000-000000000000";
 
 export async function listPublishedCourses() {
   return ctx()
@@ -38,7 +43,7 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
     .select([
       "c.id", "c.slug", "c.title", "c.description", "c.visibility", "c.instructor_id", "c.is_verified_course",
       "c.min_watch_percentage", "c.passing_quiz_score", "c.is_sequential_locked", "c.total_duration_sec",
-      "c.max_quiz_attempts_per_day", "c.quiz_time_limit_sec",
+      "c.max_quiz_attempts_per_day", "c.quiz_time_limit_sec", "c.navigation_mode", "c.completion_rule",
       "c.credential_enabled", "c.credential_name_th", "c.credential_name_en",
       sql<string>`coalesce(u.legal_full_name_th, u.legal_full_name_en, split_part(u.email, '@', 1))`.as("instructor_name"),
     ])
@@ -57,19 +62,30 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
         .executeTakeFirst()
     : undefined;
 
+  const enrollmentKey = enrollment?.id ?? NO_ID;
   const lessons = await db
     .selectFrom("lessons as l")
-    .leftJoin("lesson_progress as p", (j) => j.onRef("p.lesson_id", "=", "l.id").on("p.enrollment_id", "=", enrollment?.id ?? "00000000-0000-0000-0000-000000000000"))
+    .leftJoin("lesson_progress as p", (j) => j.onRef("p.lesson_id", "=", "l.id").on("p.enrollment_id", "=", enrollmentKey))
     .select([
       "l.id", "l.sequence_order", "l.title", "l.youtube_video_id", "l.duration_sec", "l.video_status", "l.is_public",
-      "l.checkpoint_question", "l.checkpoint_options", "l.checkpoint_at_sec",
-      "p.is_completed", "p.max_watched_sec", "p.watched_chunks", "p.total_chunks_required", "p.accumulated_valid_sec",
+      "l.checkpoint_question", "l.checkpoint_options", "l.checkpoint_at_sec", "l.unit_id", "l.description", "l.learner_note",
+      "p.is_completed", "p.max_watched_sec", "p.last_position_sec", "p.watched_chunks", "p.total_chunks_required", "p.accumulated_valid_sec",
       sql<number>`(select count(*)::int from quiz_questions q where q.lesson_id = l.id and q.assessment_type = 'lesson' and q.is_active)`.as("test_question_count"),
-      sql<number>`(select count(*)::int from quiz_attempts a where a.enrollment_id = ${enrollment?.id ?? "00000000-0000-0000-0000-000000000000"} and a.lesson_id = l.id and a.assessment_type = 'lesson' and a.is_passed)`.as("passed_test_count"),
+      sql<number>`(select count(*)::int from quiz_attempts a where a.enrollment_id = ${enrollmentKey} and a.lesson_id = l.id and a.assessment_type = 'lesson' and a.is_passed)`.as("passed_test_count"),
+      sql<string | null>`(select max(a.score_percentage)::text from quiz_attempts a where a.enrollment_id = ${enrollmentKey} and a.lesson_id = l.id and a.assessment_type = 'lesson' and a.submitted_at is not null)`.as("best_test_score"),
+      sql<boolean>`exists (select 1 from checkpoint_attempts ca where ca.user_id = ${user?.id ?? NO_ID} and ca.lesson_id = l.id and ca.passed_at is not null)`.as("checkpoint_passed"),
     ])
     .where("l.course_id", "=", course.id)
     .orderBy("l.sequence_order")
     .execute();
+
+  const units = await db
+    .selectFrom("course_units")
+    .select(["id", "sequence_order", "title", "summary"])
+    .where("course_id", "=", course.id)
+    .orderBy("sequence_order")
+    .execute();
+  const completionRule = asCompletionRule(course.completion_rule);
 
   const assessmentState = await db
     .selectFrom("courses as c")
@@ -84,12 +100,18 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
   // Sequential lock: pre-test (when configured), earlier video, and its lesson test must be complete.
   const preTestCompleted = assessmentState.pre_questions === 0 || assessmentState.pre_attempts > 0;
   let allPreviousDone = preTestCompleted;
+  const unitById = new Map(units.map((u) => [u.id, u]));
   const lessonViews = lessons.map((l) => {
     const unlocked = !course.is_sequential_locked || allPreviousDone;
     const lessonTestRequired = l.test_question_count > 0;
+    const lessonTestSubmitted = l.best_test_score !== null;
     const lessonTestPassed = !lessonTestRequired || l.passed_test_count > 0;
-    allPreviousDone &&= l.is_completed === true && lessonTestPassed;
-    const watchedPercent = l.total_chunks_required ? Math.floor(((l.watched_chunks?.length ?? 0) / l.total_chunks_required) * 100) : 0;
+    // "Done" = good enough to move on, per the course rule (passed, or just answered for lesson_tests_average)
+    const lessonTestDone = lessonTestSatisfied(completionRule, { required: lessonTestRequired, passed: lessonTestPassed, submitted: lessonTestSubmitted });
+    allPreviousDone &&= l.is_completed === true && lessonTestDone;
+    const watchedChunks = l.watched_chunks ?? [];
+    const watchedPercent = l.total_chunks_required ? Math.min(100, Math.floor((watchedChunks.length / l.total_chunks_required) * 100)) : 0;
+    const unit = l.unit_id ? unitById.get(l.unit_id) : undefined;
     return {
       id: l.id,
       order: l.sequence_order,
@@ -99,14 +121,40 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
       broken: l.video_status !== "active",
       completed: l.is_completed === true,
       maxWatchedSec: l.max_watched_sec ?? 0,
+      lastPositionSec: l.last_position_sec ?? 0,
+      watchedChunks,
       watchedPercent,
       unlocked,
       lessonTestRequired,
       lessonTestPassed,
+      lessonTestSubmitted,
+      lessonTestDone,
+      lessonTestBestScore: l.best_test_score === null ? null : Number(l.best_test_score),
+      lessonTestQuestionCount: l.test_question_count,
       isPublic: l.is_public !== false,
+      unitId: unit?.id ?? null,
+      description: l.description,
+      learnerNote: l.learner_note,
       checkpoint: l.checkpoint_question
         ? { question: l.checkpoint_question, options: (l.checkpoint_options ?? []) as string[], atSec: l.checkpoint_at_sec ?? 0 }
         : null,
+      checkpointPassed: l.checkpoint_question ? l.checkpoint_passed : true,
+    };
+  });
+  const lessonTests = summarizeLessonTests(
+    lessonViews.map((l) => ({ questionCount: l.lessonTestQuestionCount, bestScore: l.lessonTestBestScore })),
+    course.passing_quiz_score,
+  );
+  const unitViews = units.map((u, i) => {
+    const members = lessonViews.filter((l) => l.unitId === u.id);
+    return {
+      id: u.id,
+      number: i + 1,
+      title: u.title,
+      summary: u.summary,
+      lessonCount: members.length,
+      durationSec: members.reduce((n, l) => n + l.durationSec, 0),
+      completedCount: members.filter((l) => l.completed && l.lessonTestDone).length,
     };
   });
 
@@ -120,9 +168,14 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
     manager,
     enrollment: enrollment ?? null,
     lessons: lessonViews,
+    units: unitViews,
+    completionRule,
+    navigationMode: asNavigationMode(course.navigation_mode),
+    /** Combined end-of-lesson test score (drives the result for lesson_tests_average courses). */
+    lessonTests,
     allLessonsCompleted: lessonViews.length > 0 && lessonViews.every((l) => l.completed),
-    allLessonTestsPassed: lessonViews.every((l) => l.lessonTestPassed),
-    readyForPostTest: lessonViews.length > 0 && lessonViews.every((l) => l.completed && l.lessonTestPassed),
+    allLessonTestsPassed: lessonViews.every((l) => l.lessonTestDone),
+    readyForPostTest: completionRule === "post_test" && lessonViews.length > 0 && lessonViews.every((l) => l.completed && l.lessonTestDone),
     preTest: { required: assessmentState.pre_questions > 0, completed: preTestCompleted },
     postTest: { configured: assessmentState.post_questions > 0 },
     certificate: certificate ?? null,

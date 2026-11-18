@@ -1,11 +1,16 @@
 import "server-only";
+import { HEARTBEAT, chunksInRange, meetsCompletion } from "@upskill/core";
 import { sql } from "@upskill/db";
 import { ctx } from "../context";
 import { HttpError } from "../http";
+import { tryCompleteByLessonTests } from "../courses/completion.service";
+import { asNavigationMode } from "./heartbeat.service";
 
 export const CHECKPOINT_POINTS = 10;
 export const CHECKPOINT_PENALTY_PER_WRONG = 2;
 export const CHECKPOINT_MAX_ATTEMPTS = 3;
+/** After 3 wrong answers the learner rewatches this many seconds before the question (not the whole lesson). */
+export const CHECKPOINT_REWATCH_SEC = 60;
 
 export interface CheckpointAnswer {
   correct: boolean;
@@ -14,22 +19,34 @@ export interface CheckpointAnswer {
   /** Current score (0–10). Only present once the answer is known. */
   score: number | null;
   attemptsLeft: number;
-  /** true when 3 wrong answers were given: the lesson must be watched again from the start. */
+  /** true when 3 wrong answers were given: the part before the question must be watched again. */
   locked: boolean;
+  /** When locked: the part [fromSec, toSec) that was marked unwatched. */
+  rewatch?: { fromSec: number; toSec: number };
+  /** The correct answer completed the lesson (it had been watched in full already). */
+  lessonCompleted?: boolean;
+}
+
+/** The part a learner must rewatch after locking a checkpoint at `atSec`. */
+export function checkpointRewatchRange(atSec: number, durationSec: number) {
+  const fromSec = Math.max(0, Math.floor((atSec - CHECKPOINT_REWATCH_SEC) / HEARTBEAT.CHUNK_SEC) * HEARTBEAT.CHUNK_SEC);
+  const toSec = Math.min(durationSec, Math.ceil((atSec + 1) / HEARTBEAT.CHUNK_SEC) * HEARTBEAT.CHUNK_SEC);
+  return { fromSec, toSec };
 }
 
 /**
  * Grade one in-video checkpoint answer with a scoring penalty:
- * - correct on attempt N  → score = max(0, 10 - 2·(N-1)), video resumes
+ * - correct on attempt N  → score = max(0, 10 - 2·(N-1)), video resumes; completes the lesson if it was
+ *                           already watched in full (completion waits for the checkpoint)
  * - wrong                 → one attempt used, remaining attempts returned
- * - wrong on attempt 3    → checkpoint locks AND the lesson progress resets to zero
- *   (the learner must rewatch the lesson; the checkpoint re-arms for the new run)
+ * - wrong on attempt 3    → checkpoint locks and only the minute before the question is marked unwatched;
+ *                           starting the lesson again re-arms the checkpoint
  */
 export async function submitCheckpointAnswer(userId: string, lessonId: string, optionIndex: number): Promise<CheckpointAnswer> {
   const { db } = ctx();
   const lesson = await db
     .selectFrom("lessons")
-    .select(["id", "checkpoint_question", "checkpoint_correct_index"])
+    .select(["id", "checkpoint_question", "checkpoint_correct_index", "checkpoint_at_sec", "duration_sec"])
     .where("id", "=", lessonId)
     .executeTakeFirst();
   if (!lesson || lesson.checkpoint_question === null || lesson.checkpoint_correct_index === null) throw new HttpError(404, "NO_CHECKPOINT");
@@ -63,30 +80,37 @@ export async function submitCheckpointAnswer(userId: string, lessonId: string, o
         }),
       )
       .execute();
-    return { correct: true, score, attemptsLeft: 0, locked: false };
+    const lessonCompleted = await completeLessonIfWatched(userId, lessonId);
+    return { correct: true, score, attemptsLeft: 0, locked: false, lessonCompleted };
   }
 
   if (attempts >= CHECKPOINT_MAX_ATTEMPTS) {
-    await db
-      .insertInto("checkpoint_attempts")
-      .values({ user_id: userId, lesson_id: lessonId, attempt_count: attempts, locked_at: new Date() })
-      .onConflict((oc) => oc.columns(["user_id", "lesson_id"]).doUpdateSet({ attempt_count: attempts, locked_at: new Date(), updated_at: new Date() }))
-      .execute();
-    // Penalty: the learner must rewatch this lesson from the beginning (all enrollments).
-    await db
-      .updateTable("lesson_progress")
-      .set({
-        max_watched_sec: 0,
-        last_position_sec: 0,
-        accumulated_valid_sec: 0,
-        segment_start_pos_sec: 0,
-        watched_chunks: sql<number[]>`'{}'::int[]`,
-        last_ping_at: new Date(),
-      })
-      .where("lesson_id", "=", lessonId)
-      .where("enrollment_id", "in", (eb) => eb.selectFrom("enrollments").select("id").where("user_id", "=", userId))
-      .execute();
-    return { correct: false, score: null, attemptsLeft: 0, locked: true };
+    const rewatch = checkpointRewatchRange(lesson.checkpoint_at_sec ?? 0, lesson.duration_sec);
+    const removed = chunksInRange(rewatch.fromSec, rewatch.toSec);
+    await db.transaction().execute(async (trx) => {
+      await trx
+        .insertInto("checkpoint_attempts")
+        .values({ user_id: userId, lesson_id: lessonId, attempt_count: attempts, locked_at: new Date() })
+        .onConflict((oc) => oc.columns(["user_id", "lesson_id"]).doUpdateSet({ attempt_count: attempts, locked_at: new Date(), updated_at: new Date() }))
+        .execute();
+      // Penalty: the minute before the question becomes unwatched again (all of this user's enrollments).
+      // The learner resumes from its start; the furthest point is pulled back too so linear courses replay it.
+      await trx
+        .updateTable("lesson_progress")
+        .set({
+          watched_chunks: sql<number[]>`coalesce((select array_agg(c order by c) from unnest(watched_chunks) c where not (c = any(${removed}::int[]))), '{}'::int[])`,
+          max_watched_sec: sql<number>`least(max_watched_sec, ${rewatch.fromSec})`,
+          last_position_sec: rewatch.fromSec,
+          segment_start_pos_sec: null,
+          segment_started_at: null,
+          last_ping_at: null,
+          is_completed: false,
+        })
+        .where("lesson_id", "=", lessonId)
+        .where("enrollment_id", "in", (eb) => eb.selectFrom("enrollments").select("id").where("user_id", "=", userId))
+        .execute();
+    });
+    return { correct: false, score: null, attemptsLeft: 0, locked: true, rewatch };
   }
 
   await db
@@ -96,6 +120,39 @@ export async function submitCheckpointAnswer(userId: string, lessonId: string, o
     .execute();
   const projectedScore = Math.max(0, CHECKPOINT_POINTS - CHECKPOINT_PENALTY_PER_WRONG * attempts);
   return { correct: false, score: projectedScore, attemptsLeft: CHECKPOINT_MAX_ATTEMPTS - attempts, locked: false };
+}
+
+/**
+ * After a correct checkpoint answer: lessons whose video was already watched in full were held back from
+ * completion by the unanswered question — complete them now (same rules as the heartbeat).
+ */
+async function completeLessonIfWatched(userId: string, lessonId: string): Promise<boolean> {
+  const { db } = ctx();
+  return db.transaction().execute(async (trx) => {
+    const rows = await trx
+      .selectFrom("lesson_progress as p")
+      .innerJoin("enrollments as e", "e.id", "p.enrollment_id")
+      .innerJoin("lessons as l", "l.id", "p.lesson_id")
+      .innerJoin("courses as c", "c.id", "l.course_id")
+      .select(["p.id", "p.enrollment_id", "p.watched_chunks", "p.accumulated_valid_sec", "l.duration_sec", "c.min_watch_percentage", "c.navigation_mode"])
+      .where("p.lesson_id", "=", lessonId)
+      .where("e.user_id", "=", userId)
+      .where("p.is_completed", "=", false)
+      .forUpdate("p")
+      .execute();
+    let completed = false;
+    for (const r of rows) {
+      const ok = meetsCompletion(
+        { watchedChunks: new Set(r.watched_chunks), accumulatedValidSec: r.accumulated_valid_sec },
+        { durationSec: r.duration_sec, minWatchPercentage: r.min_watch_percentage, navigationMode: asNavigationMode(r.navigation_mode) },
+      );
+      if (!ok) continue;
+      await trx.updateTable("lesson_progress").set({ is_completed: true, completed_at: new Date() }).where("id", "=", r.id).execute();
+      await tryCompleteByLessonTests(trx, r.enrollment_id);
+      completed = true;
+    }
+    return completed;
+  });
 }
 
 /** State passed to the player so a passed checkpoint is not asked again after a page reload. */
