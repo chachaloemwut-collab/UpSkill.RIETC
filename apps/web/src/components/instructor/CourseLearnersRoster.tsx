@@ -132,7 +132,7 @@ export function CourseLearnersRoster({
     if (statusFilter !== "all") sp.set("status", statusFilter);
 
     api<{
-      items: LearnerItem[];
+      learners: LearnerItem[];
       total: number;
       page: number;
       pageSize: number;
@@ -141,7 +141,8 @@ export function CourseLearnersRoster({
         if (cancelled) return;
         setLoading(false);
         if (res.ok) {
-          setLearners(res.data.items);
+          // The API returns { learners, total, page, pageSize } (reading "items" crashed the tab once a learner existed)
+          setLearners(res.data.learners ?? []);
           setTotalCount(res.data.total);
         } else {
           toast({
