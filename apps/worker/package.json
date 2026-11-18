@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test src/system-owner.test.ts",
     "seed": "tsx --env-file-if-exists=../../.env.local src/seed.ts",
-    "seed:krathong": "tsx --env-file-if-exists=../../.env.local src/complete-krathong-flow.ts"
+    "seed:krathong": "tsx --env-file-if-exists=../../.env.local src/complete-krathong-flow.ts",
+    "import:krathong-contest": "tsx --env-file-if-exists=../../.env.local src/import-krathong-contest.ts"
   },
   "dependencies": {
     "@upskill/core": "workspace:*",
