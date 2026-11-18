@@ -25,6 +25,8 @@ interface Result {
   passingScore?: number;
   kind?: "pre" | "lesson" | "post";
   focusEventCount?: number;
+  courseCompleted?: boolean;
+  lessonTests?: { tests: number; answered: number; correct: number; totalQuestions: number; passed: boolean } | null;
 }
 
 const LETTERS = "ABCDEFGH";
@@ -36,6 +38,8 @@ export function QuizRunner({
   timeLimitMin,
   assessmentKind = "post",
   lessonId,
+  averageRule = false,
+  continueHref,
 }: {
   courseId: string;
   slug: string;
@@ -43,6 +47,10 @@ export function QuizRunner({
   timeLimitMin: number;
   assessmentKind?: "pre" | "lesson" | "post";
   lessonId?: string | undefined;
+  /** Course passes on the combined end-of-lesson score: answering moves the learner on, retakes raise the score. */
+  averageRule?: boolean;
+  /** Where "continue" goes after a lesson test (next lesson, or the course page). */
+  continueHref?: string | undefined;
 }) {
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -155,6 +163,47 @@ export function QuizRunner({
     );
   }
 
+  if (result && assessmentKind === "lesson" && averageRule) {
+    const lt = result.lessonTests;
+    return (
+      <Card className="grid justify-items-center gap-5 p-8 text-center">
+        <div ref={ringRef}>
+          <ProgressRing value={Math.round(result.scorePercentage)} size={120} stroke={10} label="คะแนน" />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold">
+            {result.courseCompleted ? "ยินดีด้วย คุณเรียนจบหลักสูตรแล้ว!" : result.late ? "ส่งคำตอบเกินเวลาที่กำหนด" : result.passed ? "ตอบถูกทั้งหมด" : "บันทึกคำตอบแล้ว"}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">คะแนนแบบทดสอบคลิปนี้ {result.scorePercentage.toFixed(0)}%</p>
+          {lt && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              คะแนนรวมทุกคลิปตอนนี้ {lt.correct}/{lt.totalQuestions} ข้อ · ทำแล้ว {lt.answered}/{lt.tests} คลิป · เกณฑ์ผ่าน {result.passingScore ?? passingScore}%
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap justify-center gap-2">
+          {result.courseCompleted ? (
+            <Link href={`/courses/${slug}/certificate`} className={buttonClass("default", "lg")}>
+              <Award className="h-4 w-4" /> รับใบรับรอง
+            </Link>
+          ) : (
+            <Link href={continueHref ?? `/courses/${slug}`} className={buttonClass("default", "lg")}>
+              เรียนต่อ <ChevronRight className="h-4 w-4" />
+            </Link>
+          )}
+          {!result.passed && !result.courseCompleted && (
+            <Button size="lg" variant="outline" onClick={start} loading={busy}>
+              <RotateCcw className="h-4 w-4" /> ทำใหม่เพื่อเพิ่มคะแนน
+            </Button>
+          )}
+        </div>
+        {!result.passed && !result.courseCompleted && <p className="text-xs text-muted-foreground">ระบบใช้คะแนนครั้งที่ดีที่สุดของแต่ละคลิปมารวมกัน</p>}
+        {(result.focusEventCount ?? 0) > 0 && <Alert variant="warning" title={`พบการสลับหน้า ${result.focusEventCount} ครั้ง`}>ระบบบันทึกเหตุการณ์ไว้ประกอบการตรวจสอบแล้ว</Alert>}
+        {error && <Alert variant="destructive" title={error} />}
+      </Card>
+    );
+  }
+
   if (result)
     return (
       <Card className="grid justify-items-center gap-5 p-8 text-center">
@@ -166,7 +215,7 @@ export function QuizRunner({
             {assessmentKind === "pre"
               ? "ประเมินก่อนเรียนเรียบร้อยแล้ว"
               : result.passed
-                ? assessmentKind === "lesson" ? "ผ่านแบบทดสอบประจำบทแล้ว" : "ยินดีด้วย คุณสอบผ่าน!"
+                ? assessmentKind === "lesson" ? "ผ่านแบบทดสอบท้ายคลิปแล้ว" : "ยินดีด้วย คุณสอบผ่าน!"
                 : result.late ? "ส่งคำตอบเกินเวลาที่กำหนด" : "ยังไม่ผ่านเกณฑ์"}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -176,7 +225,7 @@ export function QuizRunner({
         {assessmentKind === "pre" ? (
           <Link href={`/courses/${slug}`} className={buttonClass("default", "lg")}>เริ่มเรียน</Link>
         ) : result.passed && assessmentKind === "lesson" ? (
-          <Link href={`/courses/${slug}`} className={buttonClass("default", "lg")}>กลับไปเรียนต่อ</Link>
+          <Link href={continueHref ?? `/courses/${slug}`} className={buttonClass("default", "lg")}>เรียนต่อ</Link>
         ) : result.passed ? (
           <Link href={`/courses/${slug}/certificate`} className={buttonClass("default", "lg")}>
             <Award className="h-4 w-4" /> รับใบรับรอง

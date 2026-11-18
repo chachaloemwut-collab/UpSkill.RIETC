@@ -23,21 +23,31 @@ export default async function CoursePage({ params }: Props) {
   const user = await getCurrentUser();
   const data = await getCourseForViewer(slug, user);
   if (!data) notFound();
-  const { course, enrollment, lessons, certificate, manager } = data;
+  const { course, enrollment, lessons, certificate, manager, units, lessonTests } = data;
+  const free = data.navigationMode === "free_complete";
+  const averageRule = data.completionRule === "lesson_tests_average";
   const next = lessons.find((l) => l.unlocked && !l.completed && !l.broken);
-  const pendingLessonTest = lessons.find((l) => l.completed && l.lessonTestRequired && !l.lessonTestPassed);
+  const pendingLessonTest = lessons.find((l) => l.completed && l.lessonTestRequired && !l.lessonTestDone);
   const enrolled = !!enrollment && enrollment.status !== "revoked";
-  const done = lessons.filter((l) => l.completed).length;
+  const done = lessons.filter((l) => l.completed && l.lessonTestDone).length;
+  const pendingCheckpoint = lessons.find((l) => l.unlocked && !l.checkpointPassed && l.watchedPercent > 0);
+  // average rule: every test answered but the combined score is short -> retake the tests not yet passed
+  const retakeLesson = averageRule && lessonTests.answered === lessonTests.tests && !lessonTests.passed ? lessons.find((l) => l.lessonTestRequired && !l.lessonTestPassed) : undefined;
   const progress = lessons.length ? Math.round((done / lessons.length) * 100) : 0;
   const vis = VISIBILITY[course.visibility];
 
   const criteria = [
     ...(data.preTest.required ? [{ icon: Target, text: "ทำ Pre-test ก่อนเริ่มเรียน", sub: "ใช้วัดความรู้พื้นฐานและไม่ตัดสิทธิ์การเรียน" }] : []),
-    { icon: Eye, text: `ดูวิดีโอแต่ละบทอย่างน้อย ${course.min_watch_percentage}%`, sub: "ระบบนับเวลาจริง กรอข้ามหรือเร่งความเร็วไม่ได้" },
-    ...(course.is_sequential_locked ? [{ icon: ListOrdered, text: "เรียนตามลำดับบท", sub: "บทถัดไปจะเปิดเมื่อเรียนบทก่อนหน้าครบ" }] : []),
-    { icon: Target, text: `สอบผ่านอย่างน้อย ${course.passing_quiz_score}%`, sub: `สอบได้ ${course.max_quiz_attempts_per_day} ครั้งต่อวัน` },
+    free
+      ? { icon: Eye, text: `ดูวิดีโอครบทั้ง ${lessons.length} คลิป ทุกช่วง`, sub: "เลื่อนดูช่วงไหนก่อนก็ได้ ระบบนับเฉพาะช่วงที่ดูจริงด้วยความเร็วปกติ" }
+      : { icon: Eye, text: `ดูวิดีโอแต่ละคลิปอย่างน้อย ${course.min_watch_percentage}%`, sub: "ดูต่อเนื่องตามลำดับ ระบบนับเวลาจริง" },
+    ...(course.is_sequential_locked ? [{ icon: ListOrdered, text: "เรียนตามลำดับคลิป", sub: "คลิปถัดไปจะเปิดเมื่อเรียนคลิปก่อนหน้าครบ" }] : []),
+    ...(lessons.some((lesson) => lesson.checkpoint) ? [{ icon: Target, text: "ตอบคำถามระหว่างคลิปให้ถูก", sub: "คลิปจะนับว่าครบเมื่อตอบคำถามระหว่างคลิปถูกแล้ว" }] : []),
+    averageRule
+      ? { icon: Target, text: `คะแนนแบบทดสอบท้ายคลิปรวมกันอย่างน้อย ${course.passing_quiz_score}%`, sub: `ต้องทำครบทุกคลิป ทำซ้ำเพื่อเพิ่มคะแนนได้ ${course.max_quiz_attempts_per_day} ครั้งต่อวันต่อคลิป` }
+      : { icon: Target, text: `สอบผ่านอย่างน้อย ${course.passing_quiz_score}%`, sub: `สอบได้ ${course.max_quiz_attempts_per_day} ครั้งต่อวัน` },
     { icon: Timer, text: `เวลาทำแบบทดสอบ ${Math.round(course.quiz_time_limit_sec / 60)} นาที`, sub: "ข้อสอบและตัวเลือกสุ่มลำดับทุกครั้ง" },
-    ...(lessons.some((lesson) => lesson.lessonTestRequired) ? [{ icon: ListOrdered, text: "ผ่านแบบทดสอบระหว่างอบรม", sub: "ต้องผ่านแบบทดสอบประจำบทก่อนเปิดบทถัดไป" }] : []),
+    ...(!averageRule && lessons.some((lesson) => lesson.lessonTestRequired) ? [{ icon: ListOrdered, text: "ผ่านแบบทดสอบระหว่างอบรม", sub: "ต้องผ่านแบบทดสอบท้ายคลิปก่อนไปขั้นถัดไป" }] : []),
     ...(course.credential_enabled ? [{ icon: Award, text: course.credential_name_th, sub: "ตรวจสอบสถานะได้ผ่าน QR Code" }] : []),
   ];
 
@@ -125,8 +135,10 @@ export default async function CoursePage({ params }: Props) {
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
               2
             </span>
-            <p className="font-semibold text-xs text-foreground">เรียนวิดีโอ {lessons.length} บท</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">ผ่านเกณฑ์ ≥ {course.min_watch_percentage}%</p>
+            <p className="font-semibold text-xs text-foreground">
+              เรียนวิดีโอ {lessons.length} คลิป{units.length > 0 ? ` (${units.length} หน่วย)` : ""}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{free ? "ดูครบทุกช่วง" : `ผ่านเกณฑ์ ≥ ${course.min_watch_percentage}%`}</p>
           </div>
 
           {/* Step 3 */}
@@ -135,7 +147,7 @@ export default async function CoursePage({ params }: Props) {
               3
             </span>
             <p className="font-semibold text-xs text-foreground">
-              {lessons.some((l) => l.lessonTestRequired) ? "สอบระหว่างบท" : "Checkpoint ระหว่างเรียน"}
+              {lessons.some((l) => l.lessonTestRequired) ? "แบบทดสอบท้ายคลิป" : "คำถามระหว่างคลิป"}
             </p>
             <p className="text-[11px] text-muted-foreground mt-0.5">ทบทวนความเข้าใจ</p>
           </div>
@@ -145,7 +157,7 @@ export default async function CoursePage({ params }: Props) {
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
               4
             </span>
-            <p className="font-semibold text-xs text-foreground">ทำแบบทดสอบ Post-test</p>
+            <p className="font-semibold text-xs text-foreground">{averageRule ? "คะแนนรวมแบบทดสอบ" : "ทำแบบทดสอบ Post-test"}</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">ผ่านเกณฑ์ ≥ {course.passing_quiz_score}%</p>
           </div>
 
@@ -167,10 +179,11 @@ export default async function CoursePage({ params }: Props) {
             <div className="flex items-center justify-between border-b px-5 py-4">
               <h2 className="font-semibold">เนื้อหาหลักสูตร</h2>
               <span className="text-sm text-muted-foreground">
-                {lessons.length} บท · {formatDuration(course.total_duration_sec)}
+                {units.length > 0 ? `${units.length} หน่วย · ` : ""}
+                {lessons.length} คลิป · {formatDuration(course.total_duration_sec)}
               </span>
             </div>
-            <LessonList slug={course.slug} lessons={lessons} enrolled={enrolled} />
+            <LessonList slug={course.slug} lessons={lessons} units={units} enrolled={enrolled} />
           </Card>
 
           <Card className="p-5">
@@ -200,10 +213,25 @@ export default async function CoursePage({ params }: Props) {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">ความคืบหน้า</span>
                     <span className="font-medium tabular-nums">
-                      {done}/{lessons.length} บท · {progress}%
+                      {done}/{lessons.length} คลิป · {progress}%
                     </span>
                   </div>
                   <Progress value={progress} />
+                </div>
+              )}
+              {enrolled && averageRule && lessonTests.tests > 0 && (
+                <div className="grid gap-1.5 rounded-lg border bg-muted/30 p-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">คะแนนแบบทดสอบท้ายคลิป</span>
+                    <span className="font-medium tabular-nums">
+                      {lessonTests.correct}/{lessonTests.totalQuestions} ข้อ
+                    </span>
+                  </div>
+                  <Progress value={lessonTests.totalQuestions ? (lessonTests.correct / lessonTests.totalQuestions) * 100 : 0} />
+                  <p className="text-xs text-muted-foreground">
+                    ทำแล้ว {lessonTests.answered}/{lessonTests.tests} คลิป · เกณฑ์ผ่าน {course.passing_quiz_score}% (
+                    {Math.ceil((course.passing_quiz_score / 100) * lessonTests.totalQuestions)} ข้อ)
+                  </p>
                 </div>
               )}
               {!enrolled && course.visibility === "archived" ? (
@@ -234,23 +262,35 @@ export default async function CoursePage({ params }: Props) {
                 </Link>
               ) : pendingLessonTest ? (
                 <Link href={`/courses/${course.slug}/lessons/${pendingLessonTest.id}/test`} className={buttonClass("default", "lg", "w-full")}>
-                  ทำแบบทดสอบบทที่ {pendingLessonTest.order} <ArrowRight className="h-4 w-4" />
+                  ทำแบบทดสอบท้ายคลิปที่ {pendingLessonTest.order} <ArrowRight className="h-4 w-4" />
                 </Link>
+              ) : retakeLesson ? (
+                <>
+                  <Alert variant="warning" title={`คะแนนรวมยังไม่ถึง ${course.passing_quiz_score}%`}>ทำแบบทดสอบท้ายคลิปที่ยังตอบไม่ถูกใหม่ได้ ระบบใช้คะแนนครั้งที่ดีที่สุด</Alert>
+                  <Link href={`/courses/${course.slug}/lessons/${retakeLesson.id}/test`} className={buttonClass("default", "lg", "w-full")}>
+                    ทำแบบทดสอบคลิปที่ {retakeLesson.order} ใหม่ <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </>
               ) : data.readyForPostTest ? (
                 <Link href={`/courses/${course.slug}/quiz`} className={buttonClass("default", "lg", "w-full")}>
                   ทำ Post-test ท้ายหลักสูตร <ArrowRight className="h-4 w-4" />
                 </Link>
+              ) : !next && pendingCheckpoint ? (
+                <Link href={`/courses/${course.slug}/lessons/${pendingCheckpoint.id}`} className={buttonClass("default", "lg", "w-full")}>
+                  ตอบคำถามระหว่างคลิปที่ {pendingCheckpoint.order} <ArrowRight className="h-4 w-4" />
+                </Link>
               ) : next ? (
                 <Link href={`/courses/${course.slug}/lessons/${next.id}`} className={buttonClass("default", "lg", "w-full")}>
                   <PlayCircle className="h-4 w-4" />
-                  <span className="truncate">{done > 0 || lessons.some((l) => l.watchedPercent > 0) ? "เรียนต่อ" : "เริ่มเรียน"}: บทที่ {next.order}</span>
+                  <span className="truncate">{done > 0 || lessons.some((l) => l.watchedPercent > 0) ? "เรียนต่อ" : "เริ่มเรียน"}: คลิปที่ {next.order}</span>
                 </Link>
               ) : (
                 <Alert variant="warning" title="บางบทเรียนใช้งานไม่ได้ชั่วคราว">ระบบแจ้งผู้สอนแล้ว</Alert>
               )}
               <ul className="grid gap-2 text-sm text-muted-foreground">
                 <li className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4" /> {lessons.length} บทเรียนวิดีโอ
+                  <BookOpen className="h-4 w-4" /> {units.length > 0 ? `${units.length} หน่วยการเรียนรู้ · ` : ""}
+                  {lessons.length} คลิปวิดีโอ
                 </li>
                 <li className="flex items-center gap-2">
                   <Clock className="h-4 w-4" /> เนื้อหารวม {formatDuration(course.total_duration_sec)}
