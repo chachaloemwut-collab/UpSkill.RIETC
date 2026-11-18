@@ -7,7 +7,6 @@ import {
   Award,
   Check,
   Copy,
-  Download,
   ExternalLink,
   Plus,
   RotateCcw,
@@ -30,6 +29,7 @@ import {
 } from "@/components/ui";
 import { formatDateTh, formatDuration } from "@/lib/format";
 import { api } from "@/lib/api";
+import { DownloadCertificateButton } from "@/components/course/CertificatePanel";
 
 export interface CertificateRow {
   id: string;
@@ -365,13 +365,7 @@ export function CertificatesManager({
                         >
                           <ExternalLink className="h-3.5 w-3.5 mr-1" /> ตรวจสอบ
                         </Link>
-                        <Link
-                          href={`/api/certificates/${encodeURIComponent(c.certificate_code)}/pdf`}
-                          className={buttonClass("outline", "sm", "h-8 px-2")}
-                          title="ดาวน์โหลด PDF"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                        </Link>
+                        <DownloadCertificateButton code={c.certificate_code} variant="outline" size="sm" compact />
                         {c.status !== "revoked" && (
                           <Button
                             variant="destructive"

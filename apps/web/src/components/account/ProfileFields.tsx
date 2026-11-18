@@ -31,9 +31,10 @@ export function readProfile(f: FormData): ProfileInput {
   };
 }
 
-function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+function Section({ title, description, hidden, children }: { title: string; description?: string; hidden?: boolean; children: React.ReactNode }) {
+  // Hidden sections stay mounted so their values are still submitted (multi-step sign-up)
   return (
-    <fieldset className="grid gap-4 rounded-lg border p-4">
+    <fieldset className={hidden ? "hidden" : "grid gap-4 rounded-lg border p-4"} aria-hidden={hidden || undefined}>
       <legend className="px-1 text-sm font-semibold">{title}</legend>
       {description && <p className="-mt-2 text-xs text-muted-foreground">{description}</p>}
       {children}
@@ -43,15 +44,25 @@ function Section({ title, description, children }: { title: string; description?
 
 const titleOptions = (xs: readonly string[]) => xs.map((t) => ({ value: t, label: t }));
 
+/** Which groups are visible. Hidden groups keep their inputs mounted (values survive between sign-up steps). */
+export type ProfilePart = "identity" | "address";
+export const PROFILE_PART_FIELDS: Record<ProfilePart, ReadonlyArray<keyof ProfileErrors>> = {
+  identity: ["titleTh", "firstNameTh", "lastNameTh", "titleEn", "firstNameEn", "lastNameEn", "nationalId", "birthDate", "phone"],
+  address: ["addressLine", "subdistrict", "district", "province", "postalCode", "guardianName", "guardianPhone", "guardianConsent"],
+};
+
 /** Every member-profile input, grouped as on a Thai registration form. Errors come from validateProfile (core). */
-export function ProfileFields({ defaults = {}, errors = {}, namesLocked = false }: { defaults?: ProfileDefaults; errors?: ProfileErrors; namesLocked?: boolean }) {
+export function ProfileFields({
+  defaults = {}, errors = {}, namesLocked = false, show,
+}: { defaults?: ProfileDefaults; errors?: ProfileErrors; namesLocked?: boolean; show?: ProfilePart | "none" | undefined }) {
+  const hide = (part: ProfilePart) => show !== undefined && show !== part;
   const [birthDate, setBirthDate] = useState(defaults.birthDate ?? "");
   const minor = /^\d{4}-\d{2}-\d{2}$/.test(birthDate) && ageOn(birthDate, new Date()) < ADULT_AGE;
   const hasId = !!defaults.nationalIdMasked;
   const nameHint = namesLocked ? "ล็อกแล้วเพราะใช้พิมพ์บนใบรับรอง หากผิดกรุณาติดต่อผู้ดูแลระบบ" : undefined;
   return (
     <div className="grid gap-4">
-      <Section title="ชื่อ-นามสกุล ภาษาไทย" description="ตามบัตรประจำตัวประชาชน ใช้พิมพ์บนใบรับรอง">
+      <Section title="ชื่อ-นามสกุล ภาษาไทย" description="ตามบัตรประจำตัวประชาชน ใช้พิมพ์บนใบรับรอง" hidden={hide("identity")}>
         <div className="grid gap-3 sm:grid-cols-[150px_1fr_1fr]">
           <Field label="คำนำหน้า" error={errors.titleTh}>
             {namesLocked ? <Input name="titleTh" defaultValue={defaults.titleTh} readOnly /> : <Select name="titleTh" defaultValue={defaults.titleTh} options={titleOptions(TITLES_TH)} creatable placeholder="เลือก…" />}
@@ -60,7 +71,7 @@ export function ProfileFields({ defaults = {}, errors = {}, namesLocked = false 
           <Field label="นามสกุล" error={errors.lastNameTh}><Input name="lastNameTh" defaultValue={defaults.lastNameTh} maxLength={100} required readOnly={namesLocked} autoComplete="off" /></Field>
         </div>
       </Section>
-      <Section title="ชื่อ-นามสกุล ภาษาอังกฤษ">
+      <Section title="ชื่อ-นามสกุล ภาษาอังกฤษ" description="ตามบัตรประจำตัวประชาชนหรือหนังสือเดินทาง" hidden={hide("identity")}>
         <div className="grid gap-3 sm:grid-cols-[150px_1fr_1fr]">
           <Field label="Title" error={errors.titleEn}>
             {namesLocked ? <Input name="titleEn" defaultValue={defaults.titleEn} readOnly /> : <Select name="titleEn" defaultValue={defaults.titleEn} options={titleOptions(TITLES_EN)} creatable placeholder="Select…" />}
@@ -69,7 +80,7 @@ export function ProfileFields({ defaults = {}, errors = {}, namesLocked = false 
           <Field label="Last name" error={errors.lastNameEn}><Input name="lastNameEn" defaultValue={defaults.lastNameEn} maxLength={100} required readOnly={namesLocked} autoComplete="family-name" /></Field>
         </div>
       </Section>
-      <Section title="ข้อมูลยืนยันตัวตนและการติดต่อ">
+      <Section title="ข้อมูลยืนยันตัวตนและการติดต่อ" hidden={hide("identity")}>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field
             label="เลขประจำตัวประชาชน"
@@ -88,7 +99,7 @@ export function ProfileFields({ defaults = {}, errors = {}, namesLocked = false 
           <Field label="เบอร์โทรศัพท์มือถือ" error={errors.phone}><Input name="phone" type="tel" inputMode="tel" defaultValue={defaults.phone} maxLength={20} required placeholder="08x-xxx-xxxx" autoComplete="tel" /></Field>
         </div>
       </Section>
-      <Section title="ที่อยู่ที่ติดต่อได้">
+      <Section title="ที่อยู่ที่ติดต่อได้" hidden={hide("address")}>
         <Field label="บ้านเลขที่ หมู่ ซอย ถนน" error={errors.addressLine}><Input name="addressLine" defaultValue={defaults.addressLine} maxLength={255} required autoComplete="street-address" /></Field>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="ตำบล/แขวง" error={errors.subdistrict}><Input name="subdistrict" defaultValue={defaults.subdistrict} maxLength={100} required /></Field>
@@ -100,7 +111,7 @@ export function ProfileFields({ defaults = {}, errors = {}, namesLocked = false 
         </div>
       </Section>
       {minor && (
-        <Section title="ผู้ปกครอง" description={`ผู้สมัครอายุต่ำกว่า ${ADULT_AGE} ปี ต้องได้รับความยินยอมจากผู้ปกครองตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล`}>
+        <Section title="ผู้ปกครอง" description={`ผู้สมัครอายุต่ำกว่า ${ADULT_AGE} ปี ต้องได้รับความยินยอมจากผู้ปกครองตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล`} hidden={hide("address")}>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="ชื่อ-นามสกุลผู้ปกครอง" error={errors.guardianName}><Input name="guardianName" defaultValue={defaults.guardianName} maxLength={255} required /></Field>
             <Field label="เบอร์โทรศัพท์ผู้ปกครอง" error={errors.guardianPhone}><Input name="guardianPhone" type="tel" defaultValue={defaults.guardianPhone} maxLength={20} required /></Field>
