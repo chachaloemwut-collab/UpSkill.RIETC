@@ -126,7 +126,8 @@ export function IssueCertificateButton({ courseId, nameTh, nameEn }: { courseId:
   );
 }
 
-export function DownloadCertificateButton({ code, variant = "default", size = "md" }: { code: string; variant?: "default" | "outline"; size?: "sm" | "md" }) {
+/** `compact` = icon-only (tables), with the label kept as the accessible name/tooltip. */
+export function DownloadCertificateButton({ code, variant = "default", size = "md", compact = false }: { code: string; variant?: "default" | "outline"; size?: "sm" | "md"; compact?: boolean }) {
   const toast = useToast();
   const [play, replay] = usePlay();
   const [state, setState] = useState<"idle" | "working" | "rendering">("idle");
@@ -155,9 +156,15 @@ export function DownloadCertificateButton({ code, variant = "default", size = "m
     setState("idle");
   }
   return (
-    <Button variant={variant} size={size} onClick={() => void download()} loading={state !== "idle"}>
+    <Button
+      variant={variant}
+      size={size}
+      onClick={() => void download()}
+      loading={state !== "idle"}
+      {...(compact ? { "aria-label": state === "rendering" ? "กำลังสร้างไฟล์ PDF" : "ดาวน์โหลด PDF", title: "ดาวน์โหลด PDF", className: "h-8 px-2" } : {})}
+    >
       {state === "idle" && <DownloadIcon play={play} />}
-      {state === "rendering" ? "กำลังสร้างไฟล์ PDF…" : "ดาวน์โหลด PDF"}
+      {!compact && (state === "rendering" ? "กำลังสร้างไฟล์ PDF…" : "ดาวน์โหลด PDF")}
     </Button>
   );
 }
