@@ -99,12 +99,14 @@ export async function issueDeveloperTestCertificate(meta: { ip: string }): Promi
     throw new HttpError(404, "COURSE_NOT_FOUND", "ไม่พบหลักสูตรที่เปิดรับรองสำหรับออกใบประกาศทดสอบ");
   }
 
-  // 3. Check if test certificate already issued for this user & course
+  // 3. One developer TEST certificate ever, in any course (checking only the selected course issued new test
+  //    certificates and "completed" enrollments in real courses whenever the oldest published course changed)
   const existing = await db
     .selectFrom("certificates")
     .select(["certificate_code"])
     .where("user_id", "=", user.id)
-    .where("course_id", "=", course.id)
+    .where("document_type_snapshot", "=", DEVELOPER_TEST_DOCUMENT_TYPE)
+    .orderBy("issued_at", "asc")
     .executeTakeFirst();
 
   if (existing) {
