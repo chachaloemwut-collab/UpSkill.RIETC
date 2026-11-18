@@ -80,3 +80,21 @@
   TEST certificate CERT-2026-CZVY-1K37-EK19 in the krathong contest course (created by the old PR #17 logic).
 - Local dev server (running since 2026-11-14) serves stale Turbopack modules for new/changed server files;
   CI production build is the reliable check until it is restarted.
+
+## 2026-11-18T16:50:41+00:00 (23:50 Asia/Bangkok) — Claude Code: audit batch 1 (PR #28, 1421795)
+
+- งาน / ขอบเขต: Functional Flexibility Audit batch 1 (A01, A05, A07, A08)
+- Branch / commit: `fix/audit-batch-1` → squash merged to main as 1421795 (PR #28)
+- ไฟล์ที่แก้:
+  - `apps/web/src/components/admin/CertificatesManager.tsx` — A01: validate score 0–100 before submit (เดิม `|| 100` ทำให้ 0 กลายเป็น 100)
+  - `apps/web/src/components/admin/EnrollmentAdminActions.tsx` — A01: prompt for score instead of hardcoded 100
+  - `apps/web/src/server/certificates/issue.service.ts` — A05: per-course score via completion_rule; throws SCORE_UNAVAILABLE if incomplete
+  - `apps/web/src/server/admin/certificates.service.ts` — A08: filtered count query for pagination total
+  - `apps/web/src/server/admin/users.service.ts` — A07: "dropped" → "revoked"
+  - `apps/web/src/app/api/admin/enrollments/[id]/status/route.ts` — A07: "dropped" → "revoked" in zod enum
+- ตรวจผ่าน: `pnpm typecheck` clean, `pnpm lint` clean, CI check/codeql/e2e/secrets-scan ✅
+- main CI 44349731706 ✅ → Deploy Jasmine bw2evi7td ✅ → live at 2026-11-18T16:50:41+00:00
+- Production live check: status 1421795 ok, landing/courses/admin pages 200
+- superadmin curl login returned 403 (likely missing CSRF/Origin header in curl — ไม่ได้ retry); deploy script ✅
+- ยังไม่ได้ทำ (audit items ที่เหลือ): A02, A03, A04, A06, A09, A10; 1A LessonPlayer stability; B/G/I modules
+- dfe2fcc (PR #27, one-command release script) released earlier at 16:40 UTC ✅
