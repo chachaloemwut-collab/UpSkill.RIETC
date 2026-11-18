@@ -64,3 +64,19 @@
   superadmin login 200 (one attempt, account untouched)
 - Not done yet: file uploads for application documents (needs generic storage + hosting proxy body-size limit),
   certificate signer line for the krathong course still shows the owner account ("เจ้าของระบบ") — awaiting user decision
+
+## 2026-11-18T16:17:03+00:00 (23:17 Asia/Bangkok) — Claude Code (lease owner "human"): releases 1845e91 + 97ee46f
+
+- 1845e91 (PR #24): fixed the instructor "ผู้เรียน" tab crash (roster read `items`, API returns `learners`) and the
+  developer test certificate being re-issued in a real course after the oldest course was archived (now one ever).
+  The hosting receiver missed the first manifest write (status stayed d520a86 for 10 min); re-uploading the same
+  manifest applied it immediately.
+- 97ee46f (PR #25, migration 0026): document file uploads on course applications (PDF/JPG/PNG ≤ 5 MB, sniffed,
+  owner/applicant-only download, erased with the account). Hosting proxy measured: accepts ≥ 20 MB request bodies.
+- Production data change (via owner account, no deploy): krathong course certificate signer =
+  "วิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง", signer title cleared.
+- Verified live: status 97ee46f ok, all editor tabs load (incl. learners), superadmin login 200 (account untouched).
+- Left as is (needs owner decision): the developer account cha.chaloemwut@gmail.com has a "completed" enrollment +
+  TEST certificate CERT-2026-CZVY-1K37-EK19 in the krathong contest course (created by the old PR #17 logic).
+- Local dev server (running since 2026-11-14) serves stale Turbopack modules for new/changed server files;
+  CI production build is the reliable check until it is restarted.
