@@ -37,3 +37,18 @@
 - ขั้นตอนถัดไป: รอผู้ใช้ยืนยัน → merge PR #18 → deploy ผ่าน workflow Jasmine (migration_compatible=true) →
   ใน worker container รัน `node --import tsx src/import-krathong-contest.ts` (dry-run) แล้วจึง `--apply`
   พร้อมตัดสินใจเรื่อง `--publish` / `--archive krathong-rak-lok` / `--instructor-email`
+
+## 2026-11-18T12:16:06+00:00 (19:16 Asia/Bangkok) — Claude Code (lease owner "human"): production release 99dfb0a + course import
+
+- Release: PR #18 (units/free navigation/combined score) + PR #19 (security: no hardcoded developer test password) →
+  main `99dfb0a` → CI ✅ → Deploy Jasmine run 44299749297 ✅ → manifest uploaded 12:03 UTC via SFTP
+- เส้นทาง release ที่ตกลงกับ hosting: manifest + `jasmine-release.timer` (เปิดถาวร), ดูผลที่ `/files/jasmine-release-status.json`
+  ช่องทาง `deployer` แบบเดิมถูก hosting ปฏิเสธ (build/restart/migrate ได้) — ห้ามขอเปิด และควรลบออกจาก repo
+- ตรวจจริง: `/api/instructor/courses/<id>/units/order` 404 → 401 (โค้ดใหม่ทำงาน), `/api/health` ok,
+  ล็อกอิน superadmin หลัง deploy ผ่าน (HTTP 200) โดยไม่แก้บัญชี
+- ข้อสังเกต: ไฟล์สถานะยังแสดง last_attempt `d6608bb` และ manifest ยังอยู่บนเซิร์ฟเวอร์ แม้โค้ดใหม่ทำงานแล้ว → แจ้ง hosting ตรวจตัวสรุปสถานะ
+- นำเข้าหลักสูตรผ่าน API ของเว็บด้วยบัญชีเจ้าของระบบ (ไม่ใช้ shell): "การจัดทำกระทงรักษ์โลกเพื่อการประกวด" `/courses/course-2bd238`
+  4 หน่วย / 10 คลิป (ความยาวตรงตามแผน 1:19:57) / ข้อสอบท้ายคลิป 10 ข้อ / free_complete + lesson_tests_average 80% / เผยแพร่แล้ว
+  หลักสูตรเดิม `course-889218` → archived (ผู้เรียนเดิมเก็บความคืบหน้าและใบรับรอง) ผู้สอนคนเดิม
+- ยังไม่ได้ทดสอบ: ผู้เรียนจริงเรียนจบและรับประกาศนียบัตรบน production, การกู้คืน backup ฐานข้อมูล (hosting ยังไม่ได้ซ้อม)
+- ห้าม release ช่วงรับผลงานประกวด จันทร์ 23 พ.ย. 2569 17:30–18:30
