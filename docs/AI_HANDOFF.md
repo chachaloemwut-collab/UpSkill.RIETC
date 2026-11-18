@@ -52,3 +52,15 @@
   หลักสูตรเดิม `course-889218` → archived (ผู้เรียนเดิมเก็บความคืบหน้าและใบรับรอง) ผู้สอนคนเดิม
 - ยังไม่ได้ทดสอบ: ผู้เรียนจริงเรียนจบและรับประกาศนียบัตรบน production, การกู้คืน backup ฐานข้อมูล (hosting ยังไม่ได้ซ้อม)
 - ห้าม release ช่วงรับผลงานประกวด จันทร์ 23 พ.ย. 2569 17:30–18:30
+
+## 2026-11-18T13:05:52+00:00 (20:05 Asia/Bangkok) — Claude Code (lease owner "human"): release d520a86
+
+- Merged: PR #20 (release log), #21 (admin certificate PDF link fix + 3-step sign-up), #22 (per-course application form
+  ใบสมัคร, course types, landing without featured course; migration 0025 additive)
+- main CI 44308598275 ✅ → Deploy Jasmine 44309204797 ✅ → manifest uploaded 13:03 UTC → live 13:05 UTC
+  (`/api/courses/<id>/application` 404→401); status file: last_attempt d520a86 ok, rolled_back_to null
+- Verified live: /api/health ok, landing shows course types (no featured course), catalog ?type= filter 200,
+  register page 3 steps, krathong course page unchanged (4 units), admin certificates page has no /pdf links,
+  superadmin login 200 (one attempt, account untouched)
+- Not done yet: file uploads for application documents (needs generic storage + hosting proxy body-size limit),
+  certificate signer line for the krathong course still shows the owner account ("เจ้าของระบบ") — awaiting user decision
