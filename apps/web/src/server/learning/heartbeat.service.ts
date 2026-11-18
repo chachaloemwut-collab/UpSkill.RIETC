@@ -10,12 +10,17 @@
  */
 import "server-only";
 import { sql } from "@upskill/db";
-import { evaluateHeartbeat, hashToken } from "@upskill/core";
+import { evaluateHeartbeat, hashToken, type NavigationMode } from "@upskill/core";
 import { assertActiveLearningSession } from "@upskill/infra/learning-lock";
 import { ctx } from "../context";
 import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import { audit } from "../audit";
+import { asCompletionRule, tryCompleteByLessonTests } from "../courses/completion.service";
+
+export function asNavigationMode(value: string): NavigationMode {
+  return value === "free_complete" ? "free_complete" : "linear";
+}
 
 export async function processHeartbeat(input: {
   userId: string;
@@ -54,7 +59,10 @@ export async function processHeartbeat(input: {
       .select([
         "p.id", "p.watched_chunks", "p.max_watched_sec", "p.last_position_sec", "p.accumulated_valid_sec",
         "p.last_ping_at", "p.segment_start_pos_sec", "p.segment_started_at", "p.is_completed",
-        "l.duration_sec", "c.min_watch_percentage",
+        "l.duration_sec", "c.min_watch_percentage", "c.navigation_mode", "c.completion_rule",
+        // An in-video question must be answered correctly before the lesson can count as completed
+        sql<boolean>`(l.checkpoint_question is null or exists (select 1 from checkpoint_attempts ca
+          where ca.user_id = ${input.userId} and ca.lesson_id = l.id and ca.passed_at is not null))`.as("checkpoint_ok"),
         sql<Date>`now()`.as("db_now"),
       ])
       .where("p.enrollment_id", "=", session.enrollment_id)
@@ -76,7 +84,7 @@ export async function processHeartbeat(input: {
       },
       s.last_seq,
       { seq: input.seq, positionSec: input.positionSec },
-      { durationSec: row.duration_sec, minWatchPercentage: row.min_watch_percentage },
+      { durationSec: row.duration_sec, minWatchPercentage: row.min_watch_percentage, navigationMode: asNavigationMode(row.navigation_mode) },
       new Date(row.db_now).getTime(),
     );
 
@@ -86,6 +94,12 @@ export async function processHeartbeat(input: {
     }
 
     const st = outcome.state;
+    if (outcome.completedNow && !row.checkpoint_ok) {
+      // Watched in full, but the in-video question is still unanswered: completion waits for it
+      // (submitCheckpointAnswer completes the lesson once it is answered correctly).
+      st.isCompleted = false;
+      outcome.completedNow = false;
+    }
     await trx
       .updateTable("lesson_progress")
       .set({
@@ -119,7 +133,9 @@ export async function processHeartbeat(input: {
       await audit(trx, { action: "learning.cheat_flag", userId: input.userId, entityType: "lesson", entityId: input.lessonId, ip: input.ip, details: { reason: outcome.flag } });
     }
 
-    if (outcome.completedNow) {
+    if (outcome.completedNow && asCompletionRule(row.completion_rule) === "lesson_tests_average") {
+      await tryCompleteByLessonTests(trx, session.enrollment_id);
+    } else if (outcome.completedNow) {
       const progress = await trx
         .selectFrom("enrollments as e")
         .innerJoin("courses as c", "c.id", "e.course_id")
@@ -152,6 +168,8 @@ export async function processHeartbeat(input: {
       watchedPercent: Math.floor(outcome.watchedPercent),
       minWatchPercentage: row.min_watch_percentage,
       isCompleted: st.isCompleted,
+      watchedChunks: [...st.watchedChunks].sort((a, b) => a - b),
+      checkpointPending: !row.checkpoint_ok,
     };
   });
 }

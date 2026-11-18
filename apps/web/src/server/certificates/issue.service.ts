@@ -10,6 +10,7 @@ import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import { audit } from "../audit";
 import { enqueueCertificatePdf } from "../queue";
+import { asCompletionRule, lessonTestsSummaryFor } from "../courses/completion.service";
 
 export async function issueCertificate(input: {
   userId: string;
@@ -34,7 +35,7 @@ export async function issueCertificate(input: {
     .innerJoin("users as u", "u.id", "e.user_id")
     .innerJoin("users as ins", "ins.id", "c.instructor_id")
     .select([
-      "e.id as enrollment_id", "e.status", "c.title", "c.visibility", "c.is_verified_course", "c.total_duration_sec",
+      "e.id as enrollment_id", "e.status", "c.title", "c.visibility", "c.is_verified_course", "c.total_duration_sec", "c.completion_rule", "c.passing_quiz_score",
       "c.credential_enabled", "c.credential_type", "c.credential_name_th", "c.credential_name_en", "c.credential_validity_days", "c.credential_signer_name", "c.credential_signer_title", "c.credential_achievement_th", "c.credential_achievement_en", "c.credential_template_key", "c.credential_background_url", "c.credential_text_align",
       "u.email", "u.legal_full_name_th", "u.legal_full_name_en", "u.legal_name_locked_at",
       "ins.legal_full_name_th as ins_th", "ins.legal_full_name_en as ins_en", "ins.email as ins_email",
@@ -58,13 +59,20 @@ export async function issueCertificate(input: {
     .select(sql<number>`coalesce(sum(accumulated_valid_sec), 0)::int`.as("study_sec"))
     .where("enrollment_id", "=", data.enrollment_id)
     .executeTakeFirstOrThrow();
-  const best = await db
-    .selectFrom("quiz_attempts")
-    .select(sql<string>`max(score_percentage)::text`.as("score"))
-    .where("enrollment_id", "=", data.enrollment_id)
-    .where("assessment_type", "=", "post")
-    .where("is_passed", "=", true)
-    .executeTakeFirstOrThrow();
+  const best =
+    asCompletionRule(data.completion_rule) === "lesson_tests_average"
+      ? await (async () => {
+          // No post-test: the certificate shows the combined end-of-lesson test score that completed the course
+          const summary = await lessonTestsSummaryFor(db, data.enrollment_id, input.courseId, data.passing_quiz_score);
+          return { score: summary.passed && summary.totalQuestions > 0 ? String((summary.correct / summary.totalQuestions) * 100) : null };
+        })()
+      : await db
+          .selectFrom("quiz_attempts")
+          .select(sql<string>`max(score_percentage)::text`.as("score"))
+          .where("enrollment_id", "=", data.enrollment_id)
+          .where("assessment_type", "=", "post")
+          .where("is_passed", "=", true)
+          .executeTakeFirstOrThrow();
   if (!best.score && !input.adminOverride) throw new HttpError(403, "QUIZ_NOT_PASSED");
 
   const quizScore = input.adminOverride?.score !== undefined ? input.adminOverride.score.toFixed(2) : (best.score ? Number(best.score).toFixed(2) : "100.00");

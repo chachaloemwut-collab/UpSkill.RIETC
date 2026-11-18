@@ -9,6 +9,7 @@ import { generateToken, hashToken, totalChunksFor } from "@upskill/core";
 import { claimActiveLearningSession } from "@upskill/infra/learning-lock";
 import { ctx } from "../context";
 import { HttpError } from "../http";
+import { asCompletionRule } from "../courses/completion.service";
 
 export async function startLearningSession(input: { userId: string; lessonId: string; ip: string; userAgent: string }) {
   const { db, redis } = ctx();
@@ -20,7 +21,7 @@ export async function startLearningSession(input: { userId: string; lessonId: st
     .leftJoin("program_cohorts as pc", "pc.id", "e.cohort_id")
     .select([
       "l.id", "l.course_id", "l.sequence_order", "l.duration_sec", "l.video_status",
-      "c.visibility", "c.is_sequential_locked", "e.id as enrollment_id", "e.status as enrollment_status",
+      "c.visibility", "c.is_sequential_locked", "c.completion_rule", "e.id as enrollment_id", "e.status as enrollment_status",
       "pc.starts_at as cohort_starts_at",
     ])
     .where("l.id", "=", input.lessonId)
@@ -55,13 +56,24 @@ export async function startLearningSession(input: { userId: string; lessonId: st
       .executeTakeFirstOrThrow();
     if (pending.n > 0) throw new HttpError(403, "PREVIOUS_LESSON_INCOMPLETE");
 
+    // post_test courses: earlier lesson tests must be passed; lesson_tests_average courses: answered is enough
+    // (the combined score decides the course result)
+    const answeredOnly = asCompletionRule(lesson.completion_rule) === "lesson_tests_average";
     const pendingTests = await db
       .selectFrom("lessons as l")
       .select(sql<number>`count(*)::int`.as("n"))
       .where("l.course_id", "=", lesson.course_id)
       .where("l.sequence_order", "<", lesson.sequence_order)
       .where((eb) => eb.exists(eb.selectFrom("quiz_questions as q").select("q.id").whereRef("q.lesson_id", "=", "l.id").where("q.assessment_type", "=", "lesson").where("q.is_active", "=", true)))
-      .where((eb) => eb.not(eb.exists(eb.selectFrom("quiz_attempts as a").select("a.id").where("a.enrollment_id", "=", lesson.enrollment_id).whereRef("a.lesson_id", "=", "l.id").where("a.assessment_type", "=", "lesson").where("a.is_passed", "=", true))))
+      .where((eb) => {
+        const attempts = eb
+          .selectFrom("quiz_attempts as a")
+          .select("a.id")
+          .where("a.enrollment_id", "=", lesson.enrollment_id)
+          .whereRef("a.lesson_id", "=", "l.id")
+          .where("a.assessment_type", "=", "lesson");
+        return eb.not(eb.exists(answeredOnly ? attempts.where("a.submitted_at", "is not", null) : attempts.where("a.is_passed", "=", true)));
+      })
       .executeTakeFirstOrThrow();
     if (pendingTests.n > 0) throw new HttpError(403, "PREVIOUS_LESSON_TEST_REQUIRED");
   }
@@ -127,7 +139,7 @@ export async function startLearningSession(input: { userId: string; lessonId: st
     streamToken: token,
     resumeAtSec: result.progress.last_position_sec,
     maxWatchedSec: result.progress.max_watched_sec,
-    watchedChunks: result.progress.watched_chunks.length,
+    watchedChunks: [...result.progress.watched_chunks].sort((a, b) => a - b),
     totalChunks: totalChunksFor(lesson.duration_sec),
     isCompleted: result.progress.is_completed,
   };
