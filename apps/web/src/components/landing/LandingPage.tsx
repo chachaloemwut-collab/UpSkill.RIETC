@@ -9,13 +9,13 @@ import { listPublicAnnouncements } from "@/server/programs/announcements.service
 import { AnnouncementCard } from "@/components/programs/AnnouncementCard";
 import { UpcomingCohortCard } from "@/components/programs/UpcomingCohortCard";
 import { LandingNav } from "./LandingNav";
-import { LandingCourseShowcase } from "./LandingCourseShowcase";
+import { COURSE_TYPES, COURSE_TYPE_INFO } from "@upskill/core/application";
 
 const STEPS = [
-  { icon: UserPlus, title: "สมัครและลงทะเบียน", text: "สร้างบัญชี แล้วเลือกหลักสูตรที่ต้องการเรียน" },
+  { icon: UserPlus, title: "สมัครและลงทะเบียน", text: "สร้างบัญชี เลือกหลักสูตร และกรอกใบสมัครเมื่อหลักสูตรกำหนด" },
   { icon: PlayCircle, title: "เรียนจากวิดีโอ", text: "ระบบบันทึกเวลาเรียนจริงของแต่ละบทจากฝั่งเซิร์ฟเวอร์" },
-  { icon: ClipboardCheck, title: "ทำแบบทดสอบ", text: "เรียนครบทุกบทแล้วทำแบบทดสอบท้ายหลักสูตรตามเกณฑ์" },
-  { icon: Award, title: "รับใบรับรอง", text: "ใบรับรองลงนามดิจิทัล ตรวจสอบสถานะได้ด้วย QR Code" },
+  { icon: ClipboardCheck, title: "ทำแบบทดสอบ", text: "ทำแบบทดสอบตามเกณฑ์ที่เจ้าของหลักสูตรกำหนด" },
+  { icon: Award, title: "รับใบรับรองหรือประกาศนียบัตร", text: "เอกสารลงนามดิจิทัล ตรวจสอบสถานะได้ด้วย QR Code" },
 ];
 
 const FEATURES = [
@@ -31,8 +31,8 @@ const GRID =
 /** Public landing page for visitors who are not signed in. */
 export async function LandingPage() {
   const [courses, stats, upcoming, announcements] = await Promise.all([listPublishedCourses(), publicStats(), listUpcomingCohorts(3), listPublicAnnouncements({ limit: 3 })]);
-  // Verified courses lead; otherwise newest first (the catalog order)
-  const featured = [...courses].sort((a, b) => Number(b.is_verified_course) - Number(a.is_verified_course)).slice(0, 3);
+  // The landing page promotes no single course: it presents the kinds of training on offer
+  const typeCounts = { certified_training: stats.certifiedTraining, short_course: stats.shortCourses } as const;
   const longContent = stats.durationSec >= 10 * 3600;
   const statItems = [
     { label: "หลักสูตรที่เผยแพร่", value: stats.courses },
@@ -77,7 +77,7 @@ export async function LandingPage() {
             </div>
           </div>
 
-          <HeroVisual coverVideoId={featured[0]?.cover_video_id ?? null} title={featured[0]?.title ?? "บทเรียนตัวอย่าง"} />
+          <HeroVisual coverVideoId={null} title="ห้องเรียนออนไลน์" />
         </div>
       </section>
 
@@ -188,24 +188,49 @@ export async function LandingPage() {
         </section>
       )}
 
-      {/* ---------- Courses ---------- */}
+      {/* ---------- Kinds of training (no single course is promoted here) ---------- */}
       <section id="courses" className="scroll-mt-20 border-t bg-muted/30">
         <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <SectionHeading eyebrow="หลักสูตร" title="หลักสูตรล่าสุด" align="left" />
+            <SectionHeading eyebrow="หลักสูตร" title="เลือกรูปแบบการอบรม" align="left" />
             {courses.length > 0 && (
               <Link href="/courses" className={buttonClass("outline", "md", "group")}>
-                ดูทั้งหมด {courses.length} หลักสูตร <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                ดูหลักสูตรทั้งหมด {courses.length} หลักสูตร <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             )}
           </div>
-          <div className="mt-10">
-            {featured.length === 0 ? (
+          {courses.length === 0 ? (
+            <div className="mt-10">
               <EmptyState icon={<BookOpen className="h-5 w-5" />} title="ยังไม่มีหลักสูตรที่เผยแพร่" />
-            ) : (
-              <LandingCourseShowcase courses={featured} />
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="mt-10 grid gap-5 md:grid-cols-2">
+              {COURSE_TYPES.map((t, i) => {
+                const info = COURSE_TYPE_INFO[t];
+                const Icon = t === "short_course" ? Award : BadgeCheck;
+                return (
+                  <Reveal key={t} delay={i * 80}>
+                    <Link
+                      href={`/courses?type=${t}`}
+                      className="group flex h-full flex-col gap-4 rounded-2xl border bg-card p-6 transition-[box-shadow,translate] hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <Icon className="h-6 w-6" />
+                      </span>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold tracking-tight">{info.label}</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">{info.description}</p>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+                        {typeCounts[t] > 0 ? `ดู ${typeCounts[t]} หลักสูตร` : "ยังไม่มีหลักสูตรที่เปิด"}
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </span>
+                    </Link>
+                  </Reveal>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
@@ -289,7 +314,7 @@ function HeroVisual({ coverVideoId, title }: { coverVideoId: string | null; titl
           <span className="h-2.5 w-2.5 rounded-full bg-warning/60" />
           <span className="h-2.5 w-2.5 rounded-full bg-success/60" />
           <span className="ml-3 h-5 flex-1 rounded-md bg-background/80 text-[10px] text-muted-foreground flex items-center px-2">
-            upskill.rietc.edu.vn / classroom
+            upskillreskill.rietc.ac.th / classroom
           </span>
         </div>
         <CourseCover videoId={coverVideoId} title={title} />
