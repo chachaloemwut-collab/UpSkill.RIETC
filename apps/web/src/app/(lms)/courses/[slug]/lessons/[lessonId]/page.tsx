@@ -62,6 +62,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
           <LockedNotice icon={<TriangleAlert className="h-6 w-6" />} title="วิดีโอคลิปนี้ใช้งานไม่ได้ชั่วคราว" text="ระบบแจ้งผู้สอนแล้ว" />
         ) : (
           <LessonPlayer
+            key={lesson.id}
             lessonId={lesson.id}
             videoId={lesson.videoId}
             durationSec={lesson.durationSec}

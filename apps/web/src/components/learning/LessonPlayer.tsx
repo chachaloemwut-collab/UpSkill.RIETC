@@ -127,6 +127,10 @@ export function LessonPlayer({
   const [checkpointAttemptsLeft, setCheckpointAttemptsLeft] = useState(checkpointState?.attemptsLeft ?? 3);
   const [checkpointLocked, setCheckpointLocked] = useState(checkpointState?.locked ?? false);
   const [rewatch, setRewatch] = useState<{ fromSec: number; toSec: number } | null>(null);
+  /** True while the ENDED finalization heartbeat is in-flight (prevents premature "ยังดูไม่ครบ" flash). */
+  const [confirming, setConfirming] = useState(false);
+  /** Ref to the finalization setTimeout so we can cancel it on cleanup / lesson change. */
+  const finalizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const totalChunks = totalChunksFor(durationSec);
   const watchedCount = Math.min(totalChunks, watchedChunks.length);
@@ -154,6 +158,7 @@ export function LessonPlayer({
   const markCompleted = useCallback(() => {
     setStatus({ kind: "completed" });
     setCompleted(true);
+    setConfirming(false); // finalization resolved — clear the "กำลังยืนยัน" overlay
     if (!completedRef.current) {
       completedRef.current = true;
       router.refresh(); // re-render the server parts (lesson list, next step)
@@ -242,6 +247,10 @@ export function LessonPlayer({
               if (!tokenRef.current) {
                 try {
                   await startSession();
+                  // H05-1: anchor the opening position immediately so the first chunk is credited
+                  // (without this, the server emits FIRST_PING and credits nothing until the second heartbeat)
+                  lastSentAtRef.current = 0; // bypass MIN_INTERVAL rate-limit for this one anchor ping
+                  void sendHeartbeat();
                 } catch {
                   e.target.pauseVideo();
                   toast({ title: "ไม่สามารถเริ่มบันทึกเวลาเรียนได้", description: "กรุณาลองใหม่อีกครั้ง", variant: "destructive" });
@@ -254,8 +263,17 @@ export function LessonPlayer({
               void sendHeartbeat();
             } else if (e.data === YT_STATE.ENDED) {
               setEnded(true);
-              // Wait past MIN_INTERVAL so the final ping isn't ignored as TOO_FREQUENT
-              setTimeout(() => void sendHeartbeat(), HEARTBEAT.MIN_INTERVAL_SEC * 1000 + 100);
+              // H05-3: show "กำลังยืนยันผล…" immediately while finalization is in-flight
+              setConfirming(true);
+              if (finalizeTimerRef.current) clearTimeout(finalizeTimerRef.current);
+              // After MIN_INTERVAL, bypass the rate-limit and send the final heartbeat
+              finalizeTimerRef.current = setTimeout(async () => {
+                if (disposed) return;
+                lastSentAtRef.current = 0; // bypass rate-limit for this finalization ping
+                await sendHeartbeat();
+                // sendHeartbeat calls markCompleted() if isCompleted; otherwise clear confirming
+                if (!disposed) setConfirming(false);
+              }, HEARTBEAT.MIN_INTERVAL_SEC * 1000 + 100);
             }
           },
           onPlaybackRateChange: (e) => {
@@ -273,6 +291,8 @@ export function LessonPlayer({
     });
     return () => {
       disposed = true;
+      // H05-4: cancel any pending finalization timer so it doesn't fire after lesson change/unmount
+      if (finalizeTimerRef.current) clearTimeout(finalizeTimerRef.current);
       created?.destroy();
       playerRef.current = null;
     };
@@ -536,6 +556,13 @@ export function LessonPlayer({
                       <p className="text-sm text-muted-foreground">กำลังอัปเดตขั้นตอนถัดไป…</p>
                     )}
                   </>
+                ) : confirming ? (
+                  /* H05-3: waiting for the finalization heartbeat — do NOT prematurely tell the learner they failed */
+                  <>
+                    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+                    <p className="font-semibold">กำลังยืนยันผล…</p>
+                    <p className="text-sm text-muted-foreground">รอสักครู่</p>
+                  </>
                 ) : (
                   <>
                     <p className="font-semibold">ยังดูไม่ครบ</p>
@@ -550,13 +577,10 @@ export function LessonPlayer({
                       <button type="button" onClick={() => seek(Math.max(0, checkpoint.atSec - 5), true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
                         <CircleHelp className="h-4 w-4" /> ไปที่คำถาม ({clock(checkpoint.atSec)})
                       </button>
-                    ) : free ? (
+                    ) : (
+                      /* H03: guide learner to the specific missing section, not "ดูอีกครั้ง" from start */
                       <button type="button" onClick={jumpToUnwatched} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
                         <FastForward className="h-4 w-4" /> ไปยังช่วงที่ยังไม่ได้ดู
-                      </button>
-                    ) : (
-                      <button type="button" onClick={() => seek(0, true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-                        <RotateCcw className="h-4 w-4" /> ดูอีกครั้ง
                       </button>
                     )}
                   </>

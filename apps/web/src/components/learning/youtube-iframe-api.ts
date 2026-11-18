@@ -46,7 +46,10 @@ export function loadYouTubeIframeApi(): Promise<YTNamespace> {
     // CSP 'strict-dynamic' allows a script injected by our nonced bundle
     s.src = "https://www.youtube.com/iframe_api";
     s.async = true;
-    s.onerror = () => reject(new Error("failed to load YouTube IFrame API"));
+    s.onerror = () => {
+      loading = undefined; // reset so the next caller can retry (rejected promise would be reused otherwise)
+      reject(new Error("failed to load YouTube IFrame API"));
+    };
     document.head.appendChild(s);
   });
   return loading;
