@@ -10,7 +10,8 @@
     "./youtube": "./src/youtube.ts",
     "./cohort": "./src/cohort.ts",
     "./eligibility": "./src/eligibility.ts",
-    "./profile": "./src/profile.ts"
+    "./profile": "./src/profile.ts",
+    "./completion": "./src/completion.ts"
   },
   "//exports": "Client components must import only from the subpaths above (no node:crypto). The '.' entry is server-only.",
   "scripts": {

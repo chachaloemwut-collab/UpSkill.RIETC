@@ -25,7 +25,18 @@ export const HEARTBEAT = {
   POSITION_TOLERANCE_SEC: 4,
   /** Fraction of time for the "real time" condition (spec: 0.9). */
   ACCUMULATED_TIME_FACTOR: 0.9,
+  /**
+   * free_complete mode: the final chunk may stay unwatched when it is this short or shorter
+   * (players often stop a fraction of a second before the true end).
+   */
+  FREE_TAIL_TOLERANCE_SEC: 5,
 } as const;
+
+/**
+ * linear        = watch from the start; seeking past the furthest point watched earns nothing (original rule)
+ * free_complete = seek anywhere, but every part of the video must be watched in real time to complete
+ */
+export type NavigationMode = "linear" | "free_complete";
 
 export interface ProgressState {
   watchedChunks: ReadonlySet<number>;
@@ -40,7 +51,8 @@ export interface ProgressState {
 
 export interface LessonRules {
   durationSec: number;
-  minWatchPercentage: number; // 50..100
+  minWatchPercentage: number; // 50..100 (linear mode only; free_complete always requires every part)
+  navigationMode?: NavigationMode; // default "linear"
 }
 
 export interface Ping {
@@ -59,7 +71,7 @@ export type HeartbeatOutcome =
       newChunks: number[];
       /** "credited" = time counted | "resync" = new segment starts here, no credit */
       mode: "credited" | "resync";
-      resyncReason?: "FIRST_PING" | "GAP" | "SEEK_BACK" | "SEEK_WITHIN_WATCHED" | "UNANCHORED" | "FLAGGED";
+      resyncReason?: "FIRST_PING" | "GAP" | "SEEK_BACK" | "SEEK_WITHIN_WATCHED" | "SEEK_FORWARD" | "UNANCHORED" | "FLAGGED";
       flag?: FlagReason;
       completedNow: boolean;
       watchedPercent: number;
@@ -74,11 +86,64 @@ export function watchedPercentOf(chunks: ReadonlySet<number>, durationSec: numbe
 }
 
 export function meetsCompletion(state: Pick<ProgressState, "watchedChunks" | "accumulatedValidSec">, rules: LessonRules): boolean {
+  if (rules.navigationMode === "free_complete") {
+    const missing = missingChunks(state.watchedChunks, rules.durationSec);
+    const total = totalChunksFor(rules.durationSec);
+    const tailSec = rules.durationSec - (total - 1) * HEARTBEAT.CHUNK_SEC;
+    const coverageOk = missing.length === 0 || (missing.length === 1 && missing[0] === total - 1 && tailSec <= HEARTBEAT.FREE_TAIL_TOLERANCE_SEC);
+    const timeOk = state.accumulatedValidSec >= rules.durationSec * HEARTBEAT.ACCUMULATED_TIME_FACTOR;
+    return coverageOk && timeOk;
+  }
   const pctOk = watchedPercentOf(state.watchedChunks, rules.durationSec) >= rules.minWatchPercentage;
   const timeOk =
     state.accumulatedValidSec >=
     rules.durationSec * (rules.minWatchPercentage / 100) * HEARTBEAT.ACCUMULATED_TIME_FACTOR;
   return pctOk && timeOk;
+}
+
+/** Chunk indexes not yet watched, in order. */
+export function missingChunks(chunks: ReadonlySet<number> | readonly number[], durationSec: number): number[] {
+  const have = chunks instanceof Set ? chunks : new Set(chunks as readonly number[]);
+  const out: number[] = [];
+  for (let i = 0; i < totalChunksFor(durationSec); i++) if (!have.has(i)) out.push(i);
+  return out;
+}
+
+/** Unwatched parts of a video as merged second ranges [fromSec, toSec) — for the learner's coverage map. */
+export function unwatchedRanges(chunks: ReadonlySet<number> | readonly number[], durationSec: number): Array<{ fromSec: number; toSec: number }> {
+  const ranges: Array<{ fromSec: number; toSec: number }> = [];
+  for (const c of missingChunks(chunks, durationSec)) {
+    const fromSec = c * HEARTBEAT.CHUNK_SEC;
+    const toSec = Math.min(durationSec, fromSec + HEARTBEAT.CHUNK_SEC);
+    const last = ranges.at(-1);
+    if (last && last.toSec === fromSec) last.toSec = toSec;
+    else ranges.push({ fromSec, toSec });
+  }
+  return ranges;
+}
+
+/** Watched parts as merged second ranges [fromSec, toSec). */
+export function watchedRanges(chunks: ReadonlySet<number> | readonly number[], durationSec: number): Array<{ fromSec: number; toSec: number }> {
+  const sorted = [...(chunks instanceof Set ? chunks : new Set(chunks as readonly number[]))].filter((c) => c >= 0 && c < totalChunksFor(durationSec)).sort((a, b) => a - b);
+  const ranges: Array<{ fromSec: number; toSec: number }> = [];
+  for (const c of sorted) {
+    const fromSec = c * HEARTBEAT.CHUNK_SEC;
+    const toSec = Math.min(durationSec, fromSec + HEARTBEAT.CHUNK_SEC);
+    const last = ranges.at(-1);
+    if (last && last.toSec === fromSec) last.toSec = toSec;
+    else ranges.push({ fromSec, toSec });
+  }
+  return ranges;
+}
+
+/**
+ * Where "jump to the next unwatched part" should go from the current position: the start of the first gap
+ * after `fromSec`, wrapping to the earliest gap. null when everything has been watched.
+ */
+export function nextUnwatchedSec(chunks: ReadonlySet<number> | readonly number[], durationSec: number, fromSec: number): number | null {
+  const gaps = unwatchedRanges(chunks, durationSec);
+  if (gaps.length === 0) return null;
+  return (gaps.find((g) => g.fromSec > fromSec) ?? gaps[0]!).fromSec;
 }
 
 /** Chunk indexes covered by the playback range [fromSec, toSec). */
@@ -151,14 +216,22 @@ export function evaluateHeartbeat(
   const segWall = (nowMs - segAtMs) / 1000;
   const tooFast = delta > elapsedSec + T || segContent > segWall + T;
 
+  const free = rules.navigationMode === "free_complete";
   if (tooFast) {
     // Jumping forward within already-watched content is allowed (normal seek). Beyond the frontier = flag.
     if (position <= prev.maxWatchedSec + T) return resync("SEEK_WITHIN_WATCHED");
+    if (free) {
+      // Free navigation: a single big jump is a seek (allowed, the skipped part simply stays unwatched).
+      // Small steady overruns that only the cumulative check catches are playback-speed tampering.
+      if (delta > elapsedSec + T) return resync("SEEK_FORWARD");
+      return resync("FLAGGED", "POSITION_JUMP");
+    }
     return resync("FLAGGED", "POSITION_JUMP");
   }
 
-  // Segment not anchored to the frontier (e.g. started from a point never watched) -> no credit
-  const anchored = prev.lastPositionSec <= prev.maxWatchedSec + T;
+  // Segment not anchored to the frontier (e.g. started from a point never watched) -> no credit.
+  // In free navigation every real-time segment counts wherever it starts.
+  const anchored = free || prev.lastPositionSec <= prev.maxWatchedSec + T;
   if (!anchored) return resync("UNANCHORED");
 
   const from = Math.max(0, Math.min(prev.lastPositionSec, position));
