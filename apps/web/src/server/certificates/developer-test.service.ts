@@ -8,7 +8,6 @@ import {
   signCertificate,
   type CertificatePayload,
 } from "@upskill/core";
-import { hashPassword } from "@upskill/infra/password";
 import { ctx } from "../context";
 import { HttpError } from "../http";
 import { audit } from "../audit";
@@ -33,8 +32,6 @@ export async function issueDeveloperTestCertificate(meta: { ip: string }): Promi
           role: "member",
           status: "active",
           email_verified_at: new Date(),
-          password_hash: await hashPassword("DeveloperTestPass123!"),
-          password_updated_at: new Date(),
           legal_full_name_th: "เฉลิมวุฒิ ชา",
           legal_full_name_en: "Chaloemwut Cha",
           legal_name_locked_at: new Date(),
