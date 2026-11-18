@@ -24,6 +24,7 @@ export const RATE_LIMITS = {
   verifyPublicPerIp: { name: "verify:ip", limit: 60, windowMs: 60_000 },
   videoReportPerUser: { name: "vreport:user", limit: 10, windowMs: 15 * 60_000 },
   cohortApplyPerUser: { name: "cohort-apply:user", limit: 20, windowMs: 15 * 60_000 },
+  courseApplyPerUser: { name: "course-apply:user", limit: 20, windowMs: 15 * 60_000 },
 } satisfies Record<string, RateLimitRule>;
 
 export interface RateLimitResult {

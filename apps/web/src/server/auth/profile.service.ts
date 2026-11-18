@@ -125,7 +125,7 @@ export async function getMyProfile(userId: string) {
   };
 }
 
-function toIsoDate(d: Date | string): string {
+export function toIsoDate(d: Date | string): string {
   if (typeof d === "string") return d.slice(0, 10);
   // DATE columns arrive as local-midnight Dates from node-postgres
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

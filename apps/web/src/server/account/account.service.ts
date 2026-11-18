@@ -14,7 +14,7 @@ import { revokeAllSessions, type CurrentUser } from "../auth/session";
 
 export async function exportUserData(user: CurrentUser): Promise<Record<string, unknown>> {
   const { db } = ctx();
-  const [profile, prefs, enrollments, certificates, registrations] = await Promise.all([
+  const [profile, prefs, enrollments, certificates, registrations, applications] = await Promise.all([
     db
       .selectFrom("user_profiles")
       .select([
@@ -40,6 +40,12 @@ export async function exportUserData(user: CurrentUser): Promise<Record<string, 
       .where("r.user_id", "=", user.id)
       .orderBy("r.applied_at")
       .execute(),
+    db
+      .selectFrom("course_applications")
+      .select(["application_no", "status", "created_at", "course_snapshot", "applicant", "education", "occupation", "guardian", "documents", "declaration_name"])
+      .where("user_id", "=", user.id)
+      .orderBy("created_at")
+      .execute(),
   ]);
   return {
     account: { id: user.id, email: user.email, username: user.username ?? null, role: user.role },
@@ -48,6 +54,7 @@ export async function exportUserData(user: CurrentUser): Promise<Record<string, 
     enrollments,
     certificates,
     cohortRegistrations: registrations,
+    courseApplications: applications,
     exportedAt: new Date().toISOString(),
   };
 }
@@ -70,6 +77,12 @@ export async function deleteOwnAccount(user: CurrentUser, meta: { ip: string }):
       .executeTakeFirst();
     if (Number(r.numUpdatedRows) === 0) throw new HttpError(409, "ALREADY_DELETED");
     await trx.deleteFrom("user_profiles").where("user_id", "=", user.id).execute();
+    // Applications: drop the personal data, keep the registry fields (number, status, payment/receipt) for the records
+    await trx
+      .updateTable("course_applications")
+      .set({ applicant: "{}", education: null, occupation: null, guardian: null, declaration_name: "(ลบข้อมูลตามคำขอของเจ้าของข้อมูล)", staff_note: null, updated_at: new Date() })
+      .where("user_id", "=", user.id)
+      .execute();
   });
   await revokeAllSessions(user.id, "account_deleted");
   await audit(db, { action: "auth.account_deleted", userId: user.id, ip: meta.ip });
