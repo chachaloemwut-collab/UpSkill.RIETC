@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_APPLICATION_SETTINGS, formatApplicationNo, parseApplicationSettings, validateApplication, type ApplicationInput } from "./application.ts";
+import { DEFAULT_APPLICATION_SETTINGS, cleanFileName, formatApplicationNo, parseApplicationSettings, sniffApplicationFile, validateApplication, type ApplicationInput } from "./application.ts";
 
 const base: ApplicationInput = {
   contact: { phone: "081-234-5678", email: "", addressLine: "99 หมู่ 1", subdistrict: "มาบตาพุด", district: "เมืองระยอง", province: "ระยอง", postalCode: "21150" },
@@ -71,5 +71,30 @@ describe("formatApplicationNo", () => {
   it("uses the Buddhist-era year in Bangkok time", () => {
     expect(formatApplicationNo(new Date("2026-11-18T10:00:00Z"), 42)).toBe("APP-2569-000042");
     expect(formatApplicationNo(new Date("2026-12-31T18:00:00Z"), 1)).toBe("APP-2570-000001"); // already Jan 1 in Bangkok
+  });
+});
+
+describe("attached files", () => {
+  it("sniffs PDF/JPEG/PNG by magic bytes and rejects everything else", () => {
+    expect(sniffApplicationFile(new TextEncoder().encode("%PDF-1.7\n"))).toBe("application/pdf");
+    expect(sniffApplicationFile(Uint8Array.from([0xff, 0xd8, 0xff, 0xe0]))).toBe("image/jpeg");
+    expect(sniffApplicationFile(Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe("image/png");
+    expect(sniffApplicationFile(new TextEncoder().encode("<html><script>"))).toBeNull();
+    expect(sniffApplicationFile(new Uint8Array())).toBeNull();
+  });
+
+  it("cleans file names (no paths, control chars) and fixes the extension", () => {
+    expect(cleanFileName("C:\\fake\\..\\บัตร ประชาชน.PDF", "application/pdf")).toBe("บัตร ประชาชน.PDF");
+    expect(cleanFileName("../../etc/passwd", "image/png")).toBe("passwd.png");
+    expect(cleanFileName("", "image/jpeg")).toBe("document.jpg");
+  });
+
+  it("required uploads: every declared document needs a file; a file also counts as declaring", () => {
+    const s = parseApplicationSettings({ documentUploads: "required", documents: [{ key: "id_card", label: "บัตร", required: true }, { key: "photo", label: "รูป" }] });
+    const noFile = validateApplication(s, { ...base, documents: { id_card: true } }, ctx);
+    expect(noFile.errors["documents.id_card"]).toBe("กรุณาแนบไฟล์เอกสารนี้");
+    const ok = validateApplication(s, { ...base, documents: {} }, { ...ctx, uploadedDocKeys: ["id_card"] });
+    expect(ok.errors).toEqual({});
+    expect(ok.value?.documents).toEqual({ id_card: true, photo: false });
   });
 });

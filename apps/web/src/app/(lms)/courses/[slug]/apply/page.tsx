@@ -64,6 +64,7 @@ export default async function ApplyPage({ params }: { params: Promise<{ slug: st
           settings={context.settings}
           profile={context.profile}
           minor={context.minor}
+          pendingFiles={context.pendingFiles}
         />
       )}
     </div>

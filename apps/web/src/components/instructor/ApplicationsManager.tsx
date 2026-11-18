@@ -5,7 +5,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Check, ChevronDown, Download, FileText, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Download, FileText, Paperclip, Plus, Trash2, X } from "lucide-react";
 import {
   APPLICATION_STATUS_LABEL,
   PAYMENT_STATUSES,
@@ -36,6 +36,7 @@ export interface EditorApplication {
   guardian: unknown;
   documents: unknown;
   declaration_name: string;
+  files?: Array<{ id: string; doc_key: string; original_name: string; size_bytes: number }>;
 }
 
 const STANDARD_DOCUMENTS: ApplicationDocument[] = [
@@ -97,6 +98,7 @@ function ApplicationSettingsCard({ base, rawSettings }: { base: string; rawSetti
             education: f.get("education"),
             occupation: f.get("occupation"),
             documents: docs.filter((d) => d.label.trim()),
+            documentUploads: f.get("documentUploads"),
             requireApproval: f.get("requireApproval") === "on",
             fee: Number(f.get("fee") || 0),
           },
@@ -135,6 +137,13 @@ function ApplicationSettingsCard({ base, rawSettings }: { base: string; rawSetti
             <Field label="ข้อมูลอาชีพ">
               <Select name="occupation" defaultValue={initial.occupation}>
                 {(["off", "optional", "required"] as const).map((m) => <option key={m} value={m}>{MODE_LABEL[m]}</option>)}
+              </Select>
+            </Field>
+            <Field label="การแนบไฟล์เอกสาร" hint="PDF, JPG หรือ PNG ไม่เกิน 5 MB ต่อไฟล์">
+              <Select name="documentUploads" defaultValue={initial.documentUploads}>
+                <option value="off">ไม่ต้องแนบไฟล์ (ติ๊กรายการเท่านั้น)</option>
+                <option value="optional">แนบไฟล์ได้ (ไม่บังคับ)</option>
+                <option value="required">ต้องแนบไฟล์ทุกเอกสารที่ยื่น</option>
               </Select>
             </Field>
             <Field label="ค่าลงทะเบียน (บาท)" hint="0 = ไม่มีค่าใช้จ่าย"><Input name="fee" type="number" min={0} max={1000000} defaultValue={initial.fee} /></Field>
@@ -234,6 +243,9 @@ function ApplicationDetail({ base, app }: { base: string; app: EditorApplication
   const docs = (app.documents ?? {}) as Record<string, { label: string; declared: boolean; verified: boolean | null }>;
   const [docVerify, setDocVerify] = useState<Record<string, boolean | null>>(Object.fromEntries(Object.entries(docs).map(([k, d]) => [k, d.verified ?? null])));
   const url = `${base}/applications/${app.id}`;
+  // base = /api/instructor/courses/<id> → files are served by /api/courses/<id>/application/files/<fileId>
+  const fileBase = `${base.replace("/api/instructor/courses/", "/api/courses/")}/application/files`;
+  const fileFor = (docKey: string) => app.files?.find((f) => f.doc_key === docKey);
 
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -277,7 +289,14 @@ function ApplicationDetail({ base, app }: { base: string; app: EditorApplication
             <p className="text-xs font-semibold">ผลตรวจเอกสาร</p>
             {Object.entries(docs).map(([k, d]) => (
               <div key={k} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span>{d.declared ? "☑" : "☐"} {d.label}</span>
+                <span className="grid">
+                  <span>{d.declared ? "☑" : "☐"} {d.label}</span>
+                  {fileFor(k) && (
+                    <a href={`${fileBase}/${fileFor(k)!.id}`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                      <Paperclip className="h-3 w-3" /> {fileFor(k)!.original_name}
+                    </a>
+                  )}
+                </span>
                 <div className="flex gap-1">
                   {([true, false, null] as const).map((v) => (
                     <button

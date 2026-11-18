@@ -27,6 +27,8 @@ export interface ApplicationSettings {
   occupation: FieldMode;
   /** หมวด 7: documents the applicant declares they will submit (checklist; staff verify) */
   documents: ApplicationDocument[];
+  /** Attach files to the documents: off = checklist only, optional, required = every declared document needs a file */
+  documentUploads: FieldMode;
   /** Staff must approve before the applicant is enrolled */
   requireApproval: boolean;
   /** Fee in baht (0 = free); staff record payment and receipt numbers */
@@ -42,6 +44,7 @@ export const DEFAULT_APPLICATION_SETTINGS: ApplicationSettings = {
   education: "optional",
   occupation: "optional",
   documents: [],
+  documentUploads: "off",
   requireApproval: false,
   fee: 0,
 };
@@ -100,6 +103,7 @@ export function parseApplicationSettings(raw: unknown): ApplicationSettings {
     education: mode(o.education, DEFAULT_APPLICATION_SETTINGS.education),
     occupation: mode(o.occupation, DEFAULT_APPLICATION_SETTINGS.occupation),
     documents: documents.slice(0, APPLICATION_LIMITS.documents),
+    documentUploads: mode(o.documentUploads, DEFAULT_APPLICATION_SETTINGS.documentUploads),
     requireApproval: o.requireApproval === true,
     fee,
   };
@@ -139,7 +143,7 @@ const sameName = (a: string, b: string) => a.replace(/\s+/g, "") === b.replace(/
 export function validateApplication(
   settings: ApplicationSettings,
   input: ApplicationInput,
-  ctx: { minor: boolean; expectedSignature: string; expectedSignatureWithTitle?: string },
+  ctx: { minor: boolean; expectedSignature: string; expectedSignatureWithTitle?: string; uploadedDocKeys?: readonly string[] },
 ): { value: ApplicationValues | null; errors: ApplicationErrors } {
   const e: ApplicationErrors = {};
   const c = input.contact ?? ({} as ApplicationInput["contact"]);
@@ -194,9 +198,12 @@ export function validateApplication(
   }
 
   const documents: Record<string, boolean> = {};
+  const uploaded = new Set(settings.documentUploads === "off" ? [] : (ctx.uploadedDocKeys ?? []));
   for (const d of settings.documents) {
-    documents[d.key] = input.documents?.[d.key] === true;
+    // An attached file counts as declaring that document
+    documents[d.key] = input.documents?.[d.key] === true || uploaded.has(d.key);
     if (d.required && !documents[d.key]) e[`documents.${d.key}`] = "เอกสารนี้จำเป็นต้องยื่น";
+    else if (settings.documentUploads === "required" && documents[d.key] && !uploaded.has(d.key)) e[`documents.${d.key}`] = "กรุณาแนบไฟล์เอกสารนี้";
   }
 
   const signatureName = str(input.declaration?.signatureName, APPLICATION_LIMITS.signature);
@@ -234,4 +241,29 @@ export const COURSE_TYPE_INFO: Record<CourseType, { label: string; short: string
 };
 export function asCourseType(v: unknown): CourseType {
   return v === "short_course" ? "short_course" : "certified_training";
+}
+
+
+// ------------------------------------------------------------------ attached files
+export const APPLICATION_FILE_MAX_BYTES = 5 * 1024 * 1024;
+export const APPLICATION_FILE_MAX_PENDING = 20;
+export type ApplicationFileType = "application/pdf" | "image/jpeg" | "image/png";
+export const APPLICATION_FILE_EXT: Record<ApplicationFileType, string> = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" };
+
+/** Detect the file type from its first bytes (never trust the client's name or Content-Type). */
+export function sniffApplicationFile(bytes: Uint8Array): ApplicationFileType | null {
+  const b = (i: number) => bytes[i] ?? -1;
+  if (b(0) === 0x25 && b(1) === 0x50 && b(2) === 0x44 && b(3) === 0x46 && b(4) === 0x2d) return "application/pdf"; // %PDF-
+  if (b(0) === 0xff && b(1) === 0xd8 && b(2) === 0xff) return "image/jpeg";
+  if (b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4e && b(3) === 0x47 && b(4) === 0x0d && b(5) === 0x0a && b(6) === 0x1a && b(7) === 0x0a) return "image/png";
+  return null;
+}
+
+/** Keep a display-safe file name: no path parts or control characters, bounded length. */
+export function cleanFileName(raw: string, type: ApplicationFileType): string {
+  // eslint-disable-next-line no-control-regex
+  const base = (raw.split(/[\\/]/).pop() ?? "").normalize("NFC").replace(/[\u0000-\u001f\u007f"<>|*?:]/g, "").trim().slice(0, 200);
+  const ext = APPLICATION_FILE_EXT[type];
+  const name = base || `document.${ext}`;
+  return name.toLowerCase().endsWith(`.${ext}`) ? name : `${name}.${ext}`;
 }

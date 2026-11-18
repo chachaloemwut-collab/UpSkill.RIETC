@@ -148,6 +148,20 @@ export interface CohortWatches {
   user_id: string;
 }
 
+export interface CourseApplicationFiles {
+  application_id: string | null;
+  content_type: string;
+  course_id: string;
+  created_at: Generated<Timestamp>;
+  doc_key: string;
+  id: Generated<string>;
+  original_name: string;
+  sha256: Buffer;
+  size_bytes: number;
+  storage_key: string;
+  user_id: string;
+}
+
 export interface CourseApplications {
   applicant: Generated<Json>;
   application_no: string;
@@ -609,6 +623,7 @@ export interface DB {
   checkpoint_attempts: CheckpointAttempts;
   cohort_registrations: CohortRegistrations;
   cohort_watches: CohortWatches;
+  course_application_files: CourseApplicationFiles;
   course_applications: CourseApplications;
   course_assignment_recipients: CourseAssignmentRecipients;
   course_assignments: CourseAssignments;

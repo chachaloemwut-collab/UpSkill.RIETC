@@ -7,8 +7,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { CheckCircle2, ClipboardList, Printer } from "lucide-react";
+import { CheckCircle2, ClipboardList, FileUp, Paperclip, Printer, X } from "lucide-react";
 import {
+  APPLICATION_FILE_MAX_BYTES,
   EDUCATION_LEVELS,
   GUARDIAN_RELATIONS,
   OCCUPATIONS,
@@ -82,8 +83,19 @@ export function CourseInfoRows({ title, settings }: { title: string; settings: P
   );
 }
 
+export interface ApplicationFile {
+  id: string;
+  doc_key: string;
+  original_name: string;
+  content_type: string;
+  size_bytes: number;
+}
+
+const fileSize = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+const ACCEPT = "application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png";
+
 export function CourseApplicationForm({
-  courseId, courseSlug, courseTitle, settings, profile, minor,
+  courseId, courseSlug, courseTitle, settings, profile, minor, pendingFiles = [],
 }: {
   courseId: string;
   courseSlug: string;
@@ -91,6 +103,7 @@ export function CourseApplicationForm({
   settings: ApplicationSettings;
   profile: ApplyProfile;
   minor: boolean;
+  pendingFiles?: ApplicationFile[];
 }) {
   const router = useRouter();
   const [contact, setContact] = useState<ApplicationInput["contact"]>({
@@ -100,7 +113,53 @@ export function CourseApplicationForm({
   const [education, setEducation] = useState({ level: "", institution: "", qualification: "" });
   const [occupation, setOccupation] = useState({ occupation: "", organization: "" });
   const [guardian, setGuardian] = useState({ name: profile.guardian_name ?? "", relation: "", phone: profile.guardian_phone ?? "", consent: false });
-  const [documents, setDocuments] = useState<Record<string, boolean>>({});
+  const [documents, setDocuments] = useState<Record<string, boolean>>(Object.fromEntries(pendingFiles.map((f) => [f.doc_key, true])));
+  // newest file per document (the server keeps one per document)
+  const [files, setFiles] = useState<Record<string, ApplicationFile>>(() => {
+    const m: Record<string, ApplicationFile> = {};
+    for (const f of pendingFiles) m[f.doc_key] ??= f;
+    return m;
+  });
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<Record<string, string>>({});
+  const uploads = settings.documentUploads !== "off";
+
+  async function upload(docKey: string, file: File) {
+    setUploadError((x) => ({ ...x, [docKey]: "" }));
+    if (!/\.(pdf|jpe?g|png)$/i.test(file.name) && !["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
+      setUploadError((x) => ({ ...x, [docKey]: "รองรับเฉพาะไฟล์ PDF, JPG หรือ PNG" }));
+      return;
+    }
+    if (file.size > APPLICATION_FILE_MAX_BYTES) {
+      setUploadError((x) => ({ ...x, [docKey]: `ไฟล์ใหญ่เกิน 5 MB (${fileSize(file.size)})` }));
+      return;
+    }
+    setUploading(docKey);
+    try {
+      const res = await fetch(`/api/courses/${courseId}/application/files?doc=${encodeURIComponent(docKey)}`, {
+        method: "POST",
+        headers: { "content-type": "application/octet-stream", "x-file-name": encodeURIComponent(file.name) },
+        body: file,
+        credentials: "same-origin",
+      });
+      const data = (await res.json().catch(() => ({}))) as ApplicationFile & { message?: string; error?: string };
+      if (!res.ok) throw new Error(data.message ?? (res.status === 413 ? "ไฟล์ใหญ่เกิน 5 MB" : "อัปโหลดไม่สำเร็จ"));
+      setFiles((x) => ({ ...x, [docKey]: data }));
+      setDocuments((x) => ({ ...x, [docKey]: true }));
+    } catch (e) {
+      setUploadError((x) => ({ ...x, [docKey]: e instanceof Error ? e.message : "อัปโหลดไม่สำเร็จ" }));
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  async function removeFile(docKey: string) {
+    const f = files[docKey];
+    if (!f) return;
+    const r = await api(`/api/courses/${courseId}/application/files/${f.id}`, { method: "DELETE" });
+    if (r.ok) setFiles((x) => Object.fromEntries(Object.entries(x).filter(([k]) => k !== docKey)));
+    else setUploadError((x) => ({ ...x, [docKey]: r.message }));
+  }
   const [signatureName, setSignatureName] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [errors, setErrors] = useState<ApplicationErrors>({});
@@ -121,7 +180,12 @@ export function CourseApplicationForm({
       declaration: { signatureName, accepted },
       pdpaConsent: new FormData(form).get("pdpaConsent") === "on",
     };
-    const checked = validateApplication(settings, input, { minor, expectedSignature: expected, expectedSignatureWithTitle: `${profile.title_th}${expected}` });
+    const checked = validateApplication(settings, input, {
+      minor,
+      expectedSignature: expected,
+      expectedSignatureWithTitle: `${profile.title_th}${expected}`,
+      uploadedDocKeys: Object.keys(files),
+    });
     setErrors(checked.errors);
     if (!checked.value) {
       setError("กรุณาแก้ไขช่องที่มีข้อความสีแดง");
@@ -253,18 +317,64 @@ export function CourseApplicationForm({
       )}
 
       {settings.documents.length > 0 && (
-        <Section n={++n} title="เอกสารประกอบการสมัคร" hint="ทำเครื่องหมายเอกสารที่คุณจะยื่นตามประกาศรับสมัคร เจ้าหน้าที่จะตรวจสอบหลักฐานอีกครั้ง">
-          <div className="grid gap-2">
-            {settings.documents.map((d) => (
-              <div key={d.key}>
-                <Checkbox
-                  checked={documents[d.key] === true}
-                  onChange={(e) => setDocuments((x) => ({ ...x, [d.key]: e.target.checked }))}
-                  label={`${d.label}${d.required ? " (จำเป็น)" : ""}`}
-                />
-                {err(`documents.${d.key}`) && <p className="mt-1 text-xs text-destructive">{err(`documents.${d.key}`)}</p>}
-              </div>
-            ))}
+        <Section
+          n={++n}
+          title="เอกสารประกอบการสมัคร"
+          hint={
+            settings.documentUploads === "required"
+              ? "แนบไฟล์ทุกเอกสารที่ยื่น (PDF, JPG หรือ PNG ไม่เกิน 5 MB ต่อไฟล์) เจ้าหน้าที่จะตรวจสอบหลักฐาน"
+              : uploads
+                ? "ทำเครื่องหมายเอกสารที่จะยื่น และแนบไฟล์ได้ (PDF, JPG หรือ PNG ไม่เกิน 5 MB ต่อไฟล์)"
+                : "ทำเครื่องหมายเอกสารที่คุณจะยื่นตามประกาศรับสมัคร เจ้าหน้าที่จะตรวจสอบหลักฐานอีกครั้ง"
+          }
+        >
+          <div className="grid gap-3">
+            {settings.documents.map((d) => {
+              const f = files[d.key];
+              return (
+                <div key={d.key} className="grid gap-2 rounded-lg border p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Checkbox
+                      checked={documents[d.key] === true || !!f}
+                      disabled={!!f}
+                      onChange={(e) => setDocuments((x) => ({ ...x, [d.key]: e.target.checked }))}
+                      label={`${d.label}${d.required ? " (จำเป็น)" : ""}`}
+                    />
+                    {uploads && !f && (
+                      <label className={buttonClass("outline", "sm", "cursor-pointer gap-1.5")}>
+                        <FileUp className="h-4 w-4" /> {uploading === d.key ? "กำลังอัปโหลด…" : "แนบไฟล์"}
+                        <input
+                          type="file"
+                          accept={ACCEPT}
+                          className="sr-only"
+                          disabled={uploading !== null}
+                          onChange={(e) => {
+                            const file = e.currentTarget.files?.[0];
+                            e.currentTarget.value = "";
+                            if (file) void upload(d.key, file);
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  {f && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 px-3 py-2 text-sm">
+                      <a href={`/api/courses/${courseId}/application/files/${f.id}`} className="inline-flex min-w-0 items-center gap-1.5 font-medium text-primary hover:underline">
+                        <Paperclip className="h-4 w-4 shrink-0" /> <span className="truncate">{f.original_name}</span>
+                      </a>
+                      <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {fileSize(f.size_bytes)}
+                        <button type="button" onClick={() => void removeFile(d.key)} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-background hover:text-destructive" aria-label={`ลบไฟล์ ${f.original_name}`}>
+                          <X className="h-3.5 w-3.5" /> ลบ
+                        </button>
+                      </span>
+                    </div>
+                  )}
+                  {uploadError[d.key] && <p className="text-xs text-destructive">{uploadError[d.key]}</p>}
+                  {err(`documents.${d.key}`) && <p className="text-xs text-destructive">{err(`documents.${d.key}`)}</p>}
+                </div>
+              );
+            })}
           </div>
         </Section>
       )}
@@ -298,6 +408,7 @@ export function ApplicationSummary({
     application_no: string; status: string; verification_status: string; payment_status: string; receipt_no: string | null;
     created_at: string | Date; course_snapshot: unknown; applicant: unknown; education: unknown; occupation: unknown; guardian: unknown;
     documents: unknown; declaration_name: string; declared_at: string | Date;
+    files?: ApplicationFile[]; courseId?: string;
   };
   courseSlug: string;
 }) {
@@ -363,6 +474,17 @@ export function ApplicationSummary({
               </li>
             ))}
           </ul>
+          {application.files && application.files.length > 0 && application.courseId && (
+            <ul className="grid gap-1 text-sm print:hidden">
+              {application.files.map((f) => (
+                <li key={f.id}>
+                  <a href={`/api/courses/${application.courseId}/application/files/${f.id}`} className="inline-flex items-center gap-1.5 text-primary hover:underline">
+                    <Paperclip className="h-3.5 w-3.5" /> {f.original_name} ({fileSize(f.size_bytes)})
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </Section>
       )}
       <Section n={6} title="การรับรองข้อมูล">

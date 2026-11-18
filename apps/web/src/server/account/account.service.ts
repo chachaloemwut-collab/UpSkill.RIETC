@@ -11,6 +11,7 @@ import { ctx } from "../context";
 import { audit } from "../audit";
 import { HttpError } from "../http";
 import { revokeAllSessions, type CurrentUser } from "../auth/session";
+import { deleteAllApplicationFilesOf } from "../courses/applications.service";
 
 export async function exportUserData(user: CurrentUser): Promise<Record<string, unknown>> {
   const { db } = ctx();
@@ -84,6 +85,8 @@ export async function deleteOwnAccount(user: CurrentUser, meta: { ip: string }):
       .where("user_id", "=", user.id)
       .execute();
   });
+  // Uploaded application documents are personal data with no registry value: remove the files themselves
+  await deleteAllApplicationFilesOf(user.id);
   await revokeAllSessions(user.id, "account_deleted");
   await audit(db, { action: "auth.account_deleted", userId: user.id, ip: meta.ip });
 }
