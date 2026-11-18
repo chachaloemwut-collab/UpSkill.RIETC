@@ -21,7 +21,7 @@
 - Antigravity/DeepSeek ยังไม่ได้ยืนยันการอ่านกติกาในแชตเก่า ให้สั่งอ่านก่อนรับงานถัดไป
 - สถานะ deploy และบัญชี superadmin ต้องตรวจสดก่อนดำเนินการ ห้ามถือว่าการ publish สำเร็จเท่ากับ deploy สำเร็จ
 
-## 2026-11-18T10:45:00+00:00 (17:45 Asia/Bangkok) — Claude Code (lease owner "human"): learner UX + learning units
+## 2026-11-18T10:40:51+00:00 (17:40 Asia/Bangkok) — Claude Code (lease owner "human"): learner UX + learning units
 
 - งาน / ขอบเขต: หน่วยการเรียนรู้ (course_units), โหมดดูวิดีโอ free_complete, เกณฑ์ผ่าน lesson_tests_average,
   player controls, หน้าผู้สอนจัดการหน่วย, สคริปต์นำเข้าหลักสูตร "การจัดทำกระทงรักษ์โลกเพื่อการประกวด"
