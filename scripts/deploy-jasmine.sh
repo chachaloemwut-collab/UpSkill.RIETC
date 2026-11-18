@@ -7,12 +7,14 @@
 #   scripts/deploy-jasmine.sh ls           test the SFTP login and list /files
 #   scripts/deploy-jasmine.sh upload       stage + push the bundle to /files (never deletes remote files)
 #   scripts/deploy-jasmine.sh upload-env   push deploy/jasmine/secrets/.env to /files/.env (only when it changed)
-#   scripts/deploy-jasmine.sh upload-manifest <file>  upload jasmine-release.json via .tmp + rename
-#   scripts/deploy-jasmine.sh deploy       upload + ask the server's deployer to rebuild, then wait for the result
+#   scripts/deploy-jasmine.sh release      THE release path: main CI ok → build images → manifest → wait for hosting → health
+#   scripts/deploy-jasmine.sh release-status   what hosting reports (live commit, result, rollback, receiver on/off)
+#   scripts/deploy-jasmine.sh upload-manifest <file>  upload jasmine-release.json via .tmp + rename (used by release)
+#   scripts/deploy-jasmine.sh deploy       RETIRED: the SFTP-bundle "deployer" channel was declined by hosting
 #   scripts/deploy-jasmine.sh logs         show the last deploy result and log from the server
 #   scripts/deploy-jasmine.sh status       what is on the server (RELEASE) and whether the public site answers
 #
-# Needs: lftp (brew install lftp), rsync, node 24.
+# Needs: lftp (brew install lftp), rsync, node 24; release also needs gh (logged in) and python3.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -174,6 +176,7 @@ cmd_upload_env() {
 
 # Upload, then drop deploy-request (= RELEASE built_at) for the deployer service and wait for deploy-status
 cmd_deploy() {
+  die "the deployer channel is retired (declined by hosting 2026-11-18): use scripts/deploy-jasmine.sh release"
   cmd_upload
   local release req
   release="$(sed -n 's/^built_at=//p' "$STAGE/RELEASE")"
@@ -244,6 +247,115 @@ cmd_upload_manifest() {
   info "manifest uploaded. Hosting will apply the release within ~1 minute."
 }
 
+# ---------------------------------------------------------------------------
+# Self-service release through hosting's image + manifest receiver (agreed with hosting 2026-11-18).
+# Hosting backs up the database before migrations and rolls back automatically on a failed health check;
+# we only ever ship commits whose main CI passed, with additive migrations (migration_compatible=true).
+# ---------------------------------------------------------------------------
+release_status_json() { lftp_run "cat $REMOTE_DIR/jasmine-release-status.json"; }
+# Prints one field of the status JSON read from stdin ("" when missing/false/null)
+status_field() { python3 -c 'import json,sys; d=json.load(sys.stdin); v=d.get(sys.argv[1]); print("" if v in (None, False) else v)' "$1"; }
+
+cmd_release_status() {
+  load_sftp
+  python3 - "$(release_status_json)" <<'PY'
+import json, sys
+d = json.loads(sys.argv[1])
+short = lambda v: (v or "-")[:7]
+print(f"  live:     {short(d.get('last_attempt_commit'))} ({d.get('last_attempt_result')} at {d.get('last_attempt_at_utc')})")
+print(f"  manifest: {short(d.get('manifest_commit'))} waiting={d.get('manifest_waiting')}  rollback: {d.get('rolled_back_to') or 'none'}")
+print(f"  receiver enabled: {d.get('automatic_receiver_enabled')}")
+PY
+}
+
+cmd_release() {
+  command -v gh >/dev/null || die "gh not found (brew install gh, then gh auth login)"
+  command -v python3 >/dev/null || die "python3 not found"
+  load_sftp
+  git -C "$ROOT" fetch -q origin main
+  local sha short st
+  sha="$(git -C "$ROOT" rev-parse origin/main)"
+  short="${sha:0:7}"
+  st="$(release_status_json)" || die "cannot read the release status over SFTP"
+  [[ "$(status_field automatic_receiver_enabled <<<"$st")" == "True" ]] || die "hosting's release receiver is OFF: releases are paused by hosting"
+  if [[ "$(status_field last_attempt_commit <<<"$st")" == "$sha" && "$(status_field last_attempt_result <<<"$st")" == "ok" ]]; then
+    info "$short is already live"
+    return 0
+  fi
+
+  # 1. main CI must have passed for this exact commit
+  local ci
+  ci="$(gh run list --workflow ci.yml --branch main --event push --limit 30 --json headSha,status,conclusion --jq ".[] | select(.headSha==\"$sha\") | \"\(.status) \(.conclusion)\"" | head -1)"
+  [[ "$ci" == "completed success" ]] || die "main CI for $short is '${ci:-not found}': wait until it passes"
+  local live mig
+  live="$(status_field last_attempt_commit <<<"$st")"
+  if [[ -n "$live" ]] && git -C "$ROOT" cat-file -e "$live^{commit}" 2>/dev/null; then
+    info "changes since live ${live:0:7}: $(git -C "$ROOT" rev-list --count "$live..$sha") commits"
+    mig="$(git -C "$ROOT" diff --name-only "$live" "$sha" -- packages/db/migrations)"
+    [[ -z "$mig" ]] || { info "migrations shipping (must be additive):"; sed 's/^/    /' <<<"$mig"; }
+  fi
+
+  # 2. build and publish both images for this commit
+  local before run=""
+  before="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  gh workflow run deploy-jasmine.yml --ref main -f migration_compatible=true >/dev/null
+  for _ in $(seq 1 30); do
+    run="$(gh run list --workflow deploy-jasmine.yml --limit 5 --json databaseId,headSha,createdAt --jq "[.[] | select(.headSha==\"$sha\" and .createdAt >= \"$before\")][0].databaseId // empty")"
+    [[ -n "$run" ]] && break
+    sleep 4
+  done
+  [[ -n "$run" ]] || die "the image build did not start"
+  info "building images for $short (run $run)…"
+  gh run watch "$run" --exit-status --interval 20 >/dev/null || die "image build failed: gh run view $run --log-failed"
+
+  # 3. manifest: must name this commit, both digests, migration_compatible=true
+  local dir
+  dir="$(mktemp -d)"
+  gh run download "$run" -n jasmine-release -D "$dir" >/dev/null
+  python3 - "$dir/jasmine-release.json" "$sha" <<'PY' || { rm -rf "$dir"; die "manifest check failed"; }
+import json, sys
+m = json.load(open(sys.argv[1]))
+assert m["commit"] == sys.argv[2], "commit mismatch"
+assert m["migration_compatible"] is True, "migration_compatible must be true"
+assert all(str(m[k]).startswith("sha256:") for k in ("web", "worker")), "missing image digest"
+PY
+  cmd_upload_manifest "$dir/jasmine-release.json"
+
+  # 4. wait for hosting. If the receiver has not picked the manifest up after 3 minutes, upload it again
+  #    (on 2026-11-18 it once missed a manifest write until the same file was re-uploaded).
+  local deadline last_put result=""
+  deadline=$(( $(date +%s) + 900 ))
+  last_put=$(date +%s)
+  while (( $(date +%s) < deadline )); do
+    sleep 20
+    st="$(release_status_json 2>/dev/null || echo '{}')"
+    if [[ "$(status_field last_attempt_commit <<<"$st")" == "$sha" ]]; then
+      result="$(status_field last_attempt_result <<<"$st")"
+      case "$result" in
+        ok) break ;;
+        failed) rm -rf "$dir"; die "release $short FAILED on hosting (rolled back to: $(status_field rolled_back_to <<<"$st"))" ;;
+        *) info "hosting is deploying $short… ($(date +%H:%M:%S))" ;;
+      esac
+    elif (( $(date +%s) - last_put >= 180 )) && [[ "$(status_field manifest_commit <<<"$st")" != "$sha" ]]; then
+      info "receiver has not picked up $short yet: uploading the same manifest again"
+      cmd_upload_manifest "$dir/jasmine-release.json" >/dev/null
+      last_put=$(date +%s)
+    else
+      info "waiting for hosting… ($(date +%H:%M:%S))"
+    fi
+  done
+  rm -rf "$dir"
+  [[ "$result" == "ok" ]] || die "no result for $short after 15 minutes: check release-status"
+
+  # 5. the public site answers
+  local origin
+  origin="$(sed -n 's/^APP_ORIGIN=//p' "$SECRETS/.env" 2>/dev/null)"
+  if [[ -n "$origin" ]]; then
+    curl -fsS -m 15 "$origin/api/health" >/dev/null || die "released $short but $origin/api/health does not answer"
+  fi
+  info "released $short ✓ (log it in docs/AI_HANDOFF.md and check the owner login once)"
+}
+
 case "${1:-}" in
   init) cmd_init ;;
   check) cmd_check ;;
@@ -252,8 +364,10 @@ case "${1:-}" in
   upload) cmd_upload ;;
   upload-env) cmd_upload_env ;;
   upload-manifest) shift; cmd_upload_manifest "$@" ;;
+  release) cmd_release ;;
+  release-status) cmd_release_status ;;
   deploy) cmd_deploy ;;
   logs) cmd_logs ;;
   status) cmd_status ;;
-  *) sed -n '2,16p' "$0"; exit 1 ;;
+  *) sed -n '2,19p' "$0"; exit 1 ;;
 esac

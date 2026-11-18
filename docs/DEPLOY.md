@@ -52,6 +52,18 @@ Hosting เปิดระบบ Self-deploy ของ Jasmine ให้บร�
 
 Hosting จะตรวจคำขอภายในประมาณ 1 นาที ดึงอิมเมจตาม digest รัน migration และอัปเดต Web/Worker พร้อมตรวจ health check ให้อัตโนมัติ
 
+### คำสั่งเดียวสำหรับนักพัฒนา (ใช้ทุกครั้ง)
+
+```bash
+./scripts/deploy-jasmine.sh release          # ตรวจ CI ของ main → build อิมเมจ → ตรวจ+อัปโหลด manifest → รอผล → ตรวจ health
+./scripts/deploy-jasmine.sh release-status   # ดูรุ่นที่ใช้งานจริง ผลล่าสุด การย้อนรุ่น และสถานะตัวรับของ hosting
+```
+
+- ถ้าตัวรับของ hosting ยังไม่หยิบ manifest ภายใน 3 นาที สคริปต์จะอัปโหลดไฟล์เดิมซ้ำให้เอง (เคยเกิดครั้งหนึ่งเมื่อ 18 พ.ย. 2569)
+- ถ้า hosting ปิดตัวรับไว้ (`automatic_receiver_enabled: false`) สคริปต์จะหยุดและไม่ส่งอะไร
+- หลัง release: บันทึกใน `docs/AI_HANDOFF.md` และลองล็อกอินบัญชีเจ้าของระบบหนึ่งครั้ง ห้ามแตะบัญชีผู้ดูแลระบบ
+- ช่องทาง `deploy` แบบอัปโหลดโค้ด + `deployer` เลิกใช้แล้ว (hosting ไม่อนุมัติ เพราะสั่ง build/restart/migrate ได้เอง)
+
 > **หมายเหตุ:** การ publish สำเร็จใน GitHub ยังไม่ถือว่า deploy Production สำเร็จ ต้องส่ง manifest ตามข้อ 4 ด้วยเสมอ หากคำขอเดิมล้มเหลว ให้นำข้อผิดพลาดมาตรวจแก้ก่อน ไม่ต้องกลับไปสั่ง build บน Production ซ้ำ และ migration ต้องรองรับแอปเวอร์ชันก่อนหน้าเสมอ
 
 ### อัปเดตด้วยมือ (กรณีไม่ใช้ deployer)
