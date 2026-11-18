@@ -6,8 +6,13 @@
 import "server-only";
 import {
   ADULT_AGE,
+  APPLICATION_FILE_EXT,
+  APPLICATION_FILE_MAX_BYTES,
+  APPLICATION_FILE_MAX_PENDING,
   PDPA_NOTICE_VERSION,
   ageOn,
+  cleanFileName,
+  sniffApplicationFile,
   formatApplicationNo,
   parseApplicationSettings,
   validateApplication,
@@ -16,7 +21,9 @@ import {
   type PaymentStatus,
   type VerificationStatus,
 } from "@upskill/core";
+import { createHash, randomUUID } from "node:crypto";
 import { sql } from "@upskill/db";
+import { createApplicationFileStorage } from "@upskill/infra/storage";
 import { ctx } from "../context";
 import { HttpError } from "../http";
 import { audit } from "../audit";
@@ -51,6 +58,7 @@ export async function getApplyContext(user: CurrentUser, courseId: string) {
   const settings = parseApplicationSettings(course.application_settings);
   const profile = await loadProfile(user.id);
   const existing = await getMyApplication(user.id, courseId);
+  const pendingFiles = existing ? [] : await pendingFilesOf(user.id, courseId);
   const birth = profile ? toIsoDate(profile.birth_date) : null;
   return {
     course: { id: course.id, title: course.title, slug: course.slug },
@@ -58,12 +66,110 @@ export async function getApplyContext(user: CurrentUser, courseId: string) {
     profile: profile ? { ...profile, birth_date: birth } : null,
     minor: birth ? ageOn(birth, new Date()) < ADULT_AGE : false,
     application: existing,
+    pendingFiles,
   };
 }
 
-export async function getMyApplication(userId: string, courseId: string) {
+// ------------------------------------------------------------------ attached files
+
+const FILE_COLUMNS = ["id", "doc_key", "original_name", "content_type", "size_bytes", "created_at"] as const;
+
+async function pendingFilesOf(userId: string, courseId: string) {
   return ctx()
-    .db.selectFrom("course_applications")
+    .db.selectFrom("course_application_files")
+    .select(FILE_COLUMNS)
+    .where("user_id", "=", userId)
+    .where("course_id", "=", courseId)
+    .where("application_id", "is", null)
+    .orderBy("created_at", "desc")
+    .execute();
+}
+
+/** Upload one document file before submitting (replaces an earlier file for the same document). */
+export async function uploadApplicationFile(user: CurrentUser, courseId: string, docKey: string, bytes: Uint8Array, rawName: string) {
+  const { db, env } = ctx();
+  const course = await loadEnrollableCourse(user, courseId);
+  const settings = parseApplicationSettings(course.application_settings);
+  if (!settings.enabled || settings.documentUploads === "off") throw new HttpError(409, "UPLOADS_NOT_ENABLED", "หลักสูตรนี้ไม่ได้เปิดให้แนบไฟล์");
+  if (!settings.documents.some((d) => d.key === docKey)) throw new HttpError(400, "UNKNOWN_DOCUMENT");
+  if (bytes.byteLength === 0) throw new HttpError(400, "EMPTY_FILE", "ไฟล์ว่างเปล่า");
+  if (bytes.byteLength > APPLICATION_FILE_MAX_BYTES) throw new HttpError(413, "FILE_TOO_LARGE", "ไฟล์ใหญ่เกิน 5 MB");
+  const type = sniffApplicationFile(bytes);
+  if (!type) throw new HttpError(415, "UNSUPPORTED_FILE", "รองรับเฉพาะไฟล์ PDF, JPG หรือ PNG");
+  if (await getMyApplication(user.id, courseId)) throw new HttpError(409, "APPLICATION_EXISTS", "ส่งใบสมัครแล้ว แก้ไขไฟล์ไม่ได้");
+  const pending = await pendingFilesOf(user.id, courseId);
+  if (pending.length >= APPLICATION_FILE_MAX_PENDING) throw new HttpError(409, "TOO_MANY_FILES", "แนบไฟล์ได้ไม่เกิน 20 ไฟล์");
+
+  const id = randomUUID();
+  const storageKey = `${courseId}/${user.id}/${id}.${APPLICATION_FILE_EXT[type]}`;
+  const storage = createApplicationFileStorage(env);
+  await storage.save(storageKey, bytes, type);
+  const row = await db
+    .insertInto("course_application_files")
+    .values({
+      id, course_id: courseId, user_id: user.id, doc_key: docKey, original_name: cleanFileName(rawName, type),
+      content_type: type, size_bytes: bytes.byteLength, sha256: createHash("sha256").update(bytes).digest(), storage_key: storageKey,
+    })
+    .returning(FILE_COLUMNS)
+    .executeTakeFirstOrThrow();
+  // One file per document: drop older pending files for the same document
+  for (const old of pending.filter((f) => f.doc_key === docKey)) await removePendingFile(user.id, courseId, old.id);
+  return row;
+}
+
+async function removePendingFile(userId: string, courseId: string, fileId: string) {
+  const { db, env } = ctx();
+  const row = await db
+    .deleteFrom("course_application_files")
+    .where("id", "=", fileId)
+    .where("user_id", "=", userId)
+    .where("course_id", "=", courseId)
+    .where("application_id", "is", null)
+    .returning("storage_key")
+    .executeTakeFirst();
+  if (row) await createApplicationFileStorage(env).remove(row.storage_key);
+  return !!row;
+}
+
+export async function deletePendingApplicationFile(user: CurrentUser, courseId: string, fileId: string) {
+  if (!(await removePendingFile(user.id, courseId, fileId))) throw new HttpError(404, "NOT_FOUND");
+}
+
+/** Download: the applicant, or a manager of the course. Everyone else gets 404 (no existence leak). */
+export async function readApplicationFile(viewer: CurrentUser, courseId: string, fileId: string) {
+  const { db, env } = ctx();
+  const f = await db
+    .selectFrom("course_application_files")
+    .select(["user_id", "storage_key", "content_type", "original_name"])
+    .where("id", "=", fileId)
+    .where("course_id", "=", courseId)
+    .executeTakeFirst();
+  if (!f) throw new HttpError(404, "NOT_FOUND");
+  if (f.user_id !== viewer.id) {
+    try {
+      await loadOwnedCourse(viewer, courseId);
+    } catch {
+      throw new HttpError(404, "NOT_FOUND");
+    }
+  }
+  const bytes = await createApplicationFileStorage(env).read(f.storage_key);
+  if (!bytes) throw new HttpError(404, "NOT_FOUND");
+  return { bytes, contentType: f.content_type, name: f.original_name };
+}
+
+/** Removes every stored file of a user (account erasure). Best effort on the storage side. */
+export async function deleteAllApplicationFilesOf(userId: string) {
+  const { db, env } = ctx();
+  const rows = await db.deleteFrom("course_application_files").where("user_id", "=", userId).returning("storage_key").execute();
+  const storage = createApplicationFileStorage(env);
+  for (const r of rows) await storage.remove(r.storage_key).catch(() => undefined);
+  return rows.length;
+}
+
+export async function getMyApplication(userId: string, courseId: string) {
+  const { db } = ctx();
+  const app = await db
+    .selectFrom("course_applications")
     .select([
       "id", "application_no", "status", "verification_status", "payment_status", "receipt_no", "created_at", "course_snapshot",
       "applicant", "education", "occupation", "guardian", "documents", "declaration_name", "declared_at",
@@ -71,6 +177,9 @@ export async function getMyApplication(userId: string, courseId: string) {
     .where("user_id", "=", userId)
     .where("course_id", "=", courseId)
     .executeTakeFirst();
+  if (!app) return undefined;
+  const files = await db.selectFrom("course_application_files").select(FILE_COLUMNS).where("application_id", "=", app.id).orderBy("created_at").execute();
+  return { ...app, files, courseId };
 }
 
 export async function submitApplication(user: CurrentUser, courseId: string, input: ApplicationInput, meta: { ip: string }) {
@@ -84,8 +193,10 @@ export async function submitApplication(user: CurrentUser, courseId: string, inp
 
   const birth = toIsoDate(profile.birth_date);
   const minor = ageOn(birth, new Date()) < ADULT_AGE;
+  const pendingFiles = settings.documentUploads === "off" ? [] : await pendingFilesOf(user.id, courseId);
   const { value, errors } = validateApplication(settings, input, {
     minor,
+    uploadedDocKeys: pendingFiles.map((f) => f.doc_key),
     expectedSignature: `${profile.first_name_th} ${profile.last_name_th}`,
     expectedSignatureWithTitle: `${profile.title_th}${profile.first_name_th} ${profile.last_name_th}`,
   });
@@ -128,6 +239,10 @@ export async function submitApplication(user: CurrentUser, courseId: string, inp
       })
       .returning(["id", "application_no", "status"])
       .executeTakeFirstOrThrow();
+    // Attach the pending files (one per document, the newest) to the submitted application
+    const keep = new Map<string, string>();
+    for (const f of pendingFiles) if (!keep.has(f.doc_key) && settings.documents.some((d) => d.key === f.doc_key)) keep.set(f.doc_key, f.id);
+    if (keep.size) await trx.updateTable("course_application_files").set({ application_id: app.id }).where("id", "in", [...keep.values()]).execute();
     return app;
   });
   await audit(db, { action: "course.application_submitted", userId: user.id, entityType: "course", entityId: courseId, ip: meta.ip, details: { applicationNo: result.application_no } });
@@ -148,7 +263,17 @@ export async function listApplications(manager: CurrentUser, courseId: string) {
     .where("a.course_id", "=", courseId)
     .orderBy("a.created_at", "desc")
     .limit(2000)
-    .execute();
+    .execute()
+    .then(async (apps) => {
+      if (apps.length === 0) return [];
+      const files = await ctx()
+        .db.selectFrom("course_application_files")
+        .select(["application_id", ...FILE_COLUMNS])
+        .where("application_id", "in", apps.map((a) => a.id))
+        .orderBy("created_at")
+        .execute();
+      return apps.map((a) => ({ ...a, files: files.filter((f) => f.application_id === a.id) }));
+    });
 }
 
 export interface ApplicationReview {
