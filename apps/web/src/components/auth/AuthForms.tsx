@@ -1,11 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, type FormEvent } from "react";
-import { MailCheck } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ChevronLeft, ChevronRight, MailCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { validateProfile, type ProfileErrors } from "@upskill/core/profile";
-import { PdpaNotice, ProfileFields, readProfile } from "@/components/account/ProfileFields";
+import { PROFILE_PART_FIELDS, PdpaNotice, ProfileFields, readProfile, type ProfilePart } from "@/components/account/ProfileFields";
 import { errorMessage } from "@/lib/errors";
 import { Alert, Button, CheckDrawIcon, Field, Input, LoginIcon, PasswordInput, Separator, buttonClass, useActionScene, useToast } from "@/components/ui";
 
@@ -30,13 +30,13 @@ function GoogleMark() {
 function PasswordStrengthMeter({ password }: { password: string }) {
   if (!password) return null;
   let score = 0;
-  if (password.length >= 8) score++;
   if (password.length >= 12) score++;
+  if (password.length >= 16) score++;
   if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
   if (/[0-9]/.test(password) && /[^A-Za-z0-9]/.test(password)) score++;
 
   const levels = [
-    { label: "รหัสผ่านสั้นเกินไป", color: "bg-destructive", textColor: "text-destructive" },
+    { label: "สั้นเกินไป (ต้องมีอย่างน้อย 12 ตัว)", color: "bg-destructive", textColor: "text-destructive" },
     { label: "ความปลอดภัยระดับเริ่มต้น", color: "bg-destructive", textColor: "text-destructive" },
     { label: "ความปลอดภัยปานกลาง", color: "bg-amber-500", textColor: "text-amber-500" },
     { label: "ความปลอดภัยดี", color: "bg-primary", textColor: "text-primary" },
@@ -205,92 +205,215 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
   );
 }
 
+const REGISTER_STEPS = [
+  { title: "บัญชีผู้ใช้", hint: "อีเมลและรหัสผ่าน" },
+  { title: "ข้อมูลผู้เรียน", hint: "ชื่อ เลขบัตร วันเกิด เบอร์โทร" },
+  { title: "ที่อยู่และยืนยัน", hint: "ที่อยู่ติดต่อและความยินยอม" },
+] as const;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function StepIndicator({ step }: { step: number }) {
+  return (
+    <ol className="mb-5 grid grid-cols-3 gap-2" aria-label="ขั้นตอนการสมัคร">
+      {REGISTER_STEPS.map((s, i) => {
+        const state = i < step ? "done" : i === step ? "current" : "todo";
+        return (
+          <li key={s.title} aria-current={state === "current" ? "step" : undefined} className="grid gap-1.5">
+            <span className={`h-1.5 rounded-full transition-colors duration-300 ${state === "todo" ? "bg-muted" : "bg-primary"}`} />
+            <span className={`text-xs font-medium ${state === "current" ? "text-foreground" : "text-muted-foreground"}`}>
+              {i + 1}. {s.title}
+            </span>
+            <span className="hidden text-[11px] text-muted-foreground sm:block">{s.hint}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/**
+ * Sign-up in three short steps (account → learner details → address & consent). All inputs stay mounted in one
+ * form, so values survive Back/Next and a single request is sent at the end; each step is checked with the same
+ * rules as the server before moving on.
+ */
 export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
   const s = useSubmit();
+  const [step, setStep] = useState(0);
   const [pwd, setPwd] = useState("");
-  const [mismatch, setMismatch] = useState(false);
+  const [accountErrors, setAccountErrors] = useState<{ email?: string; password?: string; confirm?: string }>({});
   const [errors, setErrors] = useState<ProfileErrors>({});
   const [consentError, setConsentError] = useState<string | undefined>();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const top = () => formRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  const focusFirstError = () =>
+    requestAnimationFrame(() => {
+      const el = formRef.current?.querySelector<HTMLElement>("fieldset:not(.hidden) [aria-invalid=true], fieldset:not(.hidden) .text-destructive");
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+
+  function checkAccount(f: FormData): boolean {
+    const email = String(f.get("email") ?? "").trim();
+    const password = String(f.get("password") ?? "");
+    const e: typeof accountErrors = {};
+    if (!EMAIL_RE.test(email)) e.email = "กรอกอีเมลให้ถูกต้อง เช่น name@example.com";
+    if (password.length < 12) e.password = "รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร";
+    if (password !== f.get("confirm")) e.confirm = "รหัสผ่านทั้งสองช่องไม่ตรงกัน";
+    setAccountErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  /** Profile errors limited to one step's fields (all fields when part is undefined). */
+  function checkProfile(f: FormData, part?: ProfilePart) {
+    const checked = validateProfile(readProfile(f));
+    const keys = part ? PROFILE_PART_FIELDS[part] : (Object.keys(checked.errors) as Array<keyof ProfileErrors>);
+    const scoped = Object.fromEntries(keys.filter((k) => checked.errors[k]).map((k) => [k, checked.errors[k]])) as ProfileErrors;
+    setErrors((prev) => {
+      const next = { ...prev };
+      for (const k of part ? PROFILE_PART_FIELDS[part] : (Object.keys(prev) as Array<keyof ProfileErrors>)) delete next[k];
+      return { ...next, ...scoped };
+    });
+    return { ok: Object.keys(scoped).length === 0, profile: checked.profile };
+  }
+
+  function next() {
+    const form = formRef.current;
+    if (!form) return;
+    const f = new FormData(form);
+    const ok = step === 0 ? checkAccount(f) : checkProfile(f, "identity").ok;
+    if (!ok) {
+      s.setError("กรุณาแก้ไขช่องที่มีข้อความสีแดง");
+      focusFirstError();
+      return;
+    }
+    s.setError(null);
+    setStep((x) => Math.min(x + 1, REGISTER_STEPS.length - 1));
+    top();
+  }
+
+  function back() {
+    s.setError(null);
+    setStep((x) => Math.max(0, x - 1));
+    top();
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (step < REGISTER_STEPS.length - 1) return next(); // Enter key on an early step = Next
     const form = e.currentTarget;
     const f = new FormData(form);
-    if (f.get("password") !== f.get("confirm")) return setMismatch(true);
-    setMismatch(false);
-    // Same rules as the server, so mistakes show next to their field before anything is sent
-    const profile = readProfile(f);
-    const checked = validateProfile(profile);
-    setErrors(checked.errors);
+    // Re-check everything: an earlier step may have been edited after moving on
+    if (!checkAccount(f)) {
+      setStep(0);
+      s.setError("กรุณาตรวจสอบอีเมลและรหัสผ่าน");
+      return;
+    }
+    if (!checkProfile(f, "identity").ok) {
+      setStep(1);
+      s.setError("กรุณาตรวจสอบข้อมูลผู้เรียน");
+      focusFirstError();
+      return;
+    }
+    const all = checkProfile(f);
     const consent = f.get("pdpaConsent") === "on";
     setConsentError(consent ? undefined : "ต้องยอมรับประกาศความเป็นส่วนตัวก่อนสมัครสมาชิก");
-    if (!checked.profile || !consent) {
-      s.setError("กรุณาตรวจสอบข้อมูลที่ไฮไลต์");
-      form.querySelector("[aria-invalid=true], .text-destructive")?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (!all.profile || !consent) {
+      s.setError("กรุณาแก้ไขช่องที่มีข้อความสีแดง");
+      focusFirstError();
       return;
     }
     s.setBusy(true);
     s.setError(null);
     const r = await api<{ message: string }>("/api/auth/register", {
-      body: { email: f.get("email"), password: f.get("password"), profile, pdpaConsent: consent },
+      body: { email: f.get("email"), password: f.get("password"), profile: all.profile, pdpaConsent: consent },
     });
     s.setBusy(false);
     if (r.ok) s.setNotice(r.data.message);
     else {
       s.setError(r.message);
-      form.scrollIntoView({ block: "start", behavior: "smooth" });
+      top();
     }
   }
+
   if (s.notice)
     return (
-      <div className="grid justify-items-center gap-4 rounded-lg border bg-card p-8 text-center">
+      <div data-auth-wide className="grid justify-items-center gap-4 rounded-lg border bg-card p-8 text-center">
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success/10 text-success [&>svg]:h-7 [&>svg]:w-7">
           <CheckDrawIcon play={1} />
         </span>
         <div>
-          <p className="font-semibold">ตรวจสอบกล่องอีเมลของคุณ</p>
+          <p className="font-semibold">อีกขั้นเดียว: ยืนยันอีเมลของคุณ</p>
           <p className="mt-1 text-sm text-muted-foreground">{s.notice}</p>
+          <p className="mt-2 text-xs text-muted-foreground">ไม่พบอีเมล? ลองดูในโฟลเดอร์จดหมายขยะ (Spam) หรือโปรโมชัน</p>
         </div>
         <Link href="/login" className={buttonClass("outline", "md")}>
           ไปหน้าเข้าสู่ระบบ
         </Link>
       </div>
     );
+
+  const last = step === REGISTER_STEPS.length - 1;
   return (
-    <div className="grid gap-5">
-      {googleEnabled && (
+    <div data-auth-wide className="grid gap-5">
+      {googleEnabled && step === 0 && (
         <>
-          <GoogleButton label="สมัครด้วย Google" />
+          <GoogleButton label="สมัครด้วยบัญชี Google (เร็วที่สุด)" />
           <OrDivider />
         </>
       )}
-      <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form ref={formRef} method="post" onSubmit={onSubmit} className="grid scroll-mt-24 gap-4" noValidate>
+        <StepIndicator step={step} />
         {s.error && <Alert variant="destructive" title={s.error} />}
-        <fieldset className="grid gap-4 rounded-lg border p-4">
+
+        <fieldset className={step === 0 ? "grid gap-4 rounded-lg border p-4" : "hidden"} aria-hidden={step !== 0 || undefined}>
           <legend className="px-1 text-sm font-semibold">บัญชีสำหรับเข้าสู่ระบบ</legend>
-          <Field label="อีเมล" hint="ใช้เข้าสู่ระบบ ระบบจะส่งลิงก์ยืนยันไปที่อีเมลนี้ ต้องยืนยันก่อนจึงเข้าสู่ระบบได้">
-            <Input name="email" type="email" autoComplete="email" placeholder="you@example.com" required className="h-10" />
+          <Field label="อีเมล" error={accountErrors.email} hint="ระบบจะส่งลิงก์ยืนยันไปที่อีเมลนี้ ต้องกดยืนยันก่อนจึงเข้าสู่ระบบได้">
+            <Input name="email" type="email" autoComplete="email" placeholder="you@example.com" required className="h-11" aria-invalid={!!accountErrors.email || undefined} />
           </Field>
-          <Field label="รหัสผ่าน" hint="อย่างน้อย 12 ตัวอักษร แนะนำให้ใช้วลีที่จำง่ายแต่เดายาก">
+          <Field label="รหัสผ่าน" error={accountErrors.password} hint="อย่างน้อย 12 ตัวอักษร เช่น วลีที่จำง่าย ‘ลอยกระทงปี2569สนุกมาก’">
             <PasswordInput
               name="password"
               autoComplete="new-password"
               minLength={12}
               required
-              className="h-10"
+              className="h-11"
               value={pwd}
               onChange={(e) => setPwd(e.target.value)}
+              aria-invalid={!!accountErrors.password || undefined}
             />
             <PasswordStrengthMeter password={pwd} />
           </Field>
-          <Field label="ยืนยันรหัสผ่าน" error={mismatch ? "รหัสผ่านทั้งสองช่องไม่ตรงกัน" : undefined}>
-            <PasswordInput name="confirm" autoComplete="new-password" minLength={12} required className="h-10" aria-invalid={mismatch || undefined} />
+          <Field label="ยืนยันรหัสผ่าน" error={accountErrors.confirm}>
+            <PasswordInput name="confirm" autoComplete="new-password" minLength={12} required className="h-11" aria-invalid={!!accountErrors.confirm || undefined} />
           </Field>
         </fieldset>
-        <ProfileFields errors={errors} />
-        <PdpaNotice error={consentError} />
-        <Button type="submit" size="lg" loading={s.busy} className="w-full">
-          สมัครสมาชิก
-        </Button>
+
+        <ProfileFields errors={errors} show={step === 1 ? "identity" : step === 2 ? "address" : "none"} />
+
+        <div className={last ? "" : "hidden"}>
+          <PdpaNotice error={consentError} />
+        </div>
+
+        <div className="flex items-center gap-3 pt-1">
+          {step > 0 && (
+            <Button type="button" variant="outline" size="lg" onClick={back} className="flex-1 sm:flex-none">
+              <ChevronLeft className="h-4 w-4" /> ย้อนกลับ
+            </Button>
+          )}
+          {/* Distinct keys: reusing one DOM button would turn the "Next" click into a submit of the last step */}
+          {last ? (
+            <Button key="submit" type="submit" size="lg" loading={s.busy} className="flex-1">
+              สมัครสมาชิก
+            </Button>
+          ) : (
+            <Button key="next" type="button" size="lg" onClick={next} className="flex-1">
+              ถัดไป <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        <p className="text-center text-xs text-muted-foreground">
+          ขั้นตอนที่ {step + 1} จาก {REGISTER_STEPS.length} · ข้อมูลที่กรอกไว้จะไม่หายเมื่อกดย้อนกลับ
+        </p>
       </form>
       <p className="text-center text-sm text-muted-foreground">
         มีบัญชีแล้ว?{" "}

@@ -42,7 +42,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </Link>
           <ThemeToggle />
         </div>
-        <div className="mx-auto my-auto w-full max-w-sm animate-slide-up py-10">
+        {/* Long forms (sign-up) mark themselves data-auth-wide to get a wider column */}
+        <div className="mx-auto my-auto w-full max-w-sm animate-slide-up py-10 has-[[data-auth-wide]]:max-w-xl">
           {/* The brand panel is hidden below lg: show the logo above the form instead */}
           <BrandLogo mode="unfold" className="mb-8 lg:hidden" />
           {children}
