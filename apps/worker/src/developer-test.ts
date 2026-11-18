@@ -22,7 +22,7 @@ import { renderCertificatePdf } from "./jobs/render-certificate-pdf.ts";
  *  - If an account already exists for cha.chaloemwut@gmail.com, its password, role, and sessions are untouched.
  *  - A newly created account has NO password (the repository is public, so a password in code is public too):
  *    its owner signs in with Google or sets a password via "forgot password" sent to that mailbox.
- *  - If a certificate already exists, does nothing.
+ *  - If a developer TEST certificate already exists in any course, does nothing (one test certificate ever).
  */
 export async function ensureDeveloperTestCertificate(db: Database, env: Env): Promise<void> {
   if (!env.CERT_SIGNING_PRIVATE_KEY || !env.CERT_SIGNING_ACTIVE_KID) {
@@ -115,12 +115,15 @@ export async function ensureDeveloperTestCertificate(db: Database, env: Env): Pr
       .execute();
   }
 
-  // 3. Check if certificate already exists
+  // 3. Check if a developer TEST certificate already exists — in ANY course. Checking only the selected course
+  //    issued a new test certificate (and a "completed" enrollment) in a real course whenever the oldest
+  //    published course changed, e.g. after an old course was archived.
   const existing = await db
     .selectFrom("certificates")
     .select(["certificate_code", "pdf_ready_at"])
     .where("user_id", "=", user.id)
-    .where("course_id", "=", course.id)
+    .where("document_type_snapshot", "=", DEVELOPER_TEST_DOCUMENT_TYPE)
+    .orderBy("issued_at", "asc")
     .executeTakeFirst();
 
   if (existing) {
