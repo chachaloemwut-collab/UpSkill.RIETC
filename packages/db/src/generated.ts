@@ -170,6 +170,7 @@ export interface CourseAssignments {
 }
 
 export interface Courses {
+  completion_rule: Generated<string>;
   created_at: Generated<Timestamp>;
   credential_achievement_en: string | null;
   credential_achievement_th: Generated<string>;
@@ -190,6 +191,7 @@ export interface Courses {
   is_verified_course: Generated<boolean>;
   max_quiz_attempts_per_day: Generated<number>;
   min_watch_percentage: Generated<number>;
+  navigation_mode: Generated<string>;
   passing_quiz_score: Generated<number>;
   published_at: Timestamp | null;
   quiz_time_limit_sec: Generated<number>;
@@ -199,6 +201,16 @@ export interface Courses {
   total_duration_sec: Generated<number>;
   updated_at: Generated<Timestamp>;
   visibility: Generated<string>;
+}
+
+export interface CourseUnits {
+  course_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  sequence_order: number;
+  summary: string | null;
+  title: string;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface EmailDeliveryEvents {
@@ -371,11 +383,14 @@ export interface Lessons {
   checkpoint_question: string | null;
   course_id: string;
   created_at: Generated<Timestamp>;
+  description: string | null;
   duration_sec: number;
   id: Generated<string>;
   is_public: Generated<boolean>;
+  learner_note: string | null;
   sequence_order: number;
   title: string;
+  unit_id: string | null;
   video_checked_at: Generated<Timestamp>;
   video_status: Generated<string>;
   youtube_video_id: string;
@@ -568,6 +583,7 @@ export interface DB {
   cohort_watches: CohortWatches;
   course_assignment_recipients: CourseAssignmentRecipients;
   course_assignments: CourseAssignments;
+  course_units: CourseUnits;
   courses: Courses;
   email_delivery_events: EmailDeliveryEvents;
   email_outbox: EmailOutbox;
