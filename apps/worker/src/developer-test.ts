@@ -9,7 +9,6 @@ import {
   signCertificate,
   type CertificatePayload,
 } from "@upskill/core";
-import { hashPassword } from "@upskill/infra/password";
 import { logger } from "@upskill/infra/logger";
 import { renderCertificatePdf } from "./jobs/render-certificate-pdf.ts";
 
@@ -21,6 +20,8 @@ import { renderCertificatePdf } from "./jobs/render-certificate-pdf.ts";
  *  - Clearly sets documentType to "development_test", marking it as TEST / DEVELOPMENT.
  *  - Explicitly records totalStudySec = 0 so no false claim of learning completion is made.
  *  - If an account already exists for cha.chaloemwut@gmail.com, its password, role, and sessions are untouched.
+ *  - A newly created account has NO password (the repository is public, so a password in code is public too):
+ *    its owner signs in with Google or sets a password via "forgot password" sent to that mailbox.
  *  - If a certificate already exists, does nothing.
  */
 export async function ensureDeveloperTestCertificate(db: Database, env: Env): Promise<void> {
@@ -73,8 +74,6 @@ export async function ensureDeveloperTestCertificate(db: Database, env: Env): Pr
           role: "member",
           status: "active",
           email_verified_at: new Date(),
-          password_hash: await hashPassword("DeveloperTestPass123!"),
-          password_updated_at: new Date(),
           legal_full_name_th: "เฉลิมวุฒิ ชา",
           legal_full_name_en: "Chaloemwut Cha",
           legal_name_locked_at: new Date(),
