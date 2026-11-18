@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, Award, BadgeCheck, BookOpen, ChevronRight, Clock, Eye, ListOrdered, Pencil, PlayCircle, Target, Timer, TriangleAlert, UserRound } from "lucide-react";
+import { ArrowRight, Award, BadgeCheck, ClipboardList, BookOpen, ChevronRight, Clock, Eye, ListOrdered, Pencil, PlayCircle, Target, Timer, TriangleAlert, UserRound } from "lucide-react";
 import { Alert, Badge, Card, Progress, buttonClass } from "@/components/ui";
 import { EnrollButton } from "@/components/course/EnrollButton";
 import { CourseCover } from "@/components/course/CourseCard";
@@ -9,6 +9,7 @@ import { LessonList } from "@/components/course/LessonList";
 import { VISIBILITY, formatDuration } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { getCourseForViewer } from "@/server/courses/courses.service";
+import { COURSE_TYPE_INFO } from "@upskill/core/application";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -78,6 +79,9 @@ export default async function CoursePage({ params }: Props) {
             ) : (
               <Badge variant="secondary">Community Course</Badge>
             )}
+            <Badge variant="outline" className="gap-1 bg-background/60">
+              <Award className="h-3.5 w-3.5 text-primary" /> {COURSE_TYPE_INFO[data.courseType].label}
+            </Badge>
             {course.visibility !== "published" && vis && <Badge variant={vis.variant}>{vis.label}</Badge>}
           </div>
 
@@ -94,6 +98,15 @@ export default async function CoursePage({ params }: Props) {
               <Clock className="h-4 w-4" /> {formatDuration(course.total_duration_sec)}
             </span>
           </div>
+
+          {data.application.enabled && (data.application.courseCode || data.application.intake || data.application.schedule || data.application.venue) && (
+            <dl className="mt-4 grid max-w-3xl gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+              {data.application.courseCode && <div className="flex gap-2"><dt className="text-muted-foreground">รหัสหลักสูตร</dt><dd className="font-medium">{data.application.courseCode}</dd></div>}
+              {data.application.intake && <div className="flex gap-2"><dt className="text-muted-foreground">รุ่น</dt><dd className="font-medium">{data.application.intake}</dd></div>}
+              {data.application.schedule && <div className="flex gap-2"><dt className="text-muted-foreground">วันและเวลาเรียน</dt><dd className="font-medium">{data.application.schedule}</dd></div>}
+              {data.application.venue && <div className="flex gap-2"><dt className="text-muted-foreground">สถานที่</dt><dd className="font-medium">{data.application.venue}</dd></div>}
+            </dl>
+          )}
 
           {course.description && (
             <p className="mt-4 max-w-3xl whitespace-pre-line text-sm sm:text-base leading-relaxed text-foreground/80">
@@ -247,6 +260,24 @@ export default async function CoursePage({ params }: Props) {
                     </Link>
                   ))}
                 </div>
+              ) : !enrolled && data.myApplication?.status === "submitted" ? (
+                <>
+                  <Alert variant="default" title={`ส่งใบสมัครแล้ว เลขที่ ${data.myApplication.application_no}`}>รอเจ้าหน้าที่พิจารณา ระบบจะแจ้งผลทางอีเมล</Alert>
+                  <Link href={`/courses/${course.slug}/apply`} className={buttonClass("outline", "lg", "w-full")}>ดูใบสมัคร</Link>
+                </>
+              ) : !enrolled && data.myApplication?.status === "rejected" ? (
+                <>
+                  <Alert variant="warning" title="ใบสมัครไม่ผ่านการพิจารณา">ติดต่อผู้จัดการหลักสูตรหากมีข้อสงสัย</Alert>
+                  <Link href={`/courses/${course.slug}/apply`} className={buttonClass("outline", "lg", "w-full")}>ดูใบสมัคร</Link>
+                </>
+              ) : !enrolled && data.application.enabled ? (
+                user ? (
+                  <Link href={`/courses/${course.slug}/apply`} className={buttonClass("default", "lg", "w-full")}>
+                    <ClipboardList className="h-4 w-4" /> กรอกใบสมัครเพื่อลงทะเบียน
+                  </Link>
+                ) : (
+                  <Link href="/login" className={buttonClass("default", "lg", "w-full")}>เข้าสู่ระบบเพื่อสมัครเรียน</Link>
+                )
               ) : !enrolled ? (
                 <EnrollButton courseId={course.id} loggedIn={!!user} />
               ) : enrollment?.status === "completed" ? (
@@ -288,6 +319,14 @@ export default async function CoursePage({ params }: Props) {
                 <Alert variant="warning" title="บางบทเรียนใช้งานไม่ได้ชั่วคราว">ระบบแจ้งผู้สอนแล้ว</Alert>
               )}
               <ul className="grid gap-2 text-sm text-muted-foreground">
+                {enrolled && data.myApplication && (
+                  <li className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4" />
+                    <Link href={`/courses/${course.slug}/apply`} className="hover:text-foreground hover:underline">
+                      ใบสมัครเลขที่ {data.myApplication.application_no}
+                    </Link>
+                  </li>
+                )}
                 <li className="flex items-center gap-2">
                   <BookOpen className="h-4 w-4" /> {units.length > 0 ? `${units.length} หน่วยการเรียนรู้ · ` : ""}
                   {lessons.length} คลิปวิดีโอ

@@ -5,6 +5,7 @@ import { Button, EmptyState, InputGroup, SegmentedControl, Select } from "@/comp
 import { createSearcher } from "@/lib/smart-search";
 import { CourseCard, type CourseCardData } from "./CourseCard";
 import { cn } from "@/lib/utils";
+import { COURSE_TYPES, COURSE_TYPE_INFO, asCourseType, type CourseType } from "@upskill/core/application";
 
 type Course = CourseCardData & { id: string; instructor_name: string; learner_count: number };
 type Filter = "all" | "verified" | "community";
@@ -22,8 +23,11 @@ function readViewMode(): ViewMode {
   }
 }
 
-export function CourseCatalog({ courses, initialQuery }: { courses: Course[]; initialQuery: string }) {
+type TypeFilter = "all" | CourseType;
+
+export function CourseCatalog({ courses, initialQuery, initialType = "all" }: { courses: Course[]; initialQuery: string; initialType?: TypeFilter }) {
   const [query, setQuery] = useState(initialQuery);
+  const [type, setType] = useState<TypeFilter>(initialType);
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("latest");
 
@@ -40,9 +44,10 @@ export function CourseCatalog({ courses, initialQuery }: { courses: Course[]; in
     }
   };
 
-  const isFiltered = query.trim().length > 0 || filter !== "all" || sort !== "latest";
+  const isFiltered = query.trim().length > 0 || filter !== "all" || type !== "all" || sort !== "latest";
   const resetFilters = () => {
     setQuery("");
+    setType("all");
     setFilter("all");
     setSort("latest");
   };
@@ -56,11 +61,12 @@ export function CourseCatalog({ courses, initialQuery }: { courses: Course[]; in
   const shown = useMemo(() => {
     let list = query.trim() ? search(query).hits.map((h) => h.item.course) : courses;
     if (filter !== "all") list = list.filter((c) => (filter === "verified" ? c.is_verified_course : !c.is_verified_course));
+    if (type !== "all") list = list.filter((c) => asCourseType(c.course_type) === type);
     if (sort === "popular") list = [...list].sort((a, b) => b.learner_count - a.learner_count);
     if (sort === "short") list = [...list].sort((a, b) => a.total_duration_sec - b.total_duration_sec);
     if (sort === "long") list = [...list].sort((a, b) => b.total_duration_sec - a.total_duration_sec);
     return list;
-  }, [courses, query, filter, sort, search]);
+  }, [courses, query, filter, type, sort, search]);
 
   return (
     <div className="grid gap-5">
@@ -87,6 +93,16 @@ export function CourseCatalog({ courses, initialQuery }: { courses: Course[]; in
         </div>
 
         <div className="flex items-center gap-2 ml-auto">
+          <div className="w-48 sm:w-56">
+            <Select value={type} onValueChange={(v) => setType(v as TypeFilter)} aria-label="ประเภทหลักสูตร">
+              <option value="all">ทุกประเภท</option>
+              {COURSE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {COURSE_TYPE_INFO[t].label}
+                </option>
+              ))}
+            </Select>
+          </div>
           <div className="w-40 sm:w-44">
             <Select value={sort} onValueChange={(v) => setSort(v as Sort)} aria-label="เรียงลำดับ">
               <option value="latest">ล่าสุด</option>

@@ -11,6 +11,7 @@ import { ctx } from "@/server/context";
 import { HttpError } from "@/server/http";
 import { getCurrentUser } from "@/server/auth/session";
 import { getCourseForEditing, PUBLISH_RULES } from "@/server/courses/instructor.service";
+import { listApplications } from "@/server/courses/applications.service";
 
 export const metadata: Metadata = { title: "แก้ไขหลักสูตร" };
 
@@ -32,6 +33,7 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
     course: data.course,
     lessons: data.lessons,
     units: data.units,
+    applications: (await listApplications(user, id)).map((a) => ({ ...a, created_at: new Date(a.created_at).toISOString() })),
     questions: data.questions.map((q) => ({
       ...q,
       assessment_type: q.assessment_type as EditorData["questions"][number]["assessment_type"],
