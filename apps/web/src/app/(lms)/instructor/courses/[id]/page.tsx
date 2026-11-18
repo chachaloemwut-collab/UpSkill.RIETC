@@ -31,6 +31,7 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
   const editor: EditorData = {
     course: data.course,
     lessons: data.lessons,
+    units: data.units,
     questions: data.questions.map((q) => ({
       ...q,
       assessment_type: q.assessment_type as EditorData["questions"][number]["assessment_type"],

@@ -101,7 +101,7 @@ export async function getCourseForEditing(user: CurrentUser, courseId: string) {
   const course = await db.selectFrom("courses").selectAll().where("id", "=", courseId).executeTakeFirstOrThrow();
   const lessons = await db
     .selectFrom("lessons")
-    .select(["id", "sequence_order", "title", "youtube_video_id", "duration_sec", "video_status", "is_public", "checkpoint_question", "checkpoint_options", "checkpoint_correct_index", "checkpoint_at_sec"])
+    .select(["id", "sequence_order", "title", "youtube_video_id", "duration_sec", "video_status", "is_public", "checkpoint_question", "checkpoint_options", "checkpoint_correct_index", "checkpoint_at_sec", "unit_id", "description", "learner_note"])
     .where("course_id", "=", courseId)
     .orderBy("sequence_order")
     .execute();
@@ -113,7 +113,8 @@ export async function getCourseForEditing(user: CurrentUser, courseId: string) {
     .where("is_active", "=", true)
     .orderBy("created_at")
     .execute();
-  return { course, lessons, questions };
+  const units = await db.selectFrom("course_units").select(["id", "sequence_order", "title", "summary"]).where("course_id", "=", courseId).orderBy("sequence_order").execute();
+  return { course, lessons, questions, units };
 }
 
 export async function createCourse(
@@ -163,6 +164,8 @@ export async function updateCourse(
     credential_achievement_en: string | null;
     credential_background_url: string | null;
     credential_text_align: string;
+    navigation_mode: "linear" | "free_complete";
+    completion_rule: "post_test" | "lesson_tests_average";
   }>,
 ) {
   await loadOwnedCourse(user, courseId);
@@ -605,14 +608,18 @@ export async function setVisibility(user: CurrentUser, courseId: string, visibil
         "c.total_duration_sec",
         sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("lessons"),
         sql<number>`(select count(*)::int from lessons l where l.course_id = c.id and l.video_status <> 'active')`.as("broken"),
+        "c.completion_rule",
         sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.assessment_type = 'post' and q.is_active)`.as("questions"),
+        sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.assessment_type = 'lesson' and q.is_active)`.as("lesson_questions"),
       ])
       .where("c.id", "=", courseId)
       .executeTakeFirstOrThrow();
     const problems: string[] = [];
     if (stats.lessons === 0) problems.push("ต้องมีบทเรียนอย่างน้อย 1 บท");
     if (stats.total_duration_sec < PUBLISH_RULES.minTotalDurationSec) problems.push("ความยาวรวมต้องอย่างน้อย 10 นาที");
-    if (stats.questions < PUBLISH_RULES.minQuestions) problems.push("ต้องมีข้อสอบอย่างน้อย 3 ข้อ");
+    if (stats.completion_rule === "lesson_tests_average") {
+      if (stats.lesson_questions < PUBLISH_RULES.minQuestions) problems.push("ต้องมีข้อสอบท้ายคลิปรวมอย่างน้อย 3 ข้อ");
+    } else if (stats.questions < PUBLISH_RULES.minQuestions) problems.push("ต้องมีข้อสอบอย่างน้อย 3 ข้อ");
     if (stats.broken > 0) problems.push("มีวิดีโอที่ใช้งานไม่ได้");
     if (problems.length) throw new HttpError(422, "PUBLISH_REQUIREMENTS_NOT_MET", problems.join(" · "));
   }
@@ -635,3 +642,93 @@ export async function setVisibility(user: CurrentUser, courseId: string, visibil
   if (visibility === "archived") await audit(db, { action: "course.archived", userId: user.id, entityType: "course", entityId: courseId, ip: meta.ip });
 }
 
+
+// ---------------------------------------------------------------------------
+// Learning units (หน่วยการเรียนรู้): a title + summary article grouping lessons.
+// Lessons keep their own global order; a unit is a label on a run of lessons.
+// ---------------------------------------------------------------------------
+
+export async function addUnit(user: CurrentUser, courseId: string, input: { title: string; summary?: string | null | undefined }) {
+  await loadOwnedCourse(user, courseId);
+  return ctx()
+    .db.transaction()
+    .execute(async (trx) => {
+      await trx.selectFrom("courses").select("id").where("id", "=", courseId).forUpdate().execute();
+      const next = await trx
+        .selectFrom("course_units")
+        .select(sql<number>`coalesce(max(sequence_order), 0)::int + 1`.as("n"))
+        .where("course_id", "=", courseId)
+        .executeTakeFirstOrThrow();
+      return trx
+        .insertInto("course_units")
+        .values({ course_id: courseId, sequence_order: next.n, title: input.title.trim(), summary: input.summary?.trim() || null })
+        .returning(["id", "sequence_order", "title", "summary"])
+        .executeTakeFirstOrThrow();
+    });
+}
+
+export async function updateUnit(user: CurrentUser, courseId: string, unitId: string, patch: { title?: string | undefined; summary?: string | null | undefined }) {
+  await loadOwnedCourse(user, courseId);
+  const set: { title?: string; summary?: string | null; updated_at: Date } = { updated_at: new Date() };
+  if (patch.title !== undefined) set.title = patch.title.trim();
+  if (patch.summary !== undefined) set.summary = patch.summary?.trim() || null;
+  const res = await ctx().db.updateTable("course_units").set(set).where("id", "=", unitId).where("course_id", "=", courseId).executeTakeFirst();
+  if (Number(res.numUpdatedRows) === 0) throw new HttpError(404, "NOT_FOUND");
+}
+
+/** Deleting a unit keeps its lessons (they become "not in a unit"). */
+export async function deleteUnit(user: CurrentUser, courseId: string, unitId: string) {
+  await loadOwnedCourse(user, courseId);
+  await ctx()
+    .db.transaction()
+    .execute(async (trx) => {
+      const del = await trx.deleteFrom("course_units").where("id", "=", unitId).where("course_id", "=", courseId).returning("sequence_order").executeTakeFirst();
+      if (!del) throw new HttpError(404, "NOT_FOUND");
+      await sql`SET CONSTRAINTS uq_course_units_order DEFERRED`.execute(trx);
+      await trx
+        .updateTable("course_units")
+        .set({ sequence_order: sql<number>`sequence_order - 1` })
+        .where("course_id", "=", courseId)
+        .where("sequence_order", ">", del.sequence_order)
+        .execute();
+    });
+}
+
+export async function reorderUnits(user: CurrentUser, courseId: string, orderedIds: string[]) {
+  await loadOwnedCourse(user, courseId);
+  await ctx()
+    .db.transaction()
+    .execute(async (trx) => {
+      const existing = await trx.selectFrom("course_units").select("id").where("course_id", "=", courseId).forUpdate().execute();
+      const ids = new Set(existing.map((u) => u.id));
+      if (orderedIds.length !== ids.size || !orderedIds.every((id) => ids.has(id)) || new Set(orderedIds).size !== orderedIds.length) {
+        throw new HttpError(400, "ORDER_MISMATCH");
+      }
+      await sql`SET CONSTRAINTS uq_course_units_order DEFERRED`.execute(trx);
+      for (const [i, id] of orderedIds.entries()) {
+        await trx.updateTable("course_units").set({ sequence_order: i + 1 }).where("id", "=", id).execute();
+      }
+    });
+}
+
+/** Unit membership, source credit/description and the learner caution note of one lesson. */
+export async function updateLessonDetails(
+  user: CurrentUser,
+  courseId: string,
+  lessonId: string,
+  patch: { unitId?: string | null | undefined; description?: string | null | undefined; learnerNote?: string | null | undefined },
+) {
+  await loadOwnedCourse(user, courseId);
+  const { db } = ctx();
+  if (patch.unitId) {
+    const unit = await db.selectFrom("course_units").select("id").where("id", "=", patch.unitId).where("course_id", "=", courseId).executeTakeFirst();
+    if (!unit) throw new HttpError(400, "UNIT_NOT_IN_COURSE", "ไม่พบหน่วยการเรียนรู้นี้ในหลักสูตร");
+  }
+  const set: { unit_id?: string | null; description?: string | null; learner_note?: string | null } = {};
+  if (patch.unitId !== undefined) set.unit_id = patch.unitId;
+  if (patch.description !== undefined) set.description = patch.description?.trim() || null;
+  if (patch.learnerNote !== undefined) set.learner_note = patch.learnerNote?.trim() || null;
+  if (Object.keys(set).length === 0) return;
+  const res = await db.updateTable("lessons").set(set).where("id", "=", lessonId).where("course_id", "=", courseId).executeTakeFirst();
+  if (Number(res.numUpdatedRows) === 0) throw new HttpError(404, "NOT_FOUND");
+}
