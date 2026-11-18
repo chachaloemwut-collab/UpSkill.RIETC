@@ -148,6 +148,32 @@ export interface CohortWatches {
   user_id: string;
 }
 
+export interface CourseApplications {
+  applicant: Generated<Json>;
+  application_no: string;
+  course_id: string;
+  course_snapshot: Generated<Json>;
+  created_at: Generated<Timestamp>;
+  declaration_name: string;
+  declared_at: Generated<Timestamp>;
+  documents: Generated<Json>;
+  education: Json | null;
+  enrollment_id: string | null;
+  guardian: Json | null;
+  id: Generated<string>;
+  occupation: Json | null;
+  payment_status: Generated<string>;
+  pdpa_notice_version: string;
+  receipt_no: string | null;
+  reviewed_at: Timestamp | null;
+  reviewed_by: string | null;
+  staff_note: string | null;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+  verification_status: Generated<string>;
+}
+
 export interface CourseAssignmentRecipients {
   assigned_at: Generated<Timestamp>;
   assignment_id: string;
@@ -170,7 +196,9 @@ export interface CourseAssignments {
 }
 
 export interface Courses {
+  application_settings: Generated<Json>;
   completion_rule: Generated<string>;
+  course_type: Generated<string>;
   created_at: Generated<Timestamp>;
   credential_achievement_en: string | null;
   credential_achievement_th: Generated<string>;
@@ -581,6 +609,7 @@ export interface DB {
   checkpoint_attempts: CheckpointAttempts;
   cohort_registrations: CohortRegistrations;
   cohort_watches: CohortWatches;
+  course_applications: CourseApplications;
   course_assignment_recipients: CourseAssignmentRecipients;
   course_assignments: CourseAssignments;
   course_units: CourseUnits;

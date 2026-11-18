@@ -1,13 +1,13 @@
 /** Public course catalog, course detail with the viewer's progress, enrollment. */
 import "server-only";
-import { sql } from "@upskill/db";
+import { sql, type Tx } from "@upskill/db";
 import { ctx } from "../context";
 import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import type { CurrentUser } from "../auth/session";
 import { programsForCourse } from "../programs/programs.service";
 import { assertProfileComplete } from "../auth/profile.service";
-import { lessonTestSatisfied, summarizeLessonTests } from "@upskill/core";
+import { asCourseType, lessonTestSatisfied, parseApplicationSettings, summarizeLessonTests } from "@upskill/core";
 import { asCompletionRule } from "./completion.service";
 import { asNavigationMode } from "../learning/heartbeat.service";
 
@@ -18,7 +18,7 @@ export async function listPublishedCourses() {
     .db.selectFrom("courses as c")
     .innerJoin("users as u", "u.id", "c.instructor_id")
     .select([
-      "c.id", "c.slug", "c.title", "c.description", "c.thumbnail_url", "c.is_verified_course", "c.total_duration_sec",
+      "c.id", "c.slug", "c.title", "c.description", "c.thumbnail_url", "c.is_verified_course", "c.total_duration_sec", "c.course_type",
       sql<string>`coalesce(u.legal_full_name_th, u.legal_full_name_en, split_part(u.email, '@', 1))`.as("instructor_name"),
       sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("lesson_count"),
       sql<number>`(select count(*)::int from enrollments e where e.course_id = c.id)`.as("learner_count"),
@@ -43,7 +43,7 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
     .select([
       "c.id", "c.slug", "c.title", "c.description", "c.visibility", "c.instructor_id", "c.is_verified_course",
       "c.min_watch_percentage", "c.passing_quiz_score", "c.is_sequential_locked", "c.total_duration_sec",
-      "c.max_quiz_attempts_per_day", "c.quiz_time_limit_sec", "c.navigation_mode", "c.completion_rule",
+      "c.max_quiz_attempts_per_day", "c.quiz_time_limit_sec", "c.navigation_mode", "c.completion_rule", "c.course_type", "c.application_settings",
       "c.credential_enabled", "c.credential_name_th", "c.credential_name_en",
       sql<string>`coalesce(u.legal_full_name_th, u.legal_full_name_en, split_part(u.email, '@', 1))`.as("instructor_name"),
     ])
@@ -158,6 +158,9 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
     };
   });
 
+  const myApplication = user
+    ? await db.selectFrom("course_applications").select(["application_no", "status"]).where("user_id", "=", user.id).where("course_id", "=", course.id).executeTakeFirst()
+    : undefined;
   const programs = await programsForCourse(course.id);
   const certificate = user
     ? await db.selectFrom("certificates").select(["certificate_code", "revoked_at"]).where("user_id", "=", user.id).where("course_id", "=", course.id).executeTakeFirst()
@@ -171,6 +174,9 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
     units: unitViews,
     completionRule,
     navigationMode: asNavigationMode(course.navigation_mode),
+    courseType: asCourseType(course.course_type),
+    application: parseApplicationSettings(course.application_settings),
+    myApplication: myApplication ?? null,
     /** Combined end-of-lesson test score (drives the result for lesson_tests_average courses). */
     lessonTests,
     allLessonsCompleted: lessonViews.length > 0 && lessonViews.every((l) => l.completed),
@@ -184,9 +190,13 @@ export async function getCourseForViewer(slug: string, user: CurrentUser | null)
   };
 }
 
-export async function enroll(user: CurrentUser, courseId: string): Promise<void> {
-  const { db, env } = ctx();
-  const course = await db.selectFrom("courses").select(["visibility", "instructor_id", "title", "slug"]).where("id", "=", courseId).executeTakeFirst();
+/** Course checks shared by one-click enrollment and the application form. Throws when the user may not enroll. */
+export async function loadEnrollableCourse(user: CurrentUser, courseId: string) {
+  const course = await ctx()
+    .db.selectFrom("courses")
+    .select(["id", "visibility", "instructor_id", "title", "slug", "application_settings", "course_type"])
+    .where("id", "=", courseId)
+    .executeTakeFirst();
   if (!course || (course.visibility !== "published" && course.visibility !== "unlisted")) throw new HttpError(404, "NOT_FOUND");
   // Anti-farming: an instructor can't earn a certificate from their own course
   if (course.instructor_id === user.id) throw new HttpError(403, "CANNOT_ENROLL_OWN_COURSE");
@@ -195,23 +205,38 @@ export async function enroll(user: CurrentUser, courseId: string): Promise<void>
   if (course.visibility === "unlisted" && (await programsForCourse(courseId)).length > 0) {
     throw new HttpError(403, "PROGRAM_REGISTRATION_REQUIRED", "รายวิชานี้เปิดให้เรียนผ่านการสมัครหลักสูตรอบรมเท่านั้น");
   }
-  await assertProfileComplete(user.id);
+  return course;
+}
 
-  await db.transaction().execute(async (trx) => {
-    const now = new Date();
-    const enrollment = await trx
-      .insertInto("enrollments")
-      .values({ user_id: user.id, course_id: courseId, enrolled_at: now })
-      .onConflict((oc) => oc.columns(["user_id", "course_id"]).doNothing())
-      .returning("id")
-      .executeTakeFirst();
-    if (!enrollment) return;
-    await addEmailToOutbox(
-      trx,
-      { template: "enrollment-confirmed", to: user.email, courseTitle: course.title, courseLink: `${env.APP_ORIGIN}/courses/${course.slug}`, enrolledAt: now.toISOString() },
-      { userId: user.id, deduplicationKey: `enrollment-confirmed:${enrollment.id}` },
-    );
-  });
+/** Inserts the enrollment (idempotent) and queues the confirmation email. Returns the enrollment id. */
+export async function insertEnrollment(trx: Tx, learner: { id: string; email: string }, course: { id: string; title: string; slug: string }): Promise<string> {
+  const { env } = ctx();
+  const now = new Date();
+  const created = await trx
+    .insertInto("enrollments")
+    .values({ user_id: learner.id, course_id: course.id, enrolled_at: now })
+    .onConflict((oc) => oc.columns(["user_id", "course_id"]).doNothing())
+    .returning("id")
+    .executeTakeFirst();
+  if (!created) {
+    const existing = await trx.selectFrom("enrollments").select("id").where("user_id", "=", learner.id).where("course_id", "=", course.id).executeTakeFirstOrThrow();
+    return existing.id;
+  }
+  await addEmailToOutbox(
+    trx,
+    { template: "enrollment-confirmed", to: learner.email, courseTitle: course.title, courseLink: `${env.APP_ORIGIN}/courses/${course.slug}`, enrolledAt: now.toISOString() },
+    { userId: learner.id, deduplicationKey: `enrollment-confirmed:${created.id}` },
+  );
+  return created.id;
+}
+
+export async function enroll(user: CurrentUser, courseId: string): Promise<void> {
+  const course = await loadEnrollableCourse(user, courseId);
+  if (parseApplicationSettings(course.application_settings).enabled) {
+    throw new HttpError(409, "APPLICATION_REQUIRED", "หลักสูตรนี้ต้องกรอกใบสมัครก่อนลงทะเบียนเรียน");
+  }
+  await assertProfileComplete(user.id);
+  await ctx().db.transaction().execute((trx) => insertEnrollment(trx, user, course));
 }
 
 export async function myEnrollments(userId: string) {
@@ -272,6 +297,8 @@ export async function publicStats() {
       sql<number>`(select count(*)::int from lessons l join courses c on c.id = l.course_id where c.visibility = 'published')`.as("lessons"),
       sql<number>`(select coalesce(sum(total_duration_sec), 0)::int from courses where visibility = 'published')`.as("durationSec"),
       sql<number>`(select count(*)::int from certificates where revoked_at is null)`.as("certificates"),
+      sql<number>`(select count(*)::int from courses where visibility = 'published' and course_type = 'certified_training')`.as("certifiedTraining"),
+      sql<number>`(select count(*)::int from courses where visibility = 'published' and course_type = 'short_course')`.as("shortCourses"),
     ])
     .executeTakeFirstOrThrow();
 }

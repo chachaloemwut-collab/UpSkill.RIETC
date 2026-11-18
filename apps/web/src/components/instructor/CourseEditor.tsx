@@ -7,6 +7,7 @@ import {
   Archive,
   ArrowDown,
   ArrowUp,
+  ClipboardList,
   Award,
   Check,
   CheckCircle2,
@@ -59,6 +60,8 @@ import { CheckpointEditorDialog } from "./CheckpointEditorDialog";
 import { QuestionEditDialog, type QuestionData } from "./QuestionEditDialog";
 import { CourseLearnersRoster } from "./CourseLearnersRoster";
 import { LessonDetailsForm, UnitBadge, UnitsManager, type EditorUnit } from "./UnitsManager";
+import { ApplicationsManager, type EditorApplication } from "./ApplicationsManager";
+import { COURSE_TYPES, COURSE_TYPE_INFO } from "@upskill/core/application";
 
 export interface EditorData {
   course: {
@@ -88,8 +91,11 @@ export interface EditorData {
     credential_text_align: string;
     navigation_mode: string;
     completion_rule: string;
+    course_type: string;
+    application_settings: unknown;
   };
   units: EditorUnit[];
+  applications: EditorApplication[];
   lessons: Array<{
     id: string;
     sequence_order: number;
@@ -176,7 +182,7 @@ export function CourseEditor({ data }: { data: EditorData }) {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <Tabs defaultValue="lessons" className="min-w-0">
-        <TabsList className="grid grid-cols-4 w-full">
+        <TabsList className="grid grid-cols-5 w-full">
           <TabsTrigger value="lessons">
             <span className="inline-flex items-center gap-1.5">
               <Video className="h-3.5 w-3.5" />
@@ -187,6 +193,12 @@ export function CourseEditor({ data }: { data: EditorData }) {
             <span className="inline-flex items-center gap-1.5">
               <FileQuestion className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">แบบทดสอบ</span> ({questions.length})
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="applications">
+            <span className="inline-flex items-center gap-1.5">
+              <ClipboardList className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">ใบสมัคร</span> ({data.applications.length})
             </span>
           </TabsTrigger>
           <TabsTrigger value="learners">
@@ -210,6 +222,10 @@ export function CourseEditor({ data }: { data: EditorData }) {
 
         <TabsContent value="quiz" className="mt-4">
           <QuizSection base={base} questions={questions} lessons={lessons} />
+        </TabsContent>
+
+        <TabsContent value="applications" className="mt-4">
+          <ApplicationsManager base={base} rawSettings={course.application_settings} applications={data.applications} />
         </TabsContent>
 
         <TabsContent value="learners" className="mt-4">
@@ -345,6 +361,7 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
           quiz_time_limit_sec: Number(f.get("quiz_time_limit_min")) * 60,
           is_sequential_locked: f.get("is_sequential_locked") === "on",
           navigation_mode: f.get("navigation_mode"),
+          course_type: f.get("course_type"),
           completion_rule: f.get("completion_rule"),
           credential_enabled: f.get("credential_enabled") === "on",
           credential_type: f.get("credential_type"),
@@ -432,6 +449,14 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
               />
             </Field>
           </div>
+
+          <Field label="ประเภทหลักสูตร" hint="แสดงในคลังหลักสูตรและหน้าแรก ชื่อเอกสารที่ออกให้ตั้งได้ในส่วนเอกสารรับรองด้านล่าง">
+            <Select name="course_type" defaultValue={course.course_type}>
+              {COURSE_TYPES.map((t) => (
+                <option key={t} value={t}>{COURSE_TYPE_INFO[t].label} — ได้รับ{COURSE_TYPE_INFO[t].short}</option>
+              ))}
+            </Select>
+          </Field>
 
           <div className="grid items-start gap-4 sm:grid-cols-2">
             <Field label="การดูวิดีโอ" hint="เลือกได้ว่าผู้เรียนเลื่อนดูช่วงไหนก่อนได้หรือไม่">

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BadgeCheck, BookOpen, Clock, PlayCircle, Users } from "lucide-react";
+import { COURSE_TYPE_INFO, asCourseType } from "@upskill/core/application";
+import { BadgeCheck, BookOpen, Clock, PlayCircle, Users, Award } from "lucide-react";
 import { Avatar, Badge, Progress } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { formatDuration, youtubeThumb } from "@/lib/format";
@@ -32,6 +33,18 @@ export interface CourseCardData {
   is_verified_course: boolean;
   cover_video_id: string | null;
   learner_count?: number;
+  course_type?: string;
+}
+
+/** What the course offers (chosen by its owner): ใบรับรอง or ประกาศนียบัตรหลักสูตรระยะสั้น */
+function CourseTypeBadge({ type }: { type?: string | undefined }) {
+  if (!type) return null;
+  const info = COURSE_TYPE_INFO[asCourseType(type)];
+  return (
+    <Badge title={info.label} className="border-transparent bg-background/95 text-foreground shadow-xs backdrop-blur">
+      <Award className="h-3.5 w-3.5 text-primary" /> {info.short}
+    </Badge>
+  );
 }
 
 export function CourseCard({
@@ -69,6 +82,7 @@ export function CourseCard({
             ) : (
               <Badge className="border-transparent bg-background/95 text-muted-foreground shadow-xs backdrop-blur">Community</Badge>
             )}
+            <CourseTypeBadge type={course.course_type} />
           </div>
         </div>
         <div className="flex flex-1 flex-col justify-between p-4 sm:p-5 gap-2.5">
@@ -114,6 +128,7 @@ export function CourseCard({
           ) : (
             <Badge className="border-transparent bg-background/95 text-muted-foreground shadow-xs backdrop-blur">Community</Badge>
           )}
+          <CourseTypeBadge type={course.course_type} />
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4">

@@ -3,7 +3,7 @@
  * IDOR check `course.instructor_id === current_user.id` (admins may manage any course).
  */
 import "server-only";
-import { extractYouTubeVideoId, type VideoValidation } from "@upskill/core";
+import { COURSE_TYPE_INFO, extractYouTubeVideoId, parseApplicationSettings, type VideoValidation } from "@upskill/core";
 import { sql, type Tx } from "@upskill/db";
 import { fetchVideos } from "@upskill/infra/youtube-client";
 import { ctx } from "../context";
@@ -25,7 +25,7 @@ const YT_ERRORS: Record<Exclude<VideoValidation, { ok: true }>["reason"], string
   BAD_DURATION: "อ่านความยาววิดีโอไม่ได้",
 };
 
-async function loadOwnedCourse(user: CurrentUser, courseId: string) {
+export async function loadOwnedCourse(user: CurrentUser, courseId: string) {
   const c = await ctx()
     .db.selectFrom("courses")
     .select(["id", "instructor_id", "visibility", "title"])
@@ -119,7 +119,7 @@ export async function getCourseForEditing(user: CurrentUser, courseId: string) {
 
 export async function createCourse(
   user: CurrentUser,
-  input: { title: string; description?: string | undefined; instructorId?: string | undefined },
+  input: { title: string; description?: string | undefined; instructorId?: string | undefined; courseType?: "certified_training" | "short_course" | undefined },
   meta?: { ip: string },
 ) {
   if (user.role !== "instructor" && user.role !== "admin") throw new HttpError(403, "FORBIDDEN");
@@ -132,7 +132,15 @@ export async function createCourse(
   const { db } = ctx();
   const c = await db
     .insertInto("courses")
-    .values({ instructor_id: instructorId, title: input.title.trim(), description: input.description?.trim() || null, slug: slugify(input.title, "course") })
+    .values({
+      instructor_id: instructorId,
+      title: input.title.trim(),
+      description: input.description?.trim() || null,
+      slug: slugify(input.title, "course"),
+      course_type: input.courseType ?? "certified_training",
+      // A short course issues a ประกาศนียบัตร; the owner can still rename the document in settings
+      credential_name_th: COURSE_TYPE_INFO[input.courseType ?? "certified_training"].defaultCredentialName,
+    })
     .returning(["id", "slug"])
     .executeTakeFirstOrThrow();
   if (instructorId !== user.id) {
@@ -166,11 +174,19 @@ export async function updateCourse(
     credential_text_align: string;
     navigation_mode: "linear" | "free_complete";
     completion_rule: "post_test" | "lesson_tests_average";
+    course_type: "certified_training" | "short_course";
+    application_settings: unknown;
   }>,
 ) {
   await loadOwnedCourse(user, courseId);
   if (Object.keys(patch).length === 0) return;
-  await ctx().db.updateTable("courses").set(patch).where("id", "=", courseId).execute();
+  const { application_settings, ...rest } = patch;
+  await ctx()
+    .db.updateTable("courses")
+    // Settings are normalized by the core parser, so nothing it doesn't understand is ever stored
+    .set({ ...rest, ...(application_settings !== undefined ? { application_settings: JSON.stringify(parseApplicationSettings(application_settings)) } : {}) })
+    .where("id", "=", courseId)
+    .execute();
 }
 
 async function lookupVideo(videoId: string, devDurationSec?: number): Promise<{ durationSec: number; title: string; isPublic: boolean }> {

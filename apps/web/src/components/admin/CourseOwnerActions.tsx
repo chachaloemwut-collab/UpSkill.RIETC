@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Plus, UserCog } from "lucide-react";
 import { api } from "@/lib/api";
+import { COURSE_TYPES, COURSE_TYPE_INFO } from "@upskill/core/application";
 import { Alert, Button, Dialog, Field, Input, Select, Textarea, useToast } from "@/components/ui";
 
 export type InstructorOption = { id: string; email: string; name: string; role: string };
@@ -21,7 +22,7 @@ export function AdminCreateCourseDialog({ instructors, selfId }: { instructors: 
     const f = new FormData(e.currentTarget);
     setBusy(true);
     setError(null);
-    const r = await api<{ id: string }>("/api/admin/courses", { body: { title: f.get("title"), description: String(f.get("description") ?? "") || undefined, instructor_id: owner } });
+    const r = await api<{ id: string }>("/api/admin/courses", { body: { title: f.get("title"), description: String(f.get("description") ?? "") || undefined, instructor_id: owner, course_type: f.get("course_type") || undefined } });
     setBusy(false);
     if (r.ok) router.push(`/instructor/courses/${r.data.id}`);
     else setError(r.message);
@@ -35,6 +36,13 @@ export function AdminCreateCourseDialog({ instructors, selfId }: { instructors: 
           <Field label="ชื่อรายวิชา"><Input name="title" minLength={3} maxLength={255} required /></Field>
           <Field label="ผู้สอน" hint="ผู้สอนจะเห็นและแก้ไขรายวิชานี้ได้ และลงทะเบียนเรียนรายวิชานี้ไม่ได้">
             <Select value={owner} onValueChange={setOwner} options={options(instructors)} />
+          </Field>
+          <Field label="ประเภทหลักสูตร">
+            <Select name="course_type" defaultValue="certified_training">
+              {COURSE_TYPES.map((t) => (
+                <option key={t} value={t}>{COURSE_TYPE_INFO[t].label} — ได้รับ{COURSE_TYPE_INFO[t].short}</option>
+              ))}
+            </Select>
           </Field>
           <Field label="คำอธิบาย" hint="ไม่บังคับ"><Textarea name="description" rows={3} maxLength={10000} /></Field>
           <div className="flex justify-end gap-2">
