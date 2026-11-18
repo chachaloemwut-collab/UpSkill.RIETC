@@ -333,7 +333,7 @@ export async function adminUpdateLegalName(
 export async function adminSetEnrollmentStatus(
   adminId: string,
   enrollmentId: string,
-  status: "completed" | "in_progress" | "dropped",
+  status: "completed" | "in_progress" | "revoked",
   meta: { ip: string },
 ) {
   const { db } = ctx();

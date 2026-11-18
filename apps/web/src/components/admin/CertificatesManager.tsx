@@ -151,6 +151,12 @@ export function CertificatesManager({
       toast({ variant: "destructive", title: "ข้อผิดพลาด", description: "กรุณาเลือกหลักสูตร" });
       return;
     }
+    const scoreText = scoreInput.trim();
+    const score = scoreText === "" ? NaN : Number(scoreText);
+    if (!Number.isFinite(score) || score < 0 || score > 100) {
+      toast({ variant: "destructive", title: "คะแนนไม่ถูกต้อง", description: "กรอกคะแนน 0–100 (0 เป็นคะแนนจริง ไม่ใช่ค่าว่าง)" });
+      return;
+    }
     setIssuing(true);
     try {
       const res = await api<{ code: string }>("/api/admin/certificates", {
@@ -158,7 +164,7 @@ export function CertificatesManager({
         body: {
           userId: userIdInput.trim(),
           courseId: courseIdInput,
-          score: Number(scoreInput) || 100,
+          score,
           reason: reasonInput.trim(),
         },
       });

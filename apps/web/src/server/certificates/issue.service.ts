@@ -191,13 +191,13 @@ export async function issueProgramCertificate(input: { userId: string; programId
     .executeTakeFirst();
   if (!reg) throw new HttpError(403, "NOT_APPROVED");
 
-  const required = await db
+  const requiredCourseIds = await db
     .selectFrom("program_courses")
     .select(["course_id"])
     .where("program_id", "=", input.programId)
     .where("is_required", "=", true)
     .execute();
-  if (required.length === 0) throw new HttpError(403, "PROGRAM_EMPTY");
+  if (requiredCourseIds.length === 0) throw new HttpError(403, "PROGRAM_EMPTY");
 
   const completed = await db
     .selectFrom("enrollments")
@@ -207,7 +207,7 @@ export async function issueProgramCertificate(input: { userId: string; programId
     .where("status", "=", "completed")
     .execute();
   const done = new Set(completed.map((e) => e.course_id));
-  if (required.some((r) => !done.has(r.course_id))) throw new HttpError(403, "PROGRAM_NOT_COMPLETED");
+  if (requiredCourseIds.some((r) => !done.has(r.course_id))) throw new HttpError(403, "PROGRAM_NOT_COMPLETED");
 
   const program = await db
     .selectFrom("programs as p")
@@ -231,18 +231,36 @@ export async function issueProgramCertificate(input: { userId: string; programId
     .where("e.user_id", "=", input.userId)
     .where("e.cohort_id", "=", reg.cohort_id)
     .executeTakeFirstOrThrow();
-  const scores = await db
-    .selectFrom("quiz_attempts as qa")
-    .innerJoin("enrollments as e", "e.id", "qa.enrollment_id")
-    .innerJoin("program_courses as pc", "pc.course_id", "e.course_id")
-    .select(sql<string>`round(avg(qa.score_percentage), 2)::text`.as("avg"))
-    .where("qa.assessment_type", "=", "post")
-    .where("qa.is_passed", "=", true)
+  // Score per required course by that course's own completion rule (post-test best, or the combined
+  // end-of-lesson score), then the plain average. A missing score is an error, never silently 0.
+  const required = await db
+    .selectFrom("program_courses as pc")
+    .innerJoin("courses as c", "c.id", "pc.course_id")
+    .innerJoin("enrollments as e", (j) => j.onRef("e.course_id", "=", "c.id").on("e.user_id", "=", input.userId).on("e.cohort_id", "=", reg.cohort_id))
+    .select(["c.id as course_id", "c.completion_rule", "c.passing_quiz_score", "e.id as enrollment_id"])
     .where("pc.program_id", "=", input.programId)
     .where("pc.is_required", "=", true)
-    .where("e.user_id", "=", input.userId)
-    .where("e.cohort_id", "=", reg.cohort_id)
-    .executeTakeFirstOrThrow();
+    .execute();
+  const courseScores: number[] = [];
+  for (const r of required) {
+    if (asCompletionRule(r.completion_rule) === "lesson_tests_average") {
+      const sum = await lessonTestsSummaryFor(db, r.enrollment_id, r.course_id, r.passing_quiz_score);
+      if (sum.passed && sum.totalQuestions > 0) courseScores.push((sum.correct / sum.totalQuestions) * 100);
+    } else {
+      const best = await db
+        .selectFrom("quiz_attempts")
+        .select(sql<string>`max(score_percentage)::text`.as("score"))
+        .where("enrollment_id", "=", r.enrollment_id)
+        .where("assessment_type", "=", "post")
+        .where("is_passed", "=", true)
+        .executeTakeFirstOrThrow();
+      if (best.score !== null) courseScores.push(Number(best.score));
+    }
+  }
+  if (courseScores.length === 0 || courseScores.length < required.length) {
+    throw new HttpError(409, "SCORE_UNAVAILABLE", "ยังไม่มีคะแนนครบทุกรายวิชาบังคับ จึงออกใบรับรองระดับหลักสูตรไม่ได้");
+  }
+  const programScore = courseScores.reduce((a, b) => a + b, 0) / courseScores.length;
 
   const issuedAt = new Date();
   const code = generateCertificateCode(issuedAt.getUTCFullYear());
@@ -262,7 +280,7 @@ export async function issueProgramCertificate(input: { userId: string; programId
     courseTitle: programTitle,
     instructorName: signerName,
     totalStudySec: study.study_sec,
-    quizScore: Number(scores.avg).toFixed(2),
+    quizScore: programScore.toFixed(2),
     verifiedCourse: false,
     issuedAt: issuedAt.toISOString(),
     documentName: "ใบประกาศนียบัตร",

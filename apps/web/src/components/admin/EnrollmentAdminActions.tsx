@@ -53,7 +53,14 @@ export function EnrollmentAdminActions({
   };
 
   const manualIssue = async () => {
-    if (!window.confirm("ยืนยันออกใบรับรองหลักสูตรนี้ให้ผู้เรียนทันที?")) return;
+    // The score printed on the certificate must be stated, never defaulted
+    const answer = window.prompt("ออกใบรับรองหลักสูตรนี้ให้ผู้เรียนทันที\nกรอกคะแนนที่จะพิมพ์บนใบรับรอง (0–100):");
+    if (answer === null) return;
+    const score = answer.trim() === "" ? NaN : Number(answer);
+    if (!Number.isFinite(score) || score < 0 || score > 100) {
+      toast({ variant: "destructive", title: "คะแนนไม่ถูกต้อง", description: "กรอกคะแนน 0–100" });
+      return;
+    }
     setBusy(true);
     try {
       const res = await api<{ code: string }>("/api/admin/certificates", {
@@ -61,7 +68,7 @@ export function EnrollmentAdminActions({
         body: {
           userId,
           courseId,
-          score: 100,
+          score,
           reason: "อนุมัติจบหลักสูตรและออกใบรับรองจากหน้าจัดการสมาชิก",
         },
       });

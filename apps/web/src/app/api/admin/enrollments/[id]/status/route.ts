@@ -4,7 +4,7 @@ import { uuidParam } from "@/server/params";
 import { adminSetEnrollmentStatus } from "@/server/admin/users.service";
 
 const Body = z.object({
-  status: z.enum(["completed", "in_progress", "dropped"]),
+  status: z.enum(["completed", "in_progress", "revoked"]),
 });
 
 export const POST = route<typeof Body, { id: string }>({ auth: "required", roles: ["admin"], body: Body }, async ({ user, params, body, ip }) => {
