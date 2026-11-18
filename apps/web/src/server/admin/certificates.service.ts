@@ -88,6 +88,12 @@ export async function listCertificatesAdmin(input: {
       .where((eb) => eb.or([eb("cert.expires_at", "is", null), eb("cert.expires_at", ">", new Date())]));
   }
 
+  // The page count must use the same search + status filters as the rows (the category totals above ignore the search)
+  const filtered = await db
+    .selectFrom(query.as("f"))
+    .select(sql<number>`count(*)::int`.as("n"))
+    .executeTakeFirstOrThrow();
+
   const certificates = await query
     .orderBy("cert.issued_at", "desc")
     .limit(pageSize)
@@ -114,14 +120,7 @@ export async function listCertificatesAdmin(input: {
     },
     page,
     pageSize,
-    total:
-      input.status === "revoked"
-        ? counts.revoked
-        : input.status === "expired"
-          ? counts.expired
-          : input.status === "valid"
-            ? counts.valid
-            : counts.total,
+    total: filtered.n,
   };
 }
 
