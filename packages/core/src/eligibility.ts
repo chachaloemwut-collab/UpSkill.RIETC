@@ -4,8 +4,10 @@
 export interface ApplicationField {
   key: string;
   label: string;
-  type: "text" | "textarea";
+  type: "text" | "textarea" | "select" | "date" | "number";
   required: boolean;
+  options?: string[];
+  showIf?: { field: string; value: string };
 }
 
 export interface EligibilityRules {
@@ -48,7 +50,19 @@ export function parseEligibilityRules(raw: unknown): EligibilityRules {
     const label = typeof r.label === "string" ? r.label.trim().slice(0, 120) : "";
     if (!KEY_RE.test(key) || !label || seen.has(key)) continue;
     seen.add(key);
-    applicationForm.push({ key, label, type: r.type === "textarea" ? "textarea" : "text", required: r.required === true });
+    const TYPES = ["text", "textarea", "select", "date", "number"] as const;
+    const type = TYPES.includes(r.type as (typeof TYPES)[number]) ? (r.type as ApplicationField["type"]) : "text";
+    const options = type === "select" && Array.isArray(r.options)
+      ? (r.options as unknown[]).filter((o): o is string => typeof o === "string" && o.trim().length > 0).map((o) => o.trim().slice(0, 120)).slice(0, 20)
+      : undefined;
+    const rawShowIf = r.showIf && typeof r.showIf === "object" ? (r.showIf as Record<string, unknown>) : null;
+    const showIf: ApplicationField["showIf"] = rawShowIf && typeof rawShowIf.field === "string" && typeof rawShowIf.value === "string"
+      ? { field: rawShowIf.field as string, value: rawShowIf.value as string }
+      : undefined;
+    const field: ApplicationField = { key, label, type, required: r.required === true };
+    if (options) field.options = options;
+    if (showIf) field.showIf = showIf;
+    applicationForm.push(field);
   }
   return {
     emailDomains: domains.slice(0, ELIGIBILITY_LIMITS.domains),
@@ -98,10 +112,13 @@ export function normalizeAnswers(form: ApplicationField[], raw: unknown): { answ
   const answers: Record<string, string> = {};
   const errors: string[] = [];
   for (const f of form) {
+    // Skip fields whose showIf condition is not met
+    if (f.showIf && answers[f.showIf.field] !== f.showIf.value) continue;
     const v = typeof input[f.key] === "string" ? (input[f.key] as string).trim() : "";
-    if (v.length > ELIGIBILITY_LIMITS.answerLength) errors.push(`"${f.label}" ยาวเกินไป`);
-    else if (f.required && !v) errors.push(`กรุณากรอก "${f.label}"`);
-    else if (v) answers[f.key] = v;
+    if (v.length > ELIGIBILITY_LIMITS.answerLength) { errors.push(`"${f.label}" ยาวเกินไป`); continue; }
+    if (f.required && !v) { errors.push(`กรุณากรอก "${f.label}"`); continue; }
+    if (f.type === "select" && v && f.options && !f.options.includes(v)) { errors.push(`"${f.label}" มีค่าที่ไม่ถูกต้อง`); continue; }
+    if (v) answers[f.key] = v;
   }
   return { answers, errors };
 }

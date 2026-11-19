@@ -4,9 +4,12 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { LogIn, Send, Undo2 } from "lucide-react";
 import { api } from "@/lib/api";
-import { Alert, AlertDialog, Button, Dialog, Field, Input, Textarea, buttonClass, confettiFrom, useToast } from "@/components/ui";
+import { Alert, AlertDialog, Button, Dialog, Field, Input, Select, Textarea, buttonClass, confettiFrom, useToast } from "@/components/ui";
 
-type Field = { key: string; label: string; type: "text" | "textarea"; required: boolean };
+type Field = {
+  key: string; label: string; type: "text" | "textarea" | "select" | "date" | "number"; required: boolean;
+  options?: string[]; showIf?: { field: string; value: string };
+};
 
 const RESULT: Record<string, { title: string; description: string }> = {
   approved: { title: "สมัครสำเร็จ", description: "คุณได้รับสิทธิ์เข้าอบรมแล้ว ระบบลงทะเบียนรายวิชาให้เรียบร้อย" },
@@ -36,11 +39,13 @@ export function CohortApply({
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const setAnswer = (key: string, v: string) => setAnswers((x) => ({ ...x, [key]: v }));
 
-  async function submit(answers: Record<string, string>, el?: HTMLElement | null) {
+  async function submit(a: Record<string, string>, el?: HTMLElement | null) {
     setBusy(true);
     setError(null);
-    const r = await api<{ status: string }>(`/api/cohorts/${cohortId}/apply`, { body: { answers } });
+    const r = await api<{ status: string }>(`/api/cohorts/${cohortId}/apply`, { body: { answers: a } });
     setBusy(false);
     if (!r.ok) {
       if (open) setError(r.message);
@@ -48,6 +53,7 @@ export function CohortApply({
       return;
     }
     setOpen(false);
+    setAnswers({});
     if (r.data.status === "approved" && el) confettiFrom(el, { count: 60 });
     const msg = RESULT[r.data.status] ?? RESULT.pending!;
     toast({ title: msg.title, description: msg.description, variant: "success" });
@@ -56,8 +62,7 @@ export function CohortApply({
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    await submit(Object.fromEntries(form.map((x) => [x.key, String(f.get(x.key) ?? "")])), e.currentTarget.querySelector("button[type=submit]"));
+    await submit(answers, e.currentTarget.querySelector("button[type=submit]"));
   }
 
   async function withdraw() {
@@ -83,7 +88,7 @@ export function CohortApply({
         <Button
           loading={busy && !open}
           className="w-full sm:w-auto"
-          onClick={(e) => (form.length ? setOpen(true) : void submit({}, e.currentTarget))}
+          onClick={(e) => (form.length ? setOpen(true) : void submit(answers, e.currentTarget))}
         >
           <Send className="h-4 w-4" /> {label}
         </Button>
@@ -96,9 +101,21 @@ export function CohortApply({
       <Dialog open={open} onOpenChange={setOpen} title="ใบสมัครเข้าอบรม" description="กรอกข้อมูลตามที่หลักสูตรกำหนด">
         <form onSubmit={onSubmit} className="grid gap-4">
           {error && <Alert variant="destructive" title={error} />}
-          {form.map((f) => (
+          {form.filter((f) => !f.showIf || answers[f.showIf.field] === f.showIf.value).map((f) => (
             <Field key={f.key} label={f.required ? `${f.label} *` : f.label}>
-              {f.type === "textarea" ? <Textarea name={f.key} rows={3} maxLength={2000} required={f.required} /> : <Input name={f.key} maxLength={2000} required={f.required} />}
+              {f.type === "textarea" ? (
+                <Textarea rows={3} maxLength={2000} required={f.required} value={answers[f.key] ?? ""} onChange={(e) => setAnswer(f.key, e.target.value)} />
+              ) : f.type === "select" ? (
+                <Select required={f.required} value={answers[f.key] ?? ""} onValueChange={(v) => setAnswer(f.key, v)} placeholder="เลือก…">
+                  {(f.options ?? []).filter(Boolean).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                </Select>
+              ) : f.type === "date" ? (
+                <Input type="date" required={f.required} value={answers[f.key] ?? ""} onChange={(e) => setAnswer(f.key, e.target.value)} />
+              ) : f.type === "number" ? (
+                <Input type="number" inputMode="numeric" maxLength={20} required={f.required} value={answers[f.key] ?? ""} onChange={(e) => setAnswer(f.key, e.target.value)} />
+              ) : (
+                <Input maxLength={2000} required={f.required} value={answers[f.key] ?? ""} onChange={(e) => setAnswer(f.key, e.target.value)} />
+              )}
             </Field>
           ))}
           <div className="flex justify-end gap-2">

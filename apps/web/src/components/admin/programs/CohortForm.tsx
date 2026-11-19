@@ -6,7 +6,10 @@ import { api } from "@/lib/api";
 import { fromBangkokInput, toBangkokInput } from "@/lib/format";
 import { Alert, AlertDialog, Button, Checkbox, Dialog, Field, Input, MultiSelect, Select, TagInput, useToast } from "@/components/ui";
 
-type FormField = { key: string; label: string; type: "text" | "textarea"; required: boolean };
+type FormField = {
+  key: string; label: string; type: "text" | "textarea" | "select" | "date" | "number"; required: boolean;
+  options?: string[]; showIf?: { field: string; value: string };
+};
 export type Rules = { emailDomains: string[]; groupIds: string[]; requireLegalName: boolean; prerequisiteCourseIds: string[]; applicationForm: FormField[] };
 export type CohortDefaults = {
   title: string;
@@ -114,18 +117,84 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
         <legend className="px-1 text-sm font-semibold">คำถามในใบสมัคร</legend>
         {rules.applicationForm.length === 0 && <p className="text-sm text-muted-foreground">ไม่มีคำถาม ผู้ใช้กดสมัครได้ทันที</p>}
         {rules.applicationForm.map((q, i) => (
-          <div key={i} className="flex flex-wrap items-center gap-2">
-            <Input className="min-w-48 flex-1" value={q.label} maxLength={120} placeholder="คำถาม เช่น หน่วยงาน" onChange={(e) => setField(i, { label: e.currentTarget.value })} />
-            <div className="w-36">
-              <Select value={q.type} onValueChange={(v) => setField(i, { type: v === "textarea" ? "textarea" : "text" })}>
-                <option value="text">ข้อความสั้น</option>
-                <option value="textarea">ข้อความยาว</option>
-              </Select>
+          <div key={i} className="rounded-lg border p-3 grid gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Input className="min-w-48 flex-1" value={q.label} maxLength={120} placeholder="คำถาม เช่น หน่วยงาน" onChange={(e) => setField(i, { label: e.currentTarget.value })} />
+              <div className="w-40">
+                <Select
+                  value={q.type}
+                  onValueChange={(v) => setField(i, { type: v as FormField["type"], ...(v !== "select" ? { options: undefined } : { options: q.options ?? [""] }) })}
+                >
+                  <option value="text">ข้อความสั้น</option>
+                  <option value="textarea">ข้อความยาว</option>
+                  <option value="select">เลือกตัวเลือก</option>
+                  <option value="date">วันที่</option>
+                  <option value="number">ตัวเลข</option>
+                </Select>
+              </div>
+              <Checkbox checked={q.required} onChange={(e) => setField(i, { required: e.currentTarget.checked })} label="บังคับ" />
+              <Button type="button" variant="ghost" size="icon" aria-label="ลบคำถาม" onClick={() => setRules((r) => ({ ...r, applicationForm: r.applicationForm.filter((_, j) => j !== i) }))}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
-            <Checkbox checked={q.required} onChange={(e) => setField(i, { required: e.currentTarget.checked })} label="บังคับ" />
-            <Button type="button" variant="ghost" size="icon" aria-label="ลบคำถาม" onClick={() => setRules((r) => ({ ...r, applicationForm: r.applicationForm.filter((_, j) => j !== i) }))}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {q.type === "select" && (
+              <div className="grid gap-1 pl-2">
+                <p className="text-xs font-medium text-muted-foreground">ตัวเลือก:</p>
+                {(q.options ?? [""]).map((opt, oi) => (
+                  <div key={oi} className="flex items-center gap-2">
+                    <Input
+                      className="flex-1 h-7 text-sm"
+                      value={opt}
+                      maxLength={120}
+                      placeholder={`ตัวเลือก ${oi + 1}`}
+                      onChange={(e) => {
+                        const opts = [...(q.options ?? [""])];
+                        opts[oi] = e.currentTarget.value;
+                        setField(i, { options: opts });
+                      }}
+                    />
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="ลบตัวเลือก"
+                      onClick={() => setField(i, { options: (q.options ?? [""]).filter((_, j) => j !== oi) })}
+                    ><Trash2 className="h-3.5 w-3.5" /></Button>
+                  </div>
+                ))}
+                {(q.options ?? [""]).length < 20 && (
+                  <Button type="button" variant="ghost" size="sm" className="h-7 justify-start text-xs"
+                    onClick={() => setField(i, { options: [...(q.options ?? [""]), ""] })}
+                  ><Plus className="h-3 w-3" /> เพิ่มตัวเลือก</Button>
+                )}
+              </div>
+            )}
+            {rules.applicationForm.length > 1 && (
+              <div className="flex items-center gap-2 pl-2">
+                <span className="text-xs text-muted-foreground">แสดงเมื่อ:</span>
+                <div className="w-36">
+                  <Select
+                    value={q.showIf?.field ?? ""}
+                    onValueChange={(v) => setField(i, { showIf: v ? { field: v, value: q.showIf?.value ?? "" } : undefined })}
+                  >
+                    <option value="">เสมอ</option>
+                    {rules.applicationForm.filter((_, j) => j !== i && rules.applicationForm[j]?.type === "select").map((f) => (
+                      <option key={f.key} value={f.key}>{f.label}</option>
+                    ))}
+                  </Select>
+                </div>
+                {q.showIf?.field && (() => {
+                  const triggerField = rules.applicationForm.find((f) => f.key === q.showIf!.field);
+                  return triggerField?.options?.length ? (
+                    <div className="w-36">
+                      <Select
+                        value={q.showIf.value}
+                        onValueChange={(v) => setField(i, { showIf: { field: q.showIf!.field, value: v } })}
+                      >
+                        <option value="">เลือกค่า</option>
+                        {triggerField.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                      </Select>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            )}
           </div>
         ))}
         {rules.applicationForm.length < 10 && (

@@ -7,8 +7,10 @@ export const isoDate = z.iso.datetime({ offset: true }).transform((s) => new Dat
 const ruleField = z.strictObject({
   key: z.string().max(40),
   label: z.string().max(120),
-  type: z.enum(["text", "textarea"]),
+  type: z.enum(["text", "textarea", "select", "date", "number"]),
   required: z.boolean(),
+  options: z.array(z.string().max(120)).max(20).optional(),
+  showIf: z.strictObject({ field: z.string().max(40), value: z.string().max(120) }).optional(),
 });
 
 /** Shape only: values are normalized again by parseEligibilityRules (packages/core) */
