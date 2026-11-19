@@ -134,3 +134,29 @@
   `/api/admin/categories`, lesson activities) 404→401
 - ยังไม่ได้ทำ: ล็อกอิน superadmin หนึ่งครั้ง — session นี้ไม่มีรหัสผ่าน (ไม่เก็บไว้ที่ใดโดยเจตนา) เจ้าของต้องตรวจเอง
 - agent-work lease ค้าง (owner human, 2026-11-18 16:23 UTC, stale) — ไม่ได้ยึด/ปิด
+
+## 2026-11-19T15:26:12+00:00 (22:26 Asia/Bangkok) — Claude Code: release 056d953 (landing, วุฒิบัตร, signature, password recovery)
+
+- Released 056d953 (live เดิม 7b986f7) = PR #39 (password management) + PR #38 (landing + certificate); migrations 0038, 0039 (additive)
+- main CI 44552706555 ✅ (รวม branch-guard) → Deploy Jasmine 44553605941 → `released 056d953 ✓`
+- ก่อน merge #38 ตรวจผลรวมทั้งสอง branch บนเครื่อง: codegen ตรง, typecheck/lint/test ผ่าน
+- สิ่งที่ขึ้น:
+  - หน้า landing ใหม่ + เมนูมือถือ + ฟอร์มตรวจสอบเอกสารในหน้า + FAQ (ตัดข้อความ "100% Free")
+  - วุฒิบัตร: ตรา/ชื่อวิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง, ถ้อยคำแบบวุฒิบัตรอบรมออนไลน์ (DSD), ไม่พิมพ์คะแนน,
+    หน้า verify แสดง "ผ่านเกณฑ์ของหลักสูตร" แทน %; หลักสูตรใหม่ default ชื่อ "วุฒิบัตร" (หลักสูตรเดิมไม่แก้)
+  - ลายเซ็นรายหลักสูตร (admin เท่านั้น): แสดงชื่อผู้ลงนามเฉพาะเมื่อเปิดสวิตช์ + มีลายเซ็น + มีชื่อ; snapshot ตอนออก
+    (`certificates.signature_key_snapshot`) — ยังไม่มีการอัปโหลดลายเซ็นใดตามคำสั่งเจ้าของ
+  - รหัสผ่าน: ลืมรหัสด้วยอีเมลหรือชื่อผู้ใช้; admin ส่งลิงก์อีเมล (1 ชม.), สร้างลิงก์ส่งเอง (24 ชม.),
+    รหัสชั่วคราวที่บังคับเปลี่ยน (`users.must_change_password`), ปลดล็อกการเข้าสู่ระบบ, ประวัติรีเซ็ต
+    — ทุกเครื่องมือใช้กับ system owner / ตัวเอง / บัญชีไม่ active ไม่ได้
+- Live check (read-only): `/api/health` ok; `/`, `/login`, `/forgot-password`, `/reset-password` 200; หน้าแรกมี "วุฒิบัตร";
+  `/brand/rietc-emblem.png` 200 image/png; route ใหม่ (certificate-display, course signature) → 401;
+  forgot-password รับรูปแบบชื่อผู้ใช้ → 200
+- ยังไม่ได้ตรวจ: การ render PDF วุฒิบัตรแบบใหม่บน production (ต้องมีการออกเอกสารจริง), ล็อกอิน superadmin หนึ่งครั้ง
+  (session นี้ไม่มีรหัสผ่าน — เจ้าของต้องตรวจเอง)
+- ⚠️ ประเด็นความปลอดภัยที่พบ ยังไม่แก้ (ต้องเป็นงานแยกที่เจ้าของสั่ง): `login()` ใน
+  `apps/web/src/server/auth/auth.service.ts` มีรหัสผ่านบัญชีเจ้าของระบบเขียนตายตัวในโค้ด และเขียน password hash ทับเมื่อใช้รหัสนั้น
+  — ขัดกติกา CREATE-ONLY; ต้องถอดออก + เปลี่ยนรหัสบัญชี (รหัสอยู่ใน git history แล้ว)
+- ข้อมูลผิดที่ยังค้าง: สคริปต์ seed กระทง (`complete-krathong-flow.ts`, `krathong-contest-2569.ts`) ใช้ชื่อสถาบันผิด
+  ("สถาบันการอาชีวศึกษาภาคตะวันออก…") — ข้อมูลที่ seed ลง production แล้วอาจยังเป็นชื่อเก่า
+- agent-work lease ค้าง (owner human, 2026-11-18 16:23 UTC, stale) — ไม่ได้ยึด/ปิด
