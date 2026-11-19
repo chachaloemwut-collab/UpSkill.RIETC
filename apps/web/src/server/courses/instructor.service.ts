@@ -157,8 +157,10 @@ export async function createCourse(
       description: input.description?.trim() || null,
       slug: slugify(input.title, "course"),
       course_type: input.courseType ?? "certified_training",
-      // A short course issues a ประกาศนียบัตร; the owner can still rename the document in settings
+      // Both course types issue a วุฒิบัตร by default; the owner can still rename the document in settings
       credential_name_th: COURSE_TYPE_INFO[input.courseType ?? "certified_training"].defaultCredentialName,
+      // Wording of an online-training วุฒิบัตร (the score is never printed, passing is what earns it)
+      credential_achievement_th: "ได้ผ่านการอบรมออนไลน์",
       // Pre-fill from system defaults so new courses start with admin-configured criteria
       min_watch_percentage: defaults.min_watch_percentage,
       passing_quiz_score: defaults.passing_quiz_score,

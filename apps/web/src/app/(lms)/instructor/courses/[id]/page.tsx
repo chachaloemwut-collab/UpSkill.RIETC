@@ -12,7 +12,7 @@ import { HttpError } from "@/server/http";
 import { getCurrentUser } from "@/server/auth/session";
 import { getCourseForEditing, PUBLISH_RULES } from "@/server/courses/instructor.service";
 import { listApplications } from "@/server/courses/applications.service";
-import { getCourseDefaults } from "@/server/system-settings.service";
+import { getCertificateDisplay, getCourseDefaults } from "@/server/system-settings.service";
 
 export const metadata: Metadata = { title: "แก้ไขหลักสูตร" };
 
@@ -30,9 +30,10 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
     throw err;
   }
   const { env } = ctx();
-  const [applications, courseDefaults] = await Promise.all([
+  const [applications, courseDefaults, certificateDisplay] = await Promise.all([
     listApplications(user, id),
     getCourseDefaults(),
+    getCertificateDisplay(),
   ]);
   const editor: EditorData = {
     course: data.course,
@@ -47,6 +48,8 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
     devManualDuration: !env.YOUTUBE_API_KEY && env.APP_ENV !== "production",
     publishRules: PUBLISH_RULES,
     courseDefaults,
+    certificateDisplay,
+    isAdmin: user.role === "admin",
   };
 
   const vis = VISIBILITY[data.course.visibility];

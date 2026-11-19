@@ -106,6 +106,7 @@ export interface Certificates {
   revoked_at: Timestamp | null;
   revoked_reason: string | null;
   signature: string;
+  signature_key_snapshot: string | null;
   signed_payload: string;
   signer_title_snapshot: string | null;
   signing_key_id: string;
@@ -224,6 +225,8 @@ export interface Courses {
   credential_enabled: Generated<boolean>;
   credential_name_en: string | null;
   credential_name_th: Generated<string>;
+  credential_show_signer: Generated<boolean>;
+  credential_signature_key: string | null;
   credential_signer_name: string | null;
   credential_signer_title: string | null;
   credential_template_key: Generated<string>;

@@ -232,16 +232,16 @@ export const COURSE_TYPES = ["certified_training", "short_course"] as const;
 export type CourseType = (typeof COURSE_TYPES)[number];
 export const COURSE_TYPE_INFO: Record<CourseType, { label: string; short: string; description: string; defaultCredentialName: string }> = {
   certified_training: {
-    label: "อบรมเพื่อรับใบรับรอง",
-    short: "ใบรับรอง",
-    description: "เรียนออนไลน์ตามเกณฑ์ ผ่านแล้วได้รับใบรับรองดิจิทัลที่ตรวจสอบได้",
-    defaultCredentialName: "ใบรับรอง",
+    label: "อบรมเพื่อรับวุฒิบัตร",
+    short: "วุฒิบัตร",
+    description: "เรียนออนไลน์ตามเกณฑ์ ผ่านแล้วได้รับวุฒิบัตรดิจิทัลที่ตรวจสอบได้",
+    defaultCredentialName: "วุฒิบัตร",
   },
   short_course: {
     label: "หลักสูตรอบรมระยะสั้น",
-    short: "ประกาศนียบัตร",
-    description: "หลักสูตรระยะสั้นสำหรับประชาชนและผู้สนใจ ผ่านแล้วได้รับประกาศนียบัตร",
-    defaultCredentialName: "ประกาศนียบัตร",
+    short: "วุฒิบัตร",
+    description: "หลักสูตรระยะสั้นสำหรับประชาชนและผู้สนใจ ผ่านแล้วได้รับวุฒิบัตร",
+    defaultCredentialName: "วุฒิบัตร",
   },
 };
 export function asCourseType(v: unknown): CourseType {

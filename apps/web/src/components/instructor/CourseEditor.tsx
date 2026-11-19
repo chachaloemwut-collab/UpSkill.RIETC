@@ -26,7 +26,6 @@ import {
   RefreshCw,
   Rocket,
   Settings,
-  ShieldCheck,
   SquarePlay,
   Trash2,
   TriangleAlert,
@@ -62,6 +61,9 @@ import { QuestionEditDialog, type QuestionData } from "./QuestionEditDialog";
 import { CourseLearnersRoster } from "./CourseLearnersRoster";
 import { LessonDetailsForm, UnitBadge, UnitsManager, type EditorUnit } from "./UnitsManager";
 import { ApplicationsManager, type EditorApplication } from "./ApplicationsManager";
+import { CertificatePreview } from "@/components/certificate/CertificatePreview";
+import { SignatureAdminCard } from "@/components/admin/SignatureAdminCard";
+import type { CertificateDisplay } from "@upskill/core/certificate-patterns";
 import { COURSE_TYPES, COURSE_TYPE_INFO } from "@upskill/core/application";
 
 export interface EditorData {
@@ -90,6 +92,8 @@ export interface EditorData {
     credential_achievement_en: string | null;
     credential_background_url: string | null;
     credential_text_align: string;
+    credential_show_signer: boolean;
+    credential_signature_key: string | null;
     navigation_mode: string;
     completion_rule: string;
     course_type: string;
@@ -132,6 +136,9 @@ export interface EditorData {
     navigation_mode: string;
     completion_rule: string;
   };
+  certificateDisplay?: CertificateDisplay;
+  /** Admins manage the course's signature (SignatureAdminCard) */
+  isAdmin?: boolean;
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -248,7 +255,7 @@ export function CourseEditor({ data }: { data: EditorData }) {
         </TabsContent>
 
         <TabsContent value="settings" className="mt-4">
-          <SettingsSection base={base} course={course} courseDefaults={data.courseDefaults} />
+          <SettingsSection base={base} course={course} courseDefaults={data.courseDefaults} certificateDisplay={data.certificateDisplay} isAdmin={data.isAdmin ?? false} />
         </TabsContent>
       </Tabs>
 
@@ -380,7 +387,7 @@ function PublishSection({
 
 type CertPreset = { id: string; title: string; credential_name_th: string; credential_name_en: string | null; credential_type: string; credential_template_key: string; credential_text_align: string; credential_validity_days: number | null; credential_signer_name: string | null; credential_signer_title: string | null; credential_achievement_th: string; credential_achievement_en: string | null; credential_background_url: string | null };
 
-function SettingsSection({ base, course, courseDefaults }: { base: string; course: EditorData["course"]; courseDefaults?: EditorData["courseDefaults"] }) {
+function SettingsSection({ base, course, courseDefaults, certificateDisplay, isAdmin }: { base: string; course: EditorData["course"]; courseDefaults?: EditorData["courseDefaults"]; certificateDisplay?: CertificateDisplay; isAdmin: boolean }) {
   const a = useAction();
   const toast = useToast();
 
@@ -466,15 +473,8 @@ function SettingsSection({ base, course, courseDefaults }: { base: string; cours
     );
   }
 
-  // Preview color themes
-  const templateTheme =
-    certTemplate === "royal"
-      ? "border-sky-900/60 bg-gradient-to-b from-sky-950/10 via-background to-sky-950/20 text-sky-950 dark:text-sky-100"
-      : certTemplate === "classic"
-      ? "border-emerald-800/60 bg-gradient-to-b from-emerald-950/10 via-background to-emerald-950/20 text-emerald-950 dark:text-emerald-100"
-      : certTemplate === "minimal"
-      ? "border-slate-300 bg-background text-slate-800 dark:border-slate-800 dark:text-slate-100"
-      : "border-indigo-600/50 bg-gradient-to-b from-indigo-950/10 via-background to-indigo-950/20 text-indigo-950 dark:text-indigo-100";
+  // Printed only when the admin switch is on AND a signature exists AND a signer name is set (issue.service.ts)
+  const signerPrinted = course.credential_show_signer && !!course.credential_signature_key && !!certSigner.trim();
 
   return (
     <div className="grid gap-6">
@@ -719,7 +719,7 @@ function SettingsSection({ base, course, courseDefaults }: { base: string; cours
           <div className="flex items-center gap-2">
             <Eye className="h-4 w-4 text-primary" />
             <h4 className="font-semibold text-foreground text-sm">
-              ตัวอย่างจำลองหน้าใบประกาศนียบัตร (Live Mockup)
+              ตัวอย่างเอกสาร
             </h4>
           </div>
           <Badge variant="outline" className="text-xs uppercase font-mono">
@@ -727,57 +727,29 @@ function SettingsSection({ base, course, courseDefaults }: { base: string; cours
           </Badge>
         </div>
 
-        <div
-          className={cn(
-            "relative mx-auto w-full max-w-2xl rounded-xl border-4 p-8 shadow-md transition-all duration-300",
-            templateTheme,
-            certAlign === "left" ? "text-left" : "text-center",
-          )}
-        >
-          {/* Watermark / Seal */}
-          <div className="absolute top-4 right-4 flex items-center gap-1.5 opacity-60">
-            <ShieldCheck className="h-6 w-6 text-primary" />
-            <span className="text-[10px] font-semibold tracking-wider uppercase">
-              Ed25519 Verified
-            </span>
-          </div>
-
-          {/* Certificate Content */}
-          <div className="space-y-4 py-2">
-            <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">
-              สถาบันการอาชีวศึกษาภาคตะวันออก · RIETC
-            </p>
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">
-              {certTitleTh || "ใบประกาศนียบัตรสำเร็จการศึกษา"}
-            </h2>
-            <p className="text-xs text-muted-foreground">มอบให้แก่</p>
-            <p className="text-xl font-bold text-primary underline underline-offset-8">
-              นายสมชาย พัฒนาวิชาชีพ (ตัวอย่างชื่อผู้เรียน)
-            </p>
-            <p className="text-xs text-muted-foreground max-w-md mx-auto pt-1 leading-relaxed">
-              {certAchievement || "ได้ผ่านการศึกษาและประเมินผลสัมฤทธิ์ตามเกณฑ์มาตรฐานในหลักสูตร"}
-            </p>
-            <h3 className="text-base font-semibold text-foreground">{course.title}</h3>
-
-            <div className="pt-6 mt-4 border-t border-border/40 flex items-end justify-between text-xs text-muted-foreground">
-              <div className="text-left space-y-0.5">
-                <p className="font-mono text-[10px]">รหัส: RIETC-2026-XXXX</p>
-                <p className="text-[11px]">ออกให้เมื่อ: วันที่สำเร็จการศึกษา</p>
-              </div>
-
-              <div className="text-right space-y-1">
-                <div className="h-0.5 w-32 border-b border-foreground/30 ml-auto" />
-                <p className="font-semibold text-foreground">
-                  ({certSigner || "ผู้สอนประจำหลักสูตร"})
-                </p>
-                {certSignerTitle && (
-                  <p className="text-[11px] text-muted-foreground">{certSignerTitle}</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+        <CertificatePreview
+          template={certTemplate}
+          align={certAlign}
+          documentType={certType}
+          documentName={certTitleTh}
+          achievement={certAchievement}
+          courseTitle={course.title}
+          signerName={certSigner}
+          signerTitle={certSignerTitle}
+          display={certificateDisplay}
+          signatureUrl={signerPrinted && isAdmin ? `/api/admin/courses/${course.id}/signature?v=${course.credential_signature_key!.slice(0, 12)}` : null}
+          className="max-w-3xl"
+        />
+        <p className="text-xs text-muted-foreground">
+          ภาพจำลองใช้สีและการจัดวางเดียวกับไฟล์ PDF จริง (ชื่อผู้เรียนและ QR Code เป็นข้อมูลตัวอย่าง)
+          {signerPrinted
+            ? " · พิมพ์ลายเซ็นและชื่อผู้ลงนามบนเอกสาร"
+            : " · ยังไม่พิมพ์ชื่อผู้ลงนาม (ต้องมีลายเซ็นและผู้ดูแลระบบเปิดการแสดงผู้ลงนามของหลักสูตรนี้)"}
+        </p>
       </Card>
+      {isAdmin && (
+        <SignatureAdminCard courseId={course.id} signatureKey={course.credential_signature_key} showSigner={course.credential_show_signer} signerName={course.credential_signer_name} />
+      )}
     </div>
   );
 }

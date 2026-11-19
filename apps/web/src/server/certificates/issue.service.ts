@@ -37,6 +37,7 @@ export async function issueCertificate(input: {
     .select([
       "e.id as enrollment_id", "e.status", "c.title", "c.visibility", "c.is_verified_course", "c.total_duration_sec", "c.completion_rule", "c.passing_quiz_score",
       "c.credential_enabled", "c.credential_type", "c.credential_name_th", "c.credential_name_en", "c.credential_validity_days", "c.credential_signer_name", "c.credential_signer_title", "c.credential_achievement_th", "c.credential_achievement_en", "c.credential_template_key", "c.credential_background_url", "c.credential_text_align",
+      "c.credential_show_signer", "c.credential_signature_key",
       "u.email", "u.legal_full_name_th", "u.legal_full_name_en", "u.legal_name_locked_at",
       "ins.legal_full_name_th as ins_th", "ins.legal_full_name_en as ins_en", "ins.email as ins_email",
     ])
@@ -136,6 +137,8 @@ export async function issueCertificate(input: {
           achievement_snapshot: payload.achievement,
           visual_digest: payload.visualDigest,
           template_snapshot: data.credential_template_key,
+          // Signer block decided now: the admin switch is on AND a signature image exists (else no name is printed)
+          signature_key_snapshot: data.credential_show_signer && data.credential_signature_key && data.credential_signer_name?.trim() ? data.credential_signature_key : null,
           background_url_snapshot: data.credential_background_url,
           text_align_snapshot: data.credential_text_align,
         })
