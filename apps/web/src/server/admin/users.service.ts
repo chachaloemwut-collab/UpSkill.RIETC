@@ -1,12 +1,11 @@
 /**
  * Detailed member management for admins: searchable paginated list, full per-user detail
  * (profile, enrollments, certificates, registrations, sessions, anticheat flags, email and
- * audit history, API tokens) and account actions (role/status, force password reset, revoke
- * sessions). Every mutation is audited and forces the affected user to re-login.
+ * audit history, API tokens) and account actions (role/status, revoke sessions; password tools live in
+ * password.service.ts). Every mutation is audited and forces the affected user to re-login.
  */
 import "server-only";
 import { sql } from "@upskill/db";
-import { generateToken, hashToken } from "@upskill/core";
 import { ctx } from "../context";
 import { audit } from "../audit";
 import { HttpError } from "../http";
@@ -160,6 +159,8 @@ export async function getUserDetailAdmin(userId: string) {
       .select([
         "id", "email", "username", "role", "status", "deleted_at", "created_at", "updated_at",
         "email_verified_at", "is_system_owner", "legal_full_name_th", "legal_full_name_en", "legal_name_locked_at",
+        "must_change_password", "password_updated_at",
+        sql<boolean>`password_hash is not null`.as("has_password"),
       ])
       .where("id", "=", userId)
       .executeTakeFirst(),
@@ -278,29 +279,6 @@ export async function adminUpdateUserById(
   });
   await revokeAllSessions(user.id, "admin_update");
   await audit(db, { action: "user.admin_updated", userId: adminId, entityType: "user", entityId: user.id, ip: meta.ip, details: { role: patch.role, status: patch.status } });
-}
-
-export async function adminForcePasswordReset(adminId: string, userId: string, meta: { ip: string }) {
-  const { db, env } = ctx();
-  const user = await db.selectFrom("users").select(["id", "email", "status", "is_system_owner"]).where("id", "=", userId).executeTakeFirst();
-  if (!user) throw new HttpError(404, "NOT_FOUND");
-  if (user.id === adminId || user.is_system_owner) throw new HttpError(409, "FORBIDDEN");
-  if (user.status !== "active") throw new HttpError(409, "USER_NOT_ACTIVE");
-  const token = generateToken();
-  await db.transaction().execute(async (trx) => {
-    const reset = await trx
-      .insertInto("password_reset_tokens")
-      .values({ user_id: user.id, token_hash: hashToken(token), reset_method: "email_link", expires_at: new Date(Date.now() + 15 * 60_000) })
-      .returning("id")
-      .executeTakeFirstOrThrow();
-    await addEmailToOutbox(
-      trx,
-      { template: "reset-password", to: user.email, link: `${env.APP_ORIGIN}/reset-password?token=${token}` },
-      { userId: user.id, deduplicationKey: `reset-password:${reset.id}` },
-    );
-  });
-  await revokeAllSessions(user.id, "admin_password_reset");
-  await audit(db, { action: "auth.password_reset", userId: adminId, entityType: "user", entityId: user.id, ip: meta.ip, details: { forcedByAdmin: true } });
 }
 
 export async function adminRevokeUserSessions(adminId: string, userId: string, meta: { ip: string }) {

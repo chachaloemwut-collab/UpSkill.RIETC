@@ -19,6 +19,7 @@ import { NATIONAL_ID_IN_USE, checkedProfile, insertProfile, nationalIdInUse } fr
 const VERIFY_TTL_MS = 24 * 3600_000;
 const RESET_EMAIL_TTL_MS = 15 * 60_000; // spec: 15 minutes
 const RESET_GOOGLE_TTL_MS = 5 * 60_000; // spec: 5 minutes
+const FORCED_CHANGE_TTL_MS = 15 * 60_000; // after signing in with an admin-issued temporary password
 
 type Meta = { ip: string; userAgent: string };
 
@@ -239,6 +240,20 @@ export async function login(input: { email: string; password: string }, meta: Me
   // The protected owner account is username-only and never depends on an email workflow.
   if (!user.is_system_owner && !user.email_verified_at) throw new HttpError(403, "EMAIL_NOT_VERIFIED");
 
+  // Admin-issued temporary password: no session until the user has chosen their own password
+  const mustChange = user.is_system_owner
+    ? false
+    : (await db.selectFrom("users").select("must_change_password").where("id", "=", user.id).executeTakeFirst())?.must_change_password === true;
+  if (mustChange) {
+    const token = generateToken();
+    await db
+      .insertInto("password_reset_tokens")
+      .values({ user_id: user.id, token_hash: hashToken(token), reset_method: "forced_change", expires_at: new Date(Date.now() + FORCED_CHANGE_TTL_MS) })
+      .execute();
+    await audit(db, { action: "auth.password_change_required", userId: user.id, ip: meta.ip, userAgent: meta.userAgent });
+    return { redirectTo: `/reset-password?token=${token}&required=1` };
+  }
+
   await createSession(user.id, meta);
   await audit(db, {
     action: "auth.login",
@@ -250,33 +265,44 @@ export async function login(input: { email: string; password: string }, meta: Me
   return { redirectTo: user.is_system_owner ? "/admin" : "/" };
 }
 
-export async function forgotPassword(emailRaw: string): Promise<void> {
+/**
+ * Accepts an email or a username. The link always goes to an address on the account (the matched verified
+ * address, or the primary one for a username). The protected owner account never resets by email.
+ */
+export async function forgotPassword(identifierRaw: string): Promise<void> {
   const { db, env } = ctx();
-  const email = emailRaw.trim().toLowerCase();
-  const matched = await db
-    .selectFrom("user_emails")
-    .select(["user_id"])
-    .where("email", "=", email)
-    .where("verified_at", "is not", null)
-    .executeTakeFirst();
-  const userId = matched ? matched.user_id : null;
-  const user = userId
-    ? await db.selectFrom("users").select(["id", "status"]).where("id", "=", userId).executeTakeFirst()
-    : await db.selectFrom("users").select(["id", "status"]).where("email", "=", email).executeTakeFirst();
-  if (!user || user.status !== "active") return;
+  const identifier = identifierRaw.trim().toLowerCase();
+  let user: { id: string; status: string; email: string; is_system_owner: boolean } | undefined;
+  let email: string;
+  if (identifier.includes("@")) {
+    email = identifier;
+    const matched = await db
+      .selectFrom("user_emails")
+      .select(["user_id"])
+      .where("email", "=", email)
+      .where("verified_at", "is not", null)
+      .executeTakeFirst();
+    const base = db.selectFrom("users").select(["id", "status", "email", "is_system_owner"]);
+    user = matched ? await base.where("id", "=", matched.user_id).executeTakeFirst() : await base.where("email", "=", email).executeTakeFirst();
+  } else {
+    user = await db.selectFrom("users").select(["id", "status", "email", "is_system_owner"]).where("username", "=", identifier).executeTakeFirst();
+    email = user?.email ?? "";
+  }
+  if (!user || user.status !== "active" || user.is_system_owner || !email || email.endsWith(".invalid")) return;
+  const target = { id: user.id, email };
 
   // Spec: 32 random bytes; only the SHA-256 is stored
   await db.transaction().execute(async (trx) => {
     const token = generateToken();
     const reset = await trx
       .insertInto("password_reset_tokens")
-      .values({ user_id: user.id, token_hash: hashToken(token), reset_method: "email_link", expires_at: new Date(Date.now() + RESET_EMAIL_TTL_MS) })
+      .values({ user_id: target.id, token_hash: hashToken(token), reset_method: "email_link", expires_at: new Date(Date.now() + RESET_EMAIL_TTL_MS) })
       .returning("id")
       .executeTakeFirstOrThrow();
     await addEmailToOutbox(
       trx,
-      { template: "reset-password", to: email, link: `${env.APP_ORIGIN}/reset-password?token=${token}` },
-      { userId: user.id, deduplicationKey: `reset-password:${reset.id}` },
+      { template: "reset-password", to: target.email, link: `${env.APP_ORIGIN}/reset-password?token=${token}` },
+      { userId: target.id, deduplicationKey: `reset-password:${reset.id}` },
     );
   });
 }
@@ -305,6 +331,7 @@ export async function resetPassword(input: { token: string; newPassword: string 
       .set({
         password_hash: passwordHash,
         password_updated_at: new Date(),
+        must_change_password: false,
         // Clicking an emailed link proves ownership of the address
         ...(t.reset_method === "email_link" ? { email_verified_at: new Date() } : {}),
       })

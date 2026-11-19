@@ -11,7 +11,7 @@ export default async function ForgotPasswordPage() {
   if (current) redirect(current.isSystemOwner ? "/admin" : "/");
   return (
     <>
-      <AuthHeading title="ลืมรหัสผ่าน" description="เราจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปที่อีเมลของคุณ" />
+      <AuthHeading title="ลืมรหัสผ่าน" description="เราจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปที่อีเมลของบัญชีคุณ" />
       <ForgotPasswordForm googleEnabled={await isGoogleEnabled()} />
     </>
   );

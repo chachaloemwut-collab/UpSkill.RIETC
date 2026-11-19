@@ -120,7 +120,15 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
     setError(null);
     const r = await api<{ redirectTo: string }>("/api/auth/login", { body: { email: f.get("email"), password: f.get("password") } });
     if (r.ok) {
-      await runScene({ icon: <LoginIcon play={1} />, title: "เข้าสู่ระบบสำเร็จ", subtitle: r.data.redirectTo === "/admin" ? "กำลังพาไปยังระบบจัดการ" : "กำลังพาไปยังแดชบอร์ด" }, 1100);
+      const mustChange = r.data.redirectTo.startsWith("/reset-password");
+      await runScene(
+        {
+          icon: <LoginIcon play={1} />,
+          title: mustChange ? "กรุณาตั้งรหัสผ่านใหม่" : "เข้าสู่ระบบสำเร็จ",
+          subtitle: mustChange ? "คุณใช้รหัสผ่านชั่วคราว ต้องตั้งรหัสของตนเองก่อนใช้งาน" : r.data.redirectTo === "/admin" ? "กำลังพาไปยังระบบจัดการ" : "กำลังพาไปยังแดชบอร์ด",
+        },
+        1100,
+      );
       router.replace(r.data.redirectTo);
       router.refresh();
       return;
@@ -432,7 +440,7 @@ export function ForgotPasswordForm({ googleEnabled }: { googleEnabled: boolean }
     const f = new FormData(e.currentTarget);
     s.setBusy(true);
     s.setError(null);
-    const r = await api<{ message: string }>("/api/auth/forgot-password", { body: { email: f.get("email") } });
+    const r = await api<{ message: string }>("/api/auth/forgot-password", { body: { email: String(f.get("email") ?? "").trim().toLowerCase() } });
     s.setBusy(false);
     if (r.ok) s.setNotice(r.data.message);
     else s.setError(r.message);
@@ -441,10 +449,11 @@ export function ForgotPasswordForm({ googleEnabled }: { googleEnabled: boolean }
     <div className="grid gap-6">
       <form method="post" onSubmit={onSubmit} className="grid gap-4">
         <p className="text-sm font-medium">รับลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล</p>
+        <p className="-mt-2 text-xs text-muted-foreground">กรอกอีเมลหรือชื่อผู้ใช้ ระบบจะส่งลิงก์ไปที่อีเมลของบัญชี หากไม่ได้รับอีเมลหรือเข้าอีเมลไม่ได้ ติดต่อผู้ดูแลระบบเพื่อขอลิงก์หรือรหัสผ่านชั่วคราว</p>
         {s.notice && <Alert variant="success" title="ส่งคำขอแล้ว">{s.notice}</Alert>}
         {s.error && <Alert variant="destructive" title={s.error} />}
-        <Field label="อีเมล">
-          <Input name="email" type="email" autoComplete="email" placeholder="you@example.com" required className="h-10" />
+        <Field label="อีเมลหรือชื่อผู้ใช้">
+          <Input name="email" type="text" autoComplete="username" placeholder="you@example.com" required className="h-10" />
         </Field>
         <Button type="submit" size="lg" loading={s.busy} className="w-full">
           ส่งลิงก์ตั้งรหัสผ่านใหม่
