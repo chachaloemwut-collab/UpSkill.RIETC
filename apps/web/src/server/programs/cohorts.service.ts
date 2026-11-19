@@ -524,23 +524,53 @@ function csvCell(v: string | null | undefined): string {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
-export async function exportRegistrationsCsv(user: CurrentUser, cohortId: string, meta: { ip: string }): Promise<{ filename: string; csv: string }> {
+const EXPORT_COLS = {
+  email: "อีเมล",
+  name: "ชื่อ-นามสกุล",
+  phone: "เบอร์โทรศัพท์",
+  province: "จังหวัด",
+  status: "สถานะ",
+  applied_at: "วันที่สมัคร",
+  decided_at: "วันที่พิจารณา",
+  decision_note: "หมายเหตุ",
+} as const;
+
+export const EXPORT_COL_KEYS = Object.keys(EXPORT_COLS) as (keyof typeof EXPORT_COLS)[];
+
+export async function exportRegistrationsCsv(
+  user: CurrentUser,
+  cohortId: string,
+  meta: { ip: string; cols?: string[] },
+): Promise<{ filename: string; csv: string }> {
   const { cohort, registrations } = await getCohortForAdmin(user, cohortId);
   const form = cohort.rules.applicationForm;
-  const header = ["อีเมล", "ชื่อ-นามสกุล", "เบอร์โทรศัพท์", "จังหวัด", "สถานะ", "วันที่สมัคร", "วันที่พิจารณา", "หมายเหตุ", ...form.map((f) => f.label)];
+
+  const allowedCols = new Set(meta.cols ?? EXPORT_COL_KEYS);
+  const formKeys = meta.cols
+    ? meta.cols.filter((c) => c.startsWith("form_")).map((c) => c.slice(5))
+    : form.map((f) => f.key);
+
+  const activeCols = EXPORT_COL_KEYS.filter((k) => allowedCols.has(k));
+  const activeFormFields = form.filter((f) => formKeys.includes(f.key));
+
+  const header = [...activeCols.map((k) => EXPORT_COLS[k]), ...activeFormFields.map((f) => f.label)];
+
   const rows = registrations.map((r) => [
-    r.email,
-    r.name,
-    r.phone,
-    r.province,
-    STATUS_TH[r.status] ?? r.status,
-    formatThaiDateTime(r.applied_at),
-    r.decided_at ? formatThaiDateTime(r.decided_at) : "",
-    r.decision_note,
-    ...form.map((f) => r.answers[f.key] ?? ""),
+    ...activeCols.map((k) => {
+      if (k === "email") return r.email;
+      if (k === "name") return r.name;
+      if (k === "phone") return r.phone;
+      if (k === "province") return r.province;
+      if (k === "status") return STATUS_TH[r.status] ?? r.status;
+      if (k === "applied_at") return formatThaiDateTime(r.applied_at);
+      if (k === "decided_at") return r.decided_at ? formatThaiDateTime(r.decided_at) : "";
+      if (k === "decision_note") return r.decision_note;
+      return "";
+    }),
+    ...activeFormFields.map((f) => r.answers[f.key] ?? ""),
   ]);
-  await audit(ctx().db, { action: "cohort.registrations_exported", userId: user.id, entityType: "cohort", entityId: cohortId, ip: meta.ip, details: { rows: rows.length } });
-  // BOM so Excel opens Thai text as UTF-8
+
+  await audit(ctx().db, { action: "cohort.registrations_exported", userId: user.id, entityType: "cohort", entityId: cohortId, ip: meta.ip, details: { rows: rows.length, cols: header.length } });
   const csv = "﻿" + [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
   return { filename: `registrations-${cohortId.slice(0, 8)}.csv`, csv };
 }

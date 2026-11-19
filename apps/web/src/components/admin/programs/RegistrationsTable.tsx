@@ -6,6 +6,17 @@ import { api } from "@/lib/api";
 import { REGISTRATION_STATUS, formatDateTimeTh } from "@/lib/format";
 import { Badge, Button, Checkbox, Dialog, EmptyState, Field, SegmentedControl, Table, Textarea, useToast } from "@/components/ui";
 
+const FIXED_COLS = [
+  { key: "email", label: "อีเมล" },
+  { key: "name", label: "ชื่อ-นามสกุล" },
+  { key: "phone", label: "เบอร์โทรศัพท์" },
+  { key: "province", label: "จังหวัด" },
+  { key: "status", label: "สถานะ" },
+  { key: "applied_at", label: "วันที่สมัคร" },
+  { key: "decided_at", label: "วันที่พิจารณา" },
+  { key: "decision_note", label: "หมายเหตุ" },
+];
+
 type Registration = {
   id: string;
   status: string;
@@ -30,6 +41,9 @@ export function RegistrationsTable({ cohortId, registrations, form, cancelled }:
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ decision: string; changed: number; total: number } | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const allCols = [...FIXED_COLS, ...form.map((f) => ({ key: `form_${f.key}`, label: f.label }))];
+  const [selectedCols, setSelectedCols] = useState<Set<string>>(() => new Set(allCols.map((c) => c.key)));
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: registrations.length };
@@ -85,9 +99,9 @@ export function RegistrationsTable({ cohortId, registrations, form, cancelled }:
             { value: "all", label: `ทั้งหมด (${counts.all})` },
           ]}
         />
-        <a href={`/api/admin/cohorts/${cohortId}/registrations/export`} className="ml-auto inline-flex h-9 items-center gap-2 rounded-md border px-4 text-sm font-medium hover:bg-accent">
+        <Button variant="outline" size="sm" className="ml-auto gap-2" onClick={() => setExportOpen(true)}>
           <Download className="h-4 w-4" /> ส่งออก CSV
-        </a>
+        </Button>
       </div>
 
       {picked.length > 0 && (
@@ -180,6 +194,36 @@ export function RegistrationsTable({ cohortId, registrations, form, cancelled }:
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setRejecting(false)}>ยกเลิก</Button>
             <Button variant="destructive" loading={busy} onClick={() => void decide("reject", [...selected], note.trim() || undefined)}>ยืนยันไม่อนุมัติ</Button>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog open={exportOpen} onOpenChange={setExportOpen} title="ส่งออก CSV — เลือกคอลัมน์" description="เลือกคอลัมน์ที่ต้องการส่งออก">
+        <div className="grid gap-4">
+          <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+            {allCols.map((c) => (
+              <Checkbox
+                key={c.key}
+                label={c.label}
+                checked={selectedCols.has(c.key)}
+                onChange={() => setSelectedCols((s) => {
+                  const n = new Set(s);
+                  if (n.has(c.key)) { if (c.key !== "email") n.delete(c.key); } else n.add(c.key);
+                  return n;
+                })}
+                disabled={c.key === "email"}
+              />
+            ))}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setExportOpen(false)}>ยกเลิก</Button>
+            <a
+              href={`/api/admin/cohorts/${cohortId}/registrations/export?cols=${[...selectedCols].join(",")}`}
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              onClick={() => setExportOpen(false)}
+            >
+              <Download className="h-4 w-4" /> ดาวน์โหลด ({selectedCols.size} คอลัมน์)
+            </a>
           </div>
         </div>
       </Dialog>
