@@ -459,7 +459,7 @@ export async function addQuestion(
       question_text: input.text.trim(),
       options: JSON.stringify(options),
       correct_option_id: options[input.correctIndex]!.id,
-      tags: sql<string[]>`${JSON.stringify(input.tags ?? [])}::text[]`,
+      tags: input.tags ?? [],
     })
     .returning("id")
     .executeTakeFirstOrThrow();
@@ -516,7 +516,7 @@ export async function updateQuestion(
       correct_option_id: newCorrectOptionId,
       assessment_type: input.assessmentType,
       lesson_id: input.lessonId ?? null,
-      tags: sql<string[]>`${JSON.stringify(input.tags ?? [])}::text[]`,
+      tags: input.tags ?? [],
     })
     .where("id", "=", questionId)
     .where("course_id", "=", courseId)

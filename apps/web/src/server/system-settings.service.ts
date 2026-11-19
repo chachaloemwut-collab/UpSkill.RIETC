@@ -14,13 +14,14 @@ export interface CourseDefaults {
   completion_rule: string;
 }
 
+// Must match the courses column defaults (0001_init, 0024) so new courses keep the strict behavior
 const FALLBACK: CourseDefaults = {
   min_watch_percentage: 90,
-  passing_quiz_score: 60,
+  passing_quiz_score: 80,
   max_quiz_attempts_per_day: 3,
-  quiz_time_limit_min: 60,
-  is_sequential_locked: false,
-  navigation_mode: "free_complete",
+  quiz_time_limit_min: 30,
+  is_sequential_locked: true,
+  navigation_mode: "linear",
   completion_rule: "post_test",
 };
 
