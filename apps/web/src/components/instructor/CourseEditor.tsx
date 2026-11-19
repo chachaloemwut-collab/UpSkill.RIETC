@@ -123,6 +123,15 @@ export interface EditorData {
   }>;
   devManualDuration: boolean;
   publishRules: { minTotalDurationSec: number; minQuestions: number };
+  courseDefaults?: {
+    min_watch_percentage: number;
+    passing_quiz_score: number;
+    max_quiz_attempts_per_day: number;
+    quiz_time_limit_min: number;
+    is_sequential_locked: boolean;
+    navigation_mode: string;
+    completion_rule: string;
+  };
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -239,7 +248,7 @@ export function CourseEditor({ data }: { data: EditorData }) {
         </TabsContent>
 
         <TabsContent value="settings" className="mt-4">
-          <SettingsSection base={base} course={course} />
+          <SettingsSection base={base} course={course} courseDefaults={data.courseDefaults} />
         </TabsContent>
       </Tabs>
 
@@ -371,7 +380,7 @@ function PublishSection({
 
 type CertPreset = { id: string; title: string; credential_name_th: string; credential_name_en: string | null; credential_type: string; credential_template_key: string; credential_text_align: string; credential_validity_days: number | null; credential_signer_name: string | null; credential_signer_title: string | null; credential_achievement_th: string; credential_achievement_en: string | null; credential_background_url: string | null };
 
-function SettingsSection({ base, course }: { base: string; course: EditorData["course"] }) {
+function SettingsSection({ base, course, courseDefaults }: { base: string; course: EditorData["course"]; courseDefaults?: EditorData["courseDefaults"] }) {
   const a = useAction();
   const toast = useToast();
 
@@ -485,6 +494,12 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
             <Textarea name="description" defaultValue={course.description ?? ""} rows={4} />
           </Field>
 
+          {courseDefaults && (
+            <p className="text-xs text-muted-foreground rounded bg-muted/50 px-3 py-1.5">
+              <span className="font-medium">ค่าเริ่มต้นระบบ:</span>{" "}
+              ดูวิดีโอขั้นต่ำ {courseDefaults.min_watch_percentage}% · คะแนนผ่าน {courseDefaults.passing_quiz_score}% · สอบ {courseDefaults.max_quiz_attempts_per_day} ครั้ง/วัน · {courseDefaults.quiz_time_limit_min} นาที
+            </p>
+          )}
           <div className="grid items-start gap-4 sm:grid-cols-2">
             <Field label="ดูวิดีโอขั้นต่ำ (%)" hint="50–100%">
               <Input

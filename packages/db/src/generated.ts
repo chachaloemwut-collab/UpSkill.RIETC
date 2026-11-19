@@ -529,6 +529,13 @@ export interface QuizQuestions {
   question_text: string;
 }
 
+export interface SystemSettings {
+  key: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+  value: Json;
+}
+
 export interface UserApiTokens {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
@@ -663,6 +670,7 @@ export interface DB {
   quiz_attempts: QuizAttempts;
   quiz_lockout_resets: QuizLockoutResets;
   quiz_questions: QuizQuestions;
+  system_settings: SystemSettings;
   user_api_tokens: UserApiTokens;
   user_emails: UserEmails;
   user_oauth_accounts: UserOauthAccounts;

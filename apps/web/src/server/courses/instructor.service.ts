@@ -11,6 +11,7 @@ import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import { audit } from "../audit";
 import { slugify } from "../slug";
+import { getCourseDefaults } from "../system-settings.service";
 import type { CurrentUser } from "../auth/session";
 
 export const PUBLISH_RULES = { minTotalDurationSec: 600, minQuestions: 3 } as const;
@@ -147,6 +148,7 @@ export async function createCourse(
   }
   const instructorId = input.instructorId ?? user.id;
   const { db } = ctx();
+  const defaults = await getCourseDefaults();
   const c = await db
     .insertInto("courses")
     .values({
@@ -157,6 +159,14 @@ export async function createCourse(
       course_type: input.courseType ?? "certified_training",
       // A short course issues a ประกาศนียบัตร; the owner can still rename the document in settings
       credential_name_th: COURSE_TYPE_INFO[input.courseType ?? "certified_training"].defaultCredentialName,
+      // Pre-fill from system defaults so new courses start with admin-configured criteria
+      min_watch_percentage: defaults.min_watch_percentage,
+      passing_quiz_score: defaults.passing_quiz_score,
+      max_quiz_attempts_per_day: defaults.max_quiz_attempts_per_day,
+      quiz_time_limit_sec: defaults.quiz_time_limit_min * 60,
+      is_sequential_locked: defaults.is_sequential_locked,
+      navigation_mode: defaults.navigation_mode as "free_complete" | "linear",
+      completion_rule: defaults.completion_rule as "post_test" | "lesson_tests_average",
     })
     .returning(["id", "slug"])
     .executeTakeFirstOrThrow();
