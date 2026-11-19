@@ -15,6 +15,8 @@ import {
 } from "./jobs/process-email-outbox.ts";
 import { enqueueCohortOpenEmails, enqueueCohortStartingEmails } from "./jobs/cohort-notifications.ts";
 import { checkAnticheatAnomaly } from "./jobs/anticheat-anomaly.ts";
+import { processScheduledBroadcasts } from "./jobs/process-scheduled-broadcasts.ts";
+import { expireWaitlistOffers } from "./jobs/expire-waitlist-offers.ts";
 import { ensureSystemOwner } from "./system-owner.ts";
 import { ensureDeveloperTestCertificate } from "./developer-test.ts";
 import { configuredEmailSender } from "./email-transport.ts";
@@ -30,12 +32,14 @@ const getEmailSender = configuredEmailSender(db, env);
 // every iteration forever (e.g. outbox-poll fires every second → ~86k jobs/day).
 const schedulerQueueOptions = { connection, defaultJobOptions: { removeOnComplete: true } };
 const schedulerQueues = [
-  new Queue("email-outbox", schedulerQueueOptions),
-  new Queue("assignment-reminders", schedulerQueueOptions),
-  new Queue("weekly-summary", schedulerQueueOptions),
-  new Queue("video-recheck", schedulerQueueOptions),
-  new Queue("cohort-notifications", schedulerQueueOptions),
-  new Queue("ops-health", schedulerQueueOptions),
+  new Queue("email-outbox", schedulerQueueOptions),         // [0]
+  new Queue("assignment-reminders", schedulerQueueOptions), // [1]
+  new Queue("weekly-summary", schedulerQueueOptions),       // [2]
+  new Queue("video-recheck", schedulerQueueOptions),        // [3]
+  new Queue("cohort-notifications", schedulerQueueOptions), // [4]
+  new Queue("ops-health", schedulerQueueOptions),           // [5]
+  new Queue("scheduled-broadcasts", schedulerQueueOptions), // [6]
+  new Queue("waitlist-expire", schedulerQueueOptions),      // [7]
 ];
 
 const workers = [
@@ -74,6 +78,8 @@ const workers = [
     await enqueueCohortOpenEmails(db, env.APP_ORIGIN);
   }, { connection, concurrency: 1 }),
   new Worker("ops-health", () => checkAnticheatAnomaly(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
+  new Worker("scheduled-broadcasts", () => processScheduledBroadcasts(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
+  new Worker("waitlist-expire", () => expireWaitlistOffers(db), { connection, concurrency: 1 }),
 ];
 
 // Daily cron: re-check every lesson's video (catches broken videos before learners hit them)
@@ -83,6 +89,8 @@ await schedulerQueues[1]!.upsertJobScheduler("due-reminders", { pattern: "0 * * 
 await schedulerQueues[2]!.upsertJobScheduler("weekly", { pattern: "0 8 * * 1", tz: "Asia/Bangkok" }, { name: "weekly" });
 await schedulerQueues[4]!.upsertJobScheduler("cohort-starting", { pattern: "*/15 * * * *", tz: "Asia/Bangkok" }, { name: "starting" });
 await schedulerQueues[5]!.upsertJobScheduler("anticheat-anomaly", { pattern: "*/15 * * * *", tz: "Asia/Bangkok" }, { name: "check" });
+await schedulerQueues[6]!.upsertJobScheduler("scheduled-broadcasts", { every: 60_000 }, { name: "check" });
+await schedulerQueues[7]!.upsertJobScheduler("waitlist-expire", { every: 300_000 }, { name: "expire" }); // every 5 min
 
 for (const w of workers) {
   // Log only the job id/template: job data can hold email addresses and links with tokens

@@ -1,5 +1,6 @@
 /** Multi-stage assessment flow: pre-test, per-lesson checks, and post-test. */
 import "server-only";
+import { randomInt } from "node:crypto";
 import {
   type CompletionRule,
   buildAttemptSnapshot,
@@ -37,7 +38,7 @@ async function loadEnrollment(userId: string, courseId: string) {
     .innerJoin("users as u", "u.id", "e.user_id")
     .select([
       "e.id", "e.status", "c.passing_quiz_score", "c.max_quiz_attempts_per_day", "c.quiz_time_limit_sec",
-      "c.visibility", "c.title", "c.slug", "c.completion_rule", "u.email", "u.legal_name_locked_at",
+      "c.quiz_draw_count", "c.visibility", "c.title", "c.slug", "c.completion_rule", "u.email", "u.legal_name_locked_at",
     ])
     .where("e.user_id", "=", userId)
     .where("e.course_id", "=", courseId)
@@ -139,12 +140,23 @@ export async function startAssessment(userId: string, courseId: string, target: 
       await trx.updateTable("quiz_attempts").set({ submitted_at: new Date(), user_answers: "{}", score_percentage: "0", is_passed: false }).where("id", "=", open.id).execute();
     }
 
+    // A03: use the latest lockout-reset timestamp (if any) as the window start instead of a fixed 24h
+    let resetQuery = trx
+      .selectFrom("quiz_lockout_resets")
+      .select(sql<Date | null>`max(reset_at)`.as("latest"))
+      .where("enrollment_id", "=", e.id)
+      .where("assessment_type", "=", target.kind)
+      .where("reset_at", ">", sql<Date>`now() - interval '24 hours'`);
+    resetQuery = lessonId ? resetQuery.where("lesson_id", "=", lessonId) : resetQuery.where("lesson_id", "is", null);
+    const { latest: resetAt } = await resetQuery.executeTakeFirstOrThrow();
+    const windowStart = resetAt ? sql<Date>`${resetAt}::timestamptz` : sql<Date>`now() - interval '24 hours'`;
+
     let recentQuery = trx
       .selectFrom("quiz_attempts")
       .select(sql<number>`count(*)::int`.as("n"))
       .where("enrollment_id", "=", e.id)
       .where("assessment_type", "=", target.kind)
-      .where("started_at", ">", sql<Date>`now() - interval '24 hours'`);
+      .where("started_at", ">", windowStart);
     recentQuery = lessonId ? recentQuery.where("lesson_id", "=", lessonId) : recentQuery.where("lesson_id", "is", null);
     const recent = await recentQuery.executeTakeFirstOrThrow();
     if (recent.n >= e.max_quiz_attempts_per_day) throw new HttpError(429, "QUIZ_ATTEMPT_LIMIT");
@@ -156,8 +168,18 @@ export async function startAssessment(userId: string, courseId: string, target: 
       .where("assessment_type", "=", target.kind)
       .where("is_active", "=", true);
     questionQuery = lessonId ? questionQuery.where("lesson_id", "=", lessonId) : questionQuery.where("lesson_id", "is", null);
-    const questions = await questionQuery.execute();
+    let questions = await questionQuery.execute();
     if (questions.length === 0) throw new HttpError(409, "QUIZ_EMPTY");
+
+    // Pool draw: randomly sample quiz_draw_count questions when configured
+    if (e.quiz_draw_count && e.quiz_draw_count < questions.length) {
+      const pool = [...questions];
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = randomInt(i + 1);
+        [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+      }
+      questions = pool.slice(0, e.quiz_draw_count);
+    }
 
     const snapshot = buildAttemptSnapshot(
       questions.map((q) => ({ id: q.id, questionText: q.question_text, options: q.options as unknown as QuestionOption[], correctOptionId: q.correct_option_id })),

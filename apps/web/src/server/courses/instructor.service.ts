@@ -3,7 +3,7 @@
  * IDOR check `course.instructor_id === current_user.id` (admins may manage any course).
  */
 import "server-only";
-import { COURSE_TYPE_INFO, extractYouTubeVideoId, parseApplicationSettings, type VideoValidation } from "@upskill/core";
+import { COURSE_TYPE_INFO, extractYouTubeVideoId, gradeWithKeyOverride, parseApplicationSettings, type AttemptSnapshotItem, type VideoValidation } from "@upskill/core";
 import { sql, type Tx } from "@upskill/db";
 import { fetchVideos } from "@upskill/infra/youtube-client";
 import { ctx } from "../context";
@@ -11,6 +11,7 @@ import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import { audit } from "../audit";
 import { slugify } from "../slug";
+import { getCourseDefaults } from "../system-settings.service";
 import type { CurrentUser } from "../auth/session";
 
 export const PUBLISH_RULES = { minTotalDurationSec: 600, minQuestions: 3 } as const;
@@ -37,6 +38,23 @@ export async function loadOwnedCourse(user: CurrentUser, courseId: string) {
 }
 
 /** Instructors see their own courses; admins see every course (with its instructor) so they can manage all of them */
+export async function getCertPresets(user: CurrentUser, excludeCourseId?: string) {
+  return ctx()
+    .db.selectFrom("courses")
+    .select([
+      "id", "title",
+      "credential_enabled", "credential_type", "credential_name_th", "credential_name_en",
+      "credential_template_key", "credential_text_align", "credential_validity_days",
+      "credential_signer_name", "credential_signer_title",
+      "credential_achievement_th", "credential_achievement_en",
+      "credential_background_url",
+    ])
+    .$if(user.role !== "admin", (q) => q.where("instructor_id", "=", user.id))
+    .$if(!!excludeCourseId, (q) => q.where("id", "!=", excludeCourseId!))
+    .orderBy("title")
+    .execute();
+}
+
 export async function listMyCourses(user: CurrentUser) {
   return ctx()
     .db.selectFrom("courses as c")
@@ -130,6 +148,7 @@ export async function createCourse(
   }
   const instructorId = input.instructorId ?? user.id;
   const { db } = ctx();
+  const defaults = await getCourseDefaults();
   const c = await db
     .insertInto("courses")
     .values({
@@ -140,6 +159,14 @@ export async function createCourse(
       course_type: input.courseType ?? "certified_training",
       // A short course issues a ประกาศนียบัตร; the owner can still rename the document in settings
       credential_name_th: COURSE_TYPE_INFO[input.courseType ?? "certified_training"].defaultCredentialName,
+      // Pre-fill from system defaults so new courses start with admin-configured criteria
+      min_watch_percentage: defaults.min_watch_percentage,
+      passing_quiz_score: defaults.passing_quiz_score,
+      max_quiz_attempts_per_day: defaults.max_quiz_attempts_per_day,
+      quiz_time_limit_sec: defaults.quiz_time_limit_min * 60,
+      is_sequential_locked: defaults.is_sequential_locked,
+      navigation_mode: defaults.navigation_mode as "free_complete" | "linear",
+      completion_rule: defaults.completion_rule as "post_test" | "lesson_tests_average",
     })
     .returning(["id", "slug"])
     .executeTakeFirstOrThrow();
@@ -148,6 +175,9 @@ export async function createCourse(
   }
   return c;
 }
+
+const COURSE_RESTORABLE_FIELDS = ["title", "description"] as const;
+type CourseRestorableField = (typeof COURSE_RESTORABLE_FIELDS)[number];
 
 export async function updateCourse(
   user: CurrentUser,
@@ -177,16 +207,97 @@ export async function updateCourse(
     course_type: "certified_training" | "short_course";
     application_settings: unknown;
   }>,
+  ip?: string,
 ) {
+  const { db } = ctx();
   await loadOwnedCourse(user, courseId);
   if (Object.keys(patch).length === 0) return;
+
+  const changedRestorable = (Object.keys(patch) as string[]).filter((k) =>
+    (COURSE_RESTORABLE_FIELDS as readonly string[]).includes(k),
+  ) as CourseRestorableField[];
+
+  let before: Partial<Record<CourseRestorableField, string | null>> = {};
+  if (changedRestorable.length > 0) {
+    const row = await db.selectFrom("courses").select(changedRestorable).where("id", "=", courseId).executeTakeFirst();
+    if (row) before = row as typeof before;
+  }
+
   const { application_settings, ...rest } = patch;
-  await ctx()
-    .db.updateTable("courses")
-    // Settings are normalized by the core parser, so nothing it doesn't understand is ever stored
+  await db
+    .updateTable("courses")
     .set({ ...rest, ...(application_settings !== undefined ? { application_settings: JSON.stringify(parseApplicationSettings(application_settings)) } : {}) })
     .where("id", "=", courseId)
     .execute();
+
+  if (ip && changedRestorable.length > 0) {
+    const after: Partial<Record<CourseRestorableField, string | null>> = {};
+    for (const f of changedRestorable) after[f] = (patch as Record<string, string | null>)[f] ?? null;
+    await audit(db, { action: "course.updated", userId: user!.id, entityType: "course", entityId: courseId, ip, details: { before, after } });
+  }
+}
+
+/** List recent audit history for a course (last 100 entries). */
+export async function getCourseHistory(user: CurrentUser, courseId: string) {
+  await loadOwnedCourse(user, courseId);
+  return ctx()
+    .db.selectFrom("audit_logs")
+    .select(["id", "action", "user_id", "details", "created_at"])
+    .where("entity_type", "=", "course")
+    .where("entity_id", "=", courseId)
+    .orderBy("created_at", "desc")
+    .limit(100)
+    .execute();
+}
+
+/**
+ * Restore restorable fields (title, description) from a specific audit_log entry's before-state.
+ * Creates a new audit entry with action "course.restored" and a reference to the source entry.
+ * Does NOT restore: completion rules, quiz scores, enrollment settings, credential config.
+ */
+export async function restoreCourseDraft(
+  user: CurrentUser,
+  courseId: string,
+  auditLogId: number | string,
+  fields: CourseRestorableField[],
+  ip: string,
+) {
+  const { db } = ctx();
+  await loadOwnedCourse(user, courseId);
+
+  const sanitized = fields.filter((f) => (COURSE_RESTORABLE_FIELDS as readonly string[]).includes(f));
+  if (sanitized.length === 0) throw new HttpError(400, "NO_RESTORABLE_FIELDS");
+
+  const entry = await db
+    .selectFrom("audit_logs")
+    .select(["id", "details"])
+    .where("id", "=", String(auditLogId))
+    .where("entity_type", "=", "course")
+    .where("entity_id", "=", courseId)
+    .executeTakeFirst();
+  if (!entry) throw new HttpError(404, "HISTORY_ENTRY_NOT_FOUND");
+
+  const details = entry.details as Record<string, unknown>;
+  const before = (details.before ?? {}) as Record<string, string | null>;
+
+  const patch: Record<string, string | null> = {};
+  for (const f of sanitized) {
+    if (!(f in before)) throw new HttpError(409, "FIELD_NOT_IN_SNAPSHOT", `ไม่มีค่าก่อนหน้าสำหรับ ${f} ในรายการประวัตินี้`);
+    patch[f] = before[f] ?? null;
+  }
+
+  if (Object.keys(patch).length === 0) return { restored: [] };
+
+  await db.updateTable("courses").set(patch).where("id", "=", courseId).execute();
+  await audit(db, {
+    action: "course.restored",
+    userId: user!.id,
+    entityType: "course",
+    entityId: courseId,
+    ip,
+    details: { restoredFrom: String(auditLogId), fields: sanitized, restored: patch },
+  });
+  return { restored: sanitized };
 }
 
 async function lookupVideo(videoId: string, devDurationSec?: number): Promise<{ durationSec: number; title: string; isPublic: boolean }> {
@@ -294,13 +405,11 @@ export async function setLessonCheckpoint(
 }
 
 export async function deleteLesson(user: CurrentUser, courseId: string, lessonId: string) {
-  const c = await loadOwnedCourse(user, courseId);
+  await loadOwnedCourse(user, courseId);
   const { db } = ctx();
-  // Deleting a lesson after publishing would silently erase learners' progress
-  if (c.visibility !== "draft") {
-    const n = await db.selectFrom("enrollments").select(sql<number>`count(*)::int`.as("n")).where("course_id", "=", courseId).executeTakeFirstOrThrow();
-    if (n.n > 0) throw new HttpError(409, "COURSE_HAS_LEARNERS", "หลักสูตรมีผู้เรียนแล้ว ไม่สามารถลบบทเรียนได้ (เปลี่ยนวิดีโอแทนได้)");
-  }
+  // A09: check regardless of visibility — course can be reverted to draft after learners enrolled
+  const n = await db.selectFrom("enrollments").select(sql<number>`count(*)::int`.as("n")).where("course_id", "=", courseId).executeTakeFirstOrThrow();
+  if (n.n > 0) throw new HttpError(409, "COURSE_HAS_LEARNERS", "หลักสูตรมีผู้เรียนแล้ว ไม่สามารถลบบทเรียนได้ (เปลี่ยนวิดีโอแทนได้)");
   await db.transaction().execute(async (trx) => {
     const del = await trx.deleteFrom("lessons").where("id", "=", lessonId).where("course_id", "=", courseId).returning("sequence_order").executeTakeFirst();
     if (!del) throw new HttpError(404, "NOT_FOUND");
@@ -331,7 +440,7 @@ export async function reorderLessons(user: CurrentUser, courseId: string, ordere
 export async function addQuestion(
   user: CurrentUser,
   courseId: string,
-  input: { text: string; options: string[]; correctIndex: number; assessmentType: "pre" | "lesson" | "post"; lessonId?: string | undefined },
+  input: { text: string; options: string[]; correctIndex: number; assessmentType: "pre" | "lesson" | "post"; lessonId?: string | undefined; tags?: string[] | undefined },
 ) {
   await loadOwnedCourse(user, courseId);
   if (input.correctIndex < 0 || input.correctIndex >= input.options.length) throw new HttpError(400, "BAD_CORRECT_INDEX");
@@ -350,6 +459,7 @@ export async function addQuestion(
       question_text: input.text.trim(),
       options: JSON.stringify(options),
       correct_option_id: options[input.correctIndex]!.id,
+      tags: sql<string[]>`${JSON.stringify(input.tags ?? [])}::text[]`,
     })
     .returning("id")
     .executeTakeFirstOrThrow();
@@ -361,7 +471,7 @@ export async function removeQuestion(user: CurrentUser, courseId: string, questi
   await ctx().db.updateTable("quiz_questions").set({ is_active: false }).where("id", "=", questionId).where("course_id", "=", courseId).execute();
 }
 
-/** Update an existing quiz question without deleting historical attempt snapshots */
+/** Update an existing quiz question. When correct_option_id changes, creates correction records for all submitted attempts. */
 export async function updateQuestion(
   user: CurrentUser,
   courseId: string,
@@ -372,27 +482,178 @@ export async function updateQuestion(
     correctIndex: number;
     assessmentType: "pre" | "lesson" | "post";
     lessonId?: string | null | undefined;
+    tags?: string[] | undefined;
   },
 ) {
+  const { db } = ctx();
   await loadOwnedCourse(user, courseId);
   if (input.correctIndex < 0 || input.correctIndex >= input.options.length) throw new HttpError(400, "BAD_CORRECT_INDEX", "ลำดับคำตอบที่ถูกต้องไม่ถูกต้อง");
   if ((input.assessmentType === "lesson") !== Boolean(input.lessonId)) throw new HttpError(400, "ASSESSMENT_TARGET_INVALID", "แบบทดสอบระหว่างบทต้องระบุบทเรียน");
   if (input.lessonId) {
-    const lesson = await ctx().db.selectFrom("lessons").select("id").where("id", "=", input.lessonId).where("course_id", "=", courseId).executeTakeFirst();
+    const lesson = await db.selectFrom("lessons").select("id").where("id", "=", input.lessonId).where("course_id", "=", courseId).executeTakeFirst();
     if (!lesson) throw new HttpError(404, "NOT_FOUND", "ไม่พบบทเรียนที่ระบุ");
   }
   const options = input.options.map((text, i) => ({ id: String.fromCharCode(97 + i), text: text.trim() }));
-  await ctx()
-    .db.updateTable("quiz_questions")
+  const newCorrectOptionId = options[input.correctIndex]!.id;
+  const newCorrectText = options[input.correctIndex]!.text;
+
+  const existing = await db
+    .selectFrom("quiz_questions")
+    .select(["correct_option_id", "options"])
+    .where("id", "=", questionId)
+    .where("course_id", "=", courseId)
+    .executeTakeFirst();
+  if (!existing) throw new HttpError(404, "NOT_FOUND");
+
+  const oldOptions = existing.options as unknown as Array<{ id: string; text: string }>;
+  const oldCorrectText = oldOptions.find((o) => o.id === existing.correct_option_id)?.text ?? "";
+
+  await db
+    .updateTable("quiz_questions")
     .set({
       question_text: input.text.trim(),
       options: JSON.stringify(options),
-      correct_option_id: options[input.correctIndex]!.id,
+      correct_option_id: newCorrectOptionId,
       assessment_type: input.assessmentType,
       lesson_id: input.lessonId ?? null,
+      tags: sql<string[]>`${JSON.stringify(input.tags ?? [])}::text[]`,
     })
     .where("id", "=", questionId)
     .where("course_id", "=", courseId)
+    .execute();
+
+  if (existing.correct_option_id !== newCorrectOptionId && oldCorrectText !== newCorrectText) {
+    await _createCorrections(db, courseId, questionId, oldCorrectText, newCorrectText);
+  }
+}
+
+async function _createCorrections(
+  db: ReturnType<typeof ctx>["db"],
+  courseId: string,
+  questionId: string,
+  oldCorrectText: string,
+  newCorrectText: string,
+) {
+  const attempts = await db
+    .selectFrom("quiz_attempts as a")
+    .innerJoin("enrollments as e", "e.id", "a.enrollment_id")
+    .innerJoin("courses as c", "c.id", "e.course_id")
+    .select(["a.id", "a.questions_snapshot", "a.user_answers", "a.score_percentage", "a.is_passed", "c.passing_quiz_score"])
+    .where("e.course_id", "=", courseId)
+    .where("a.submitted_at", "is not", null)
+    .execute();
+
+  const rows: Array<{
+    course_id: string; question_id: string; attempt_id: string;
+    old_correct_text: string; new_correct_text: string;
+    old_score_percentage: number; new_score_percentage: number;
+    old_is_passed: boolean; new_is_passed: boolean;
+  }> = [];
+
+  for (const attempt of attempts) {
+    const snapshot = attempt.questions_snapshot as unknown as AttemptSnapshotItem[];
+    const answers = (attempt.user_answers ?? {}) as Record<string, string>;
+    const override = gradeWithKeyOverride(snapshot, answers, questionId, newCorrectText);
+    if (!override) continue;
+
+    const oldScore = Number(attempt.score_percentage ?? 0);
+    const newScore = override.scorePercentage;
+    const passing = Number(attempt.passing_quiz_score ?? 0);
+
+    rows.push({
+      course_id: courseId,
+      question_id: questionId,
+      attempt_id: attempt.id,
+      old_correct_text: oldCorrectText,
+      new_correct_text: newCorrectText,
+      old_score_percentage: oldScore,
+      new_score_percentage: newScore,
+      old_is_passed: attempt.is_passed ?? false,
+      new_is_passed: newScore >= passing,
+    });
+  }
+
+  if (rows.length > 0) {
+    await db
+      .insertInto("quiz_score_corrections")
+      .values(rows)
+      .onConflict((oc) => oc.columns(["question_id", "attempt_id"]).doUpdateSet((eb) => ({
+        old_correct_text: eb.ref("excluded.old_correct_text"),
+        new_correct_text: eb.ref("excluded.new_correct_text"),
+        old_score_percentage: eb.ref("excluded.old_score_percentage"),
+        new_score_percentage: eb.ref("excluded.new_score_percentage"),
+        old_is_passed: eb.ref("excluded.old_is_passed"),
+        new_is_passed: eb.ref("excluded.new_is_passed"),
+        applied_at: null,
+        applied_by: null,
+      })))
+      .execute();
+  }
+}
+
+/** Preview pending correction records for a course (unapplied ones). */
+export async function listPendingCorrections(user: CurrentUser, courseId: string) {
+  await loadOwnedCourse(user, courseId);
+  const { db } = ctx();
+  const rows = await db
+    .selectFrom("quiz_score_corrections as c")
+    .innerJoin("quiz_questions as q", "q.id", "c.question_id")
+    .select([
+      "c.id", "c.attempt_id", "c.question_id", "q.question_text",
+      "c.old_correct_text", "c.new_correct_text",
+      "c.old_score_percentage", "c.new_score_percentage",
+      "c.old_is_passed", "c.new_is_passed", "c.created_at",
+    ])
+    .where("c.course_id", "=", courseId)
+    .where("c.applied_at", "is", null)
+    .orderBy("c.created_at", "asc")
+    .execute();
+
+  const changed = rows.filter((r) => r.old_is_passed !== r.new_is_passed);
+  return { corrections: rows, passChanges: changed.length };
+}
+
+/** Apply all pending corrections for a course. */
+export async function applyCorrections(user: CurrentUser, courseId: string, ip: string) {
+  await loadOwnedCourse(user, courseId);
+  const { db } = ctx();
+  const pending = await db
+    .selectFrom("quiz_score_corrections")
+    .select(["id", "attempt_id", "new_score_percentage", "new_is_passed"])
+    .where("course_id", "=", courseId)
+    .where("applied_at", "is", null)
+    .execute();
+
+  if (pending.length === 0) return { applied: 0 };
+
+  await db.transaction().execute(async (trx) => {
+    for (const c of pending) {
+      await trx
+        .updateTable("quiz_attempts")
+        .set({ score_percentage: c.new_score_percentage, is_passed: c.new_is_passed })
+        .where("id", "=", c.attempt_id)
+        .execute();
+    }
+    const now = new Date();
+    await trx
+      .updateTable("quiz_score_corrections")
+      .set({ applied_at: now, applied_by: user!.id })
+      .where("course_id", "=", courseId)
+      .where("applied_at", "is", null)
+      .execute();
+  });
+
+  await audit(db, { action: "quiz.corrections_applied", userId: user!.id, entityType: "course", entityId: courseId, ip, details: { count: pending.length } });
+  return { applied: pending.length };
+}
+
+/** Update quiz draw count for a course (null = use all questions). */
+export async function updateQuizDrawCount(user: CurrentUser, courseId: string, drawCount: number | null) {
+  await loadOwnedCourse(user, courseId);
+  await ctx().db
+    .updateTable("courses")
+    .set({ quiz_draw_count: drawCount })
+    .where("id", "=", courseId)
     .execute();
 }
 
@@ -490,6 +751,7 @@ export async function resetCourseLearnerQuizAttempts(
   courseId: string,
   enrollmentId: string,
   meta: { ip: string },
+  options?: { assessmentType?: "pre" | "lesson" | "post"; lessonId?: string; reason?: string },
 ) {
   await loadOwnedCourse(user, courseId);
   const { db } = ctx();
@@ -501,21 +763,31 @@ export async function resetCourseLearnerQuizAttempts(
     .executeTakeFirst();
   if (!enrollment) throw new HttpError(404, "NOT_FOUND", "ไม่พบการลงทะเบียนนี้ในหลักสูตร");
 
+  const assessmentType = options?.assessmentType ?? "post";
+  const lessonId = options?.lessonId ?? null;
+
   await db.transaction().execute(async (trx) => {
-    // If an attempt is stuck open (submitted_at IS NULL), close it so uq_quiz_attempt_open is cleared
-    await trx
+    // Close any stuck-open attempt so uq_quiz_attempt_open is cleared (safe regardless of type)
+    let closeQuery = trx
       .updateTable("quiz_attempts")
-      .set({ submitted_at: new Date() })
+      .set({ submitted_at: new Date(), user_answers: "{}", score_percentage: "0", is_passed: false })
       .where("enrollment_id", "=", enrollmentId)
       .where("submitted_at", "is", null)
-      .execute();
+      .where("assessment_type", "=", assessmentType);
+    if (lessonId) closeQuery = closeQuery.where("lesson_id", "=", lessonId);
+    await closeQuery.execute();
 
-    // Shift started_at of attempts in the last 24h by 25h backward to reset the daily counter
+    // A03: insert a lockout-reset record so the next startAssessment call uses this timestamp
+    // as the window start instead of now()-24h, without touching historical attempt timestamps.
     await trx
-      .updateTable("quiz_attempts")
-      .set({ started_at: sql<Date>`started_at - interval '25 hours'` })
-      .where("enrollment_id", "=", enrollmentId)
-      .where("started_at", ">", sql<Date>`now() - interval '24 hours'`)
+      .insertInto("quiz_lockout_resets")
+      .values({
+        enrollment_id: enrollmentId,
+        assessment_type: assessmentType,
+        lesson_id: lessonId ?? undefined,
+        granted_by: user.id,
+        reason: options?.reason ?? null,
+      })
       .execute();
   });
 
@@ -525,7 +797,7 @@ export async function resetCourseLearnerQuizAttempts(
     entityType: "course",
     entityId: courseId,
     ip: meta.ip,
-    details: { enrollmentId, targetUserId: enrollment.user_id },
+    details: { enrollmentId, targetUserId: enrollment.user_id, assessmentType, lessonId },
   });
 
   return { ok: true };
@@ -612,7 +884,7 @@ export async function getCourseLearnerProgressDetail(
 }
 
 /** Spec 5.3 #2 anti-farming rules are checked here, before a course can be published */
-export async function setVisibility(user: CurrentUser, courseId: string, visibility: "draft" | "published" | "unlisted" | "archived", meta: { ip: string }) {
+export async function setVisibility(user: CurrentUser, courseId: string, visibility: "draft" | "published" | "unlisted" | "archived" | "enrollment_closed", meta: { ip: string }) {
   const c = await loadOwnedCourse(user, courseId);
   if (c.visibility === "suspended" && user.role !== "admin") throw new HttpError(403, "COURSE_SUSPENDED", "หลักสูตรถูกระงับโดยผู้ดูแลระบบ");
   const { db, env } = ctx();
@@ -641,7 +913,7 @@ export async function setVisibility(user: CurrentUser, courseId: string, visibil
   }
 
   const changedAt = new Date();
-  const statusLabels = { draft: "ฉบับร่าง", published: "เผยแพร่", unlisted: "ไม่แสดงในคลังหลักสูตร", archived: "ปิดหลักสูตร / เข้าคลัง" } as const;
+  const statusLabels = { draft: "ฉบับร่าง", published: "เผยแพร่", unlisted: "ไม่แสดงในคลังหลักสูตร", archived: "ปิดหลักสูตร / เข้าคลัง", enrollment_closed: "ปิดรับสมัครใหม่" } as const;
   await db.transaction().execute(async (trx) => {
     await trx
       .updateTable("courses")
@@ -658,6 +930,52 @@ export async function setVisibility(user: CurrentUser, courseId: string, visibil
   if (visibility === "archived") await audit(db, { action: "course.archived", userId: user.id, entityType: "course", entityId: courseId, ip: meta.ip });
 }
 
+
+// ---------------------------------------------------------------------------
+// I-03: Pre-publish readiness check — structured result with broken-item IDs
+// so the UI can render links instead of a plain error string.
+// ---------------------------------------------------------------------------
+
+export async function getPublishReadiness(user: CurrentUser, courseId: string) {
+  await loadOwnedCourse(user, courseId);
+  const { db } = ctx();
+  const stats = await db
+    .selectFrom("courses as c")
+    .select([
+      "c.total_duration_sec",
+      "c.completion_rule",
+      sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("lessons"),
+      sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.assessment_type = 'post' and q.is_active)`.as("questions"),
+      sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.assessment_type = 'lesson' and q.is_active)`.as("lesson_questions"),
+    ])
+    .where("c.id", "=", courseId)
+    .executeTakeFirstOrThrow();
+  const brokenLessons = await db
+    .selectFrom("lessons")
+    .select(["id", "title", "sequence_order"])
+    .where("course_id", "=", courseId)
+    .where("video_status", "<>", "active")
+    .orderBy("sequence_order")
+    .execute();
+
+  type Check = { id: string; label: string; ok: boolean; detail?: string };
+  const checks: Check[] = [
+    { id: "has_lessons", label: "มีบทเรียนอย่างน้อย 1 บท", ok: stats.lessons > 0 },
+    { id: "min_duration", label: "ความยาวรวมอย่างน้อย 10 นาที", ok: stats.total_duration_sec >= PUBLISH_RULES.minTotalDurationSec },
+    {
+      id: "has_questions",
+      label: stats.completion_rule === "lesson_tests_average" ? "มีข้อสอบท้ายคลิปรวมอย่างน้อย 3 ข้อ" : "มีข้อสอบอย่างน้อย 3 ข้อ",
+      ok: stats.completion_rule === "lesson_tests_average" ? stats.lesson_questions >= PUBLISH_RULES.minQuestions : stats.questions >= PUBLISH_RULES.minQuestions,
+    },
+    {
+      id: "no_broken_lessons",
+      label: "ไม่มีวิดีโอที่ใช้งานไม่ได้",
+      ok: brokenLessons.length === 0,
+      detail: brokenLessons.length > 0 ? `บทที่มีปัญหา: ${brokenLessons.map((l) => `"${l.title}"`).join(", ")}` : undefined,
+    },
+  ];
+  return { ready: checks.every((c) => c.ok), checks, brokenLessonIds: brokenLessons.map((l) => l.id) };
+}
 
 // ---------------------------------------------------------------------------
 // Learning units (หน่วยการเรียนรู้): a title + summary article grouping lessons.

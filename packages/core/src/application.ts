@@ -12,6 +12,8 @@ export interface ApplicationDocument {
   key: string;
   label: string;
   required: boolean;
+  /** Maximum number of pages/files for this document slot (default 1; ≤ 10) */
+  maxPages?: number;
 }
 
 export interface ApplicationSettings {
@@ -91,7 +93,10 @@ export function parseApplicationSettings(raw: unknown): ApplicationSettings {
     const key = typeof r.key === "string" && KEY_RE.test(r.key) ? r.key : `doc_${documents.length + 1}`;
     if (!label || seen.has(key)) continue;
     seen.add(key);
-    documents.push({ key, label, required: r.required === true });
+    const maxPagesRaw = typeof r.maxPages === "number" ? Math.min(Math.max(Math.round(r.maxPages), 1), 10) : undefined;
+    const doc: ApplicationDocument = { key, label, required: r.required === true };
+    if (maxPagesRaw && maxPagesRaw > 1) doc.maxPages = maxPagesRaw;
+    documents.push(doc);
   }
   const fee = typeof o.fee === "number" && Number.isFinite(o.fee) ? Math.min(Math.max(Math.round(o.fee), 0), 1_000_000) : 0;
   return {

@@ -98,3 +98,19 @@
 - superadmin curl login returned 403 (likely missing CSRF/Origin header in curl — ไม่ได้ retry); deploy script ✅
 - ยังไม่ได้ทำ (audit items ที่เหลือ): A02, A03, A04, A06, A09, A10; 1A LessonPlayer stability; B/G/I modules
 - dfe2fcc (PR #27, one-command release script) released earlier at 16:40 UTC ✅
+
+## 2026-11-19T00:00:00+00:00 (07:00 Asia/Bangkok) — Claude Code: audit batch 2 (PR #30, 5e60fe5)
+
+- งาน / ขอบเขต: Functional Flexibility Audit batch 2 (A06, H 1A LessonPlayer stability)
+- Branch / commit: `fix/audit-batch-2` → squash merged to main as 5e60fe5 (PR #30)
+- ไฟล์ที่แก้:
+  - `apps/web/src/server/admin/certificates.service.ts` — A06: innerJoin → leftJoin บน courses เพื่อให้ program-level certs (course_id = null) ปรากฏในรายการ admin
+  - `apps/web/src/components/admin/CertificatesManager.tsx` — A06: อัปเดต CertificateRow.course_id/course_slug เป็น string | null
+  - `apps/web/src/components/learning/youtube-iframe-api.ts` — H 1A: reset loading = undefined ใน onerror ให้ retry ได้ (rejected promise เดิมถูก reuse)
+  - `apps/web/src/components/learning/LessonPlayer.tsx` — H 1A: anchor heartbeat หลัง startSession, finalization timer + confirming state, cleanup ref, end overlay spinner "กำลังยืนยันผล…", jumpToUnwatched ทุก mode
+  - `apps/web/src/app/(lms)/courses/[slug]/lessons/[lessonId]/page.tsx` — H 1A: เพิ่ม key={lesson.id} บน LessonPlayer บังคับ remount เมื่อนำทางระหว่าง lesson
+- ตรวจผ่าน: `pnpm typecheck` clean, `pnpm lint` clean, CI check/codeql/e2e/secrets-scan ✅ (run 44356456956)
+- main CI 44357263690 ✅ → Deploy Jasmine bj1lv4cyb ✅ → released 5e60fe5 ✓
+- Production live check: ตรวจ superadmin login ในเบราว์เซอร์ (ไม่ใช้ curl — ต้องมี CSRF header)
+- ยังไม่ได้ทำ (audit items ที่เหลือ): A02, A03, A04, A09, A10; B/G/I modules
+- ยังรอการตัดสินใจ: ลบ/เพิกถอน TEST cert CERT-2026-CZVY-1K37-EK19 ของ developer account บน production

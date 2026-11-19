@@ -121,6 +121,9 @@ export function CourseLearnersRoster({
 
   // Action busy states
   const [resettingId, setResettingId] = useState<string | null>(null);
+  const [grantDialog, setGrantDialog] = useState<{ enrollmentId: string; name: string } | null>(null);
+  const [grantType, setGrantType] = useState<"pre" | "post">("post");
+  const [grantReason, setGrantReason] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -172,25 +175,38 @@ export function CourseLearnersRoster({
     setRefreshKey((k) => k + 1);
   };
 
-  const handleResetQuiz = async (enrollmentId: string, learnerName: string) => {
-    if (!confirm(`คุณต้องการปลดล็อกสิทธิ์สอบ 24 ชม. ให้ "${learnerName}" หรือไม่?`)) return;
+  const handleResetQuiz = async (enrollmentId: string) => {
     setResettingId(enrollmentId);
     try {
       const res = await api(`/api/instructor/courses/${courseId}/learners/${enrollmentId}/reset-quiz`, {
         method: "POST",
       });
       if (res.ok) {
-        toast({
-          title: "ปลดล็อกสิทธิ์สอบสำเร็จ",
-          description: `ผู้เรียนสามารถเข้าทำแบบทดสอบใหม่ได้ทันที`,
-        });
+        toast({ title: "ปลดล็อกสิทธิ์สอบสำเร็จ", description: "ผู้เรียนสามารถเข้าทำแบบทดสอบใหม่ได้ทันที" });
         triggerRefresh();
       } else {
-        toast({
-          variant: "destructive",
-          title: "ปลดล็อกไม่สำเร็จ",
-          description: res.message,
-        });
+        toast({ variant: "destructive", title: "ปลดล็อกไม่สำเร็จ", description: res.message });
+      }
+    } finally {
+      setResettingId(null);
+    }
+  };
+
+  const handleGrantAttempt = async () => {
+    if (!grantDialog) return;
+    setResettingId(grantDialog.enrollmentId);
+    try {
+      const res = await api(`/api/instructor/courses/${courseId}/learners/${grantDialog.enrollmentId}/reset-quiz`, {
+        method: "POST",
+        body: { assessmentType: grantType, reason: grantReason || undefined },
+      });
+      if (res.ok) {
+        toast({ title: "ให้สิทธิ์สอบเพิ่มสำเร็จ", description: `ผู้เรียนสามารถสอบประเภท "${grantType}" ได้ทันที` });
+        setGrantDialog(null);
+        setGrantReason("");
+        triggerRefresh();
+      } else {
+        toast({ variant: "destructive", title: "ให้สิทธิ์ไม่สำเร็จ", description: res.message });
       }
     } finally {
       setResettingId(null);
@@ -478,13 +494,21 @@ export function CourseLearnersRoster({
                               size="sm"
                               className="h-8 text-xs text-amber-600 border-amber-500/30 hover:bg-amber-500/10 dark:text-amber-400"
                               disabled={resettingId === learner.enrollment_id}
-                              onClick={() => handleResetQuiz(learner.enrollment_id, displayName)}
+                              onClick={() => handleResetQuiz(learner.enrollment_id)}
                             >
                               <Unlock className="mr-1 h-3.5 w-3.5" />
-                              ปลดล็อกสอบ
+                              ปลดล็อก
                             </Button>
                           )}
-
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                            disabled={resettingId === learner.enrollment_id}
+                            onClick={() => { setGrantType("post"); setGrantReason(""); setGrantDialog({ enrollmentId: learner.enrollment_id, name: displayName }); }}
+                          >
+                            <Unlock className="mr-1 h-3.5 w-3.5" /> ให้สิทธิ์สอบ
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -663,6 +687,50 @@ export function CourseLearnersRoster({
             </div>
           </div>
         )}
+      </Dialog>
+
+      {/* I-16: Grant extra quiz attempt dialog */}
+      <Dialog
+        open={!!grantDialog}
+        onOpenChange={(open) => !open && setGrantDialog(null)}
+        title={`ให้สิทธิ์สอบเพิ่ม: ${grantDialog?.name ?? ""}`}
+        description="เปิดหน้าต่างสอบใหม่ทันที ไม่ล้างประวัติหรือคะแนนเดิม"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setGrantDialog(null)}>ยกเลิก</Button>
+            <Button size="sm" loading={!!resettingId} onClick={handleGrantAttempt}>ให้สิทธิ์</Button>
+          </div>
+        }
+      >
+        <div className="space-y-4 py-2">
+          <div>
+            <label className="text-sm font-medium">ประเภทการสอบ</label>
+            <div className="mt-1.5 flex gap-2">
+              {(["pre", "post"] as const).map((t) => (
+                <Button
+                  key={t}
+                  type="button"
+                  variant={grantType === t ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setGrantType(t)}
+                >
+                  {t === "pre" ? "Pre-test" : "Post-test"}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium">เหตุผล (ไม่บังคับ)</label>
+            <textarea
+              className="mt-1.5 w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              rows={2}
+              maxLength={500}
+              placeholder="เช่น ระบบขัดข้องระหว่างสอบ, ผู้เรียนแจ้งปัญหา..."
+              value={grantReason}
+              onChange={(e) => setGrantReason(e.target.value)}
+            />
+          </div>
+        </div>
       </Dialog>
     </div>
   );

@@ -42,6 +42,7 @@ export interface Announcements {
   location: string | null;
   program_id: string | null;
   publish_at: Generated<Timestamp>;
+  scheduled_broadcast_at: Timestamp | null;
   slug: string;
   summary: string | null;
   title: string;
@@ -139,6 +140,7 @@ export interface CohortRegistrations {
   id: Generated<string>;
   status: Generated<string>;
   user_id: string;
+  waitlist_offer_sent_at: Timestamp | null;
 }
 
 export interface CohortWatches {
@@ -156,9 +158,11 @@ export interface CourseApplicationFiles {
   doc_key: string;
   id: Generated<string>;
   original_name: string;
+  page_no: Generated<number>;
   sha256: Buffer;
   size_bytes: number;
   storage_key: string;
+  superseded_at: Timestamp | null;
   user_id: string;
 }
 
@@ -236,6 +240,7 @@ export interface Courses {
   navigation_mode: Generated<string>;
   passing_quiz_score: Generated<number>;
   published_at: Timestamp | null;
+  quiz_draw_count: number | null;
   quiz_time_limit_sec: Generated<number>;
   slug: string;
   thumbnail_url: string | null;
@@ -401,6 +406,37 @@ export interface LearningSessions {
   user_id: string;
 }
 
+export interface LessonActivities {
+  activity_type: string;
+  content: Generated<Json>;
+  created_at: Generated<Timestamp>;
+  draft_content: Json | null;
+  draft_policy: Json | null;
+  id: Generated<string>;
+  is_active: Generated<boolean>;
+  lesson_id: string;
+  policy: Generated<Json>;
+  position_sec: number;
+  published_at: Timestamp | null;
+  sequence_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface LessonActivityResults {
+  activity_id: string;
+  answer_data: Generated<Json>;
+  attempt_count: Generated<number>;
+  correct_on_attempt: number | null;
+  created_at: Generated<Timestamp>;
+  enrollment_id: string;
+  id: Generated<string>;
+  locked_at: Timestamp | null;
+  passed_at: Timestamp | null;
+  score: number | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface LessonProgress {
   accumulated_valid_sec: Generated<number>;
   cheat_flag_count: Generated<number>;
@@ -465,6 +501,7 @@ export interface ProgramCohorts {
   status: Generated<string>;
   title: string;
   updated_at: Generated<Timestamp>;
+  waitlist_acceptance_hours: number | null;
   waitlist_enabled: Generated<boolean>;
 }
 
@@ -504,6 +541,16 @@ export interface QuizAttempts {
   user_answers: Json | null;
 }
 
+export interface QuizLockoutResets {
+  assessment_type: string;
+  enrollment_id: string;
+  granted_by: string;
+  id: Generated<string>;
+  lesson_id: string | null;
+  reason: string | null;
+  reset_at: Generated<Timestamp>;
+}
+
 export interface QuizQuestions {
   assessment_type: Generated<string>;
   correct_option_id: string;
@@ -514,6 +561,30 @@ export interface QuizQuestions {
   lesson_id: string | null;
   options: Json;
   question_text: string;
+  tags: Generated<string[]>;
+}
+
+export interface QuizScoreCorrections {
+  applied_at: Timestamp | null;
+  applied_by: string | null;
+  attempt_id: string;
+  course_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  new_correct_text: string;
+  new_is_passed: boolean;
+  new_score_percentage: Numeric;
+  old_correct_text: string;
+  old_is_passed: boolean;
+  old_score_percentage: Numeric;
+  question_id: string;
+}
+
+export interface SystemSettings {
+  key: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+  value: Json;
 }
 
 export interface UserApiTokens {
@@ -641,6 +712,8 @@ export interface DB {
   learning_group_members: LearningGroupMembers;
   learning_groups: LearningGroups;
   learning_sessions: LearningSessions;
+  lesson_activities: LessonActivities;
+  lesson_activity_results: LessonActivityResults;
   lesson_progress: LessonProgress;
   lessons: Lessons;
   password_reset_tokens: PasswordResetTokens;
@@ -648,7 +721,10 @@ export interface DB {
   program_courses: ProgramCourses;
   programs: Programs;
   quiz_attempts: QuizAttempts;
+  quiz_lockout_resets: QuizLockoutResets;
   quiz_questions: QuizQuestions;
+  quiz_score_corrections: QuizScoreCorrections;
+  system_settings: SystemSettings;
   user_api_tokens: UserApiTokens;
   user_emails: UserEmails;
   user_oauth_accounts: UserOauthAccounts;

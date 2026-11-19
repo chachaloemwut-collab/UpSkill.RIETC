@@ -21,6 +21,8 @@ export type AuditAction =
   | "user.legal_name_locked"
   | "user.legal_name_unlocked"
   | "user.pdpa_consent"
+  | "course.updated"
+  | "course.restored"
   | "course.published"
   | "course.archived"
   | "course.application_submitted"
@@ -29,6 +31,7 @@ export type AuditAction =
   | "course.suspended"
   | "course.completion_overridden"
   | "course.quiz_attempts_reset"
+  | "quiz.corrections_applied"
   | "course.assigned"
   | "course.assignment_cancelled"
   | "course.instructor_changed"
@@ -51,7 +54,11 @@ export type AuditAction =
   | "learning.cheat_flag"
   | "system.email_settings_updated"
   | "system.email_settings_tested"
-  | "system.google_oauth_settings_updated";
+  | "system.google_oauth_settings_updated"
+  | "programs.category_renamed"
+  | "programs.category_deleted"
+  | "system.course_defaults_updated"
+  | "system.automation_toggled";
 
 /** The app role can INSERT only (UPDATE/DELETE are blocked by both grant and trigger) */
 export async function audit(

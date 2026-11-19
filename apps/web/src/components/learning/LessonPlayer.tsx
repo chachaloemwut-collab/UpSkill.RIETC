@@ -9,9 +9,9 @@
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowRight, CheckCircle2, Circle, CircleHelp, FastForward, HelpCircle, Lock, Maximize, Minimize, RotateCcw, Share2, Snail, Tv, Volume2, VolumeX,
+  ArrowRight, CheckCircle2, Circle, CircleHelp, ClipboardCopy, FastForward, Flag, HelpCircle, Lock, Maximize, Minimize, RotateCcw, Share2, Snail, Tv, Volume2, VolumeX, X,
 } from "lucide-react";
 import { PlayPauseIcon, useToast } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ import { loadYouTubeIframeApi, YT_STATE, type YTPlayer } from "./youtube-iframe-
 type Status =
   | { kind: "idle" }
   | { kind: "recording" }
+  | { kind: "buffering" }
   | { kind: "paused" }
   | { kind: "focus-paused" }
   | { kind: "superseded" }
@@ -131,6 +132,14 @@ export function LessonPlayer({
   const [confirming, setConfirming] = useState(false);
   /** Ref to the finalization setTimeout so we can cancel it on cleanup / lesson change. */
   const finalizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // H04: autoplay next lesson with countdown
+  const [autoplayNext, setAutoplayNext] = useState(() => {
+    try { return localStorage.getItem("lp_autoplay") !== "off"; } catch { return true; }
+  });
+  const [countdown, setCountdown] = useState<number | null>(null);
+  // H08: report problem dialog
+  const [reportOpen, setReportOpen] = useState(false);
 
   const totalChunks = totalChunksFor(durationSec);
   const watchedCount = Math.min(totalChunks, watchedChunks.length);
@@ -258,6 +267,8 @@ export function LessonPlayer({
                 }
               }
               setStatus((s) => (s.kind === "completed" ? s : { kind: "recording" }));
+            } else if (e.data === YT_STATE.BUFFERING) {
+              setStatus((s) => (s.kind === "completed" || s.kind === "superseded" ? s : { kind: "buffering" }));
             } else if (e.data === YT_STATE.PAUSED) {
               setStatus((s) => (s.kind === "completed" || s.kind === "superseded" ? s : { kind: focusPauseRef.current ? "focus-paused" : "paused" }));
               void sendHeartbeat();
@@ -493,6 +504,23 @@ export function LessonPlayer({
 
   const pct = (s: number) => `${Math.min(100, Math.max(0, (s / durationSec) * 100))}%`;
 
+  // H04: start countdown when completed + nextAction arrive and autoplay is on
+  useEffect(() => {
+    if (completed && nextAction && autoplayNext && ended) startTransition(() => setCountdown(5));
+  }, [completed, nextAction, autoplayNext, ended]);
+
+  // H04: decrement countdown each second
+  useEffect(() => {
+    if (countdown === null || countdown <= 0) return;
+    const t = setTimeout(() => setCountdown((c) => (c !== null && c > 1 ? c - 1 : 0)), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
+
+  // H04: navigate when countdown hits 0
+  useEffect(() => {
+    if (countdown === 0 && nextAction) router.push(nextAction.href);
+  }, [countdown, nextAction, router]);
+
   const handleCopyVideoLink = () => {
     if (!isPublic) {
       toast({ title: "ไม่อนุญาตให้คัดลอกลิงก์", description: "วิดีโอนี้เป็นแบบไม่สาธารณะเพื่อการเรียนรู้เฉพาะในระบบ", variant: "destructive" });
@@ -549,9 +577,17 @@ export function LessonPlayer({
                     <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
                     <p className="font-semibold">ดูคลิปนี้ครบแล้ว</p>
                     {nextAction ? (
-                      <Link href={nextAction.href} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-                        {nextAction.label} <ArrowRight className="h-4 w-4" />
-                      </Link>
+                      <>
+                        <Link href={nextAction.href} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                          {nextAction.label} <ArrowRight className="h-4 w-4" />
+                          {countdown !== null && countdown > 0 && <span className="ml-1 tabular-nums text-xs opacity-80">({countdown})</span>}
+                        </Link>
+                        {countdown !== null && countdown > 0 && (
+                          <button type="button" className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground" onClick={() => setCountdown(null)}>
+                            ยกเลิกเล่นอัตโนมัติ
+                          </button>
+                        )}
+                      </>
                     ) : (
                       <p className="text-sm text-muted-foreground">กำลังอัปเดตขั้นตอนถัดไป…</p>
                     )}
@@ -750,6 +786,24 @@ export function LessonPlayer({
           <button type="button" className={cn(iconButton, "hidden sm:inline-flex")} onClick={() => setShortcutsOpen((v) => !v)} aria-label="คู่มือคีย์ลัด (?)" title="คู่มือคีย์ลัด (?)">
             <HelpCircle className="h-4 w-4" />
           </button>
+          <button
+            type="button"
+            className={cn(iconButton, "hidden sm:inline-flex", autoplayNext && "text-primary")}
+            title={autoplayNext ? "เล่นต่อต้นอัตโนมัติ: เปิด (คลิกเพื่อปิด)" : "เล่นต่อต้นอัตโนมัติ: ปิด"}
+            aria-label="เล่นคลิปถัดไปอัตโนมัติ"
+            onClick={() => {
+              const next = !autoplayNext;
+              setAutoplayNext(next);
+              if (!next) setCountdown(null);
+              try { localStorage.setItem("lp_autoplay", next ? "on" : "off"); } catch { /* ignore */ }
+            }}
+          >
+            <ArrowRight className="h-4 w-4" />
+            <span className="sr-only">เล่นอัตโนมัติ</span>
+          </button>
+          <button type="button" className={cn(iconButton, "hidden sm:inline-flex")} onClick={() => setReportOpen(true)} title="แจ้งปัญหาคลิปนี้" aria-label="แจ้งปัญหาคลิปนี้">
+            <Flag className="h-4 w-4" />
+          </button>
           <button type="button" className={cn(iconButton, "hidden lg:inline-flex", theaterMode && "text-primary")} onClick={toggleTheater} aria-label={theaterMode ? "ขนาดปกติ" : "โหมดจอกว้าง"} title={theaterMode ? "ขนาดปกติ" : "โหมดจอกว้าง"}>
             <Tv className="h-4 w-4" />
           </button>
@@ -759,7 +813,21 @@ export function LessonPlayer({
         </div>
       </div>
 
-      <StatusBar status={status} free={free} watchedCount={watchedCount} totalChunks={totalChunks} watchedPercent={watchedPercent} minPercent={minWatchPercentage} onTakeOver={takeOver} />
+      <StatusBar status={status} confirming={confirming} free={free} watchedCount={watchedCount} totalChunks={totalChunks} watchedPercent={watchedPercent} minPercent={minWatchPercentage} onTakeOver={takeOver} />
+
+      {/* H07: primary action bar — single most important next step, always above the fold */}
+      <PrimaryActionBar
+        completed={completed}
+        confirming={confirming}
+        watchedEnough={watchedEnough}
+        checkpointPending={checkpointPending}
+        checkpointPassed={checkpointPassed}
+        checkpoint={checkpoint}
+        lessonTest={lessonTest}
+        nextAction={nextAction}
+        onGoToCheckpoint={() => checkpoint && seek(Math.max(0, checkpoint.atSec - 5), true)}
+        onJump={jumpToUnwatched}
+      />
 
       <LessonChecklist
         free={free}
@@ -773,12 +841,49 @@ export function LessonPlayer({
         onGoToCheckpoint={() => checkpoint && seek(Math.max(0, checkpoint.atSec - 5), true)}
         lessonTest={lessonTest}
       />
+
+      {/* H08: report problem dialog */}
+      {reportOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4" onClick={(e) => e.target === e.currentTarget && setReportOpen(false)}>
+          <div className="w-full max-w-md rounded-xl border bg-background p-5 shadow-2xl grid gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">แจ้งปัญหาคลิปนี้</h3>
+              <button type="button" onClick={() => setReportOpen(false)} className="rounded p-1 hover:bg-muted"><X className="h-4 w-4" /></button>
+            </div>
+            <p className="text-sm text-muted-foreground">ข้อมูลนี้จะช่วยให้ผู้ดูแลระบบแก้ไขปัญหาได้เร็วขึ้น กด &ldquo;คัดลอก&rdquo; แล้วส่งให้ผู้ดูแล</p>
+            <pre className="overflow-x-auto rounded bg-muted p-3 text-xs font-mono select-all whitespace-pre-wrap break-all">
+              {[
+                `lessonId: ${lessonId}`,
+                `videoId: ${videoId}`,
+                `position: ${Math.floor(position)}s / ${durationSec}s`,
+                `watched: ${watchedPercent}%`,
+                `status: ${status.kind}`,
+                `completed: ${completed}`,
+                `autoplay: ${autoplayNext}`,
+                `ua: ${typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 80) : "?"}`,
+              ].join("\n")}
+            </pre>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 justify-center"
+              onClick={() => {
+                void navigator.clipboard.writeText(`ปัญหาคลิป:\nlessonId: ${lessonId}\nvideoId: ${videoId}\nposition: ${Math.floor(position)}s/${durationSec}s\nwatched: ${watchedPercent}%\nstatus: ${status.kind}\n`);
+                toast({ title: "คัดลอกรายงานแล้ว", description: "กรุณาส่งข้อมูลนี้ให้ผู้ดูแลระบบ" });
+                setReportOpen(false);
+              }}
+            >
+              <ClipboardCopy className="h-4 w-4" /> คัดลอกรายงาน
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 const STATUS_TONE = {
   idle: "bg-muted-foreground/50",
+  buffering: "bg-blue-400 animate-pulse",
   recording: "bg-success",
   paused: "bg-warning",
   "focus-paused": "bg-warning",
@@ -789,20 +894,21 @@ const STATUS_TONE = {
 } as const;
 
 function StatusBar({
-  status, free, watchedCount, totalChunks, watchedPercent, minPercent, onTakeOver,
+  status, confirming, free, watchedCount, totalChunks, watchedPercent, minPercent, onTakeOver,
 }: {
-  status: Status; free: boolean; watchedCount: number; totalChunks: number; watchedPercent: number; minPercent: number; onTakeOver: () => void;
+  status: Status; confirming: boolean; free: boolean; watchedCount: number; totalChunks: number; watchedPercent: number; minPercent: number; onTakeOver: () => void;
 }) {
   const progress = free ? `ดูแล้ว ${watchedCount}/${totalChunks} ช่วง` : `ดูแล้ว ${watchedPercent}% (เกณฑ์ ${minPercent}%)`;
   const text: Record<Status["kind"], string> = {
     idle: "กดเล่นเพื่อเริ่มนับเวลาเรียน",
+    buffering: `กำลังโหลดวิดีโอ · ${progress}`,
     recording: `กำลังนับเวลาเรียน · ${progress}`,
     paused: `หยุดชั่วคราว · ${progress}`,
     "focus-paused": "หยุดให้อัตโนมัติเพราะสลับไปหน้าอื่น — กดเล่นเพื่อเรียนต่อ",
     superseded: "มีการเปิดบทเรียนในหน้าต่างอื่น หน้านี้จึงหยุดนับเวลา",
     offline: "การเชื่อมต่อขาดหาย — ระบบจะนับต่อให้เมื่อกลับมาออนไลน์",
     broken: "วิดีโอนี้ไม่พร้อมใช้งาน ระบบแจ้งผู้สอนแล้ว",
-    completed: "ดูคลิปนี้ครบตามเกณฑ์แล้ว",
+    completed: confirming ? "กำลังยืนยันผลการดู…" : "ดูคลิปนี้ครบตามเกณฑ์แล้ว",
   };
   return (
     <div aria-live="polite" className="flex items-center justify-between gap-3 border-b bg-card px-4 py-2.5 text-xs text-foreground lg:border-b-0 lg:border-t">
@@ -820,6 +926,52 @@ function StatusBar({
       )}
     </div>
   );
+}
+
+function PrimaryActionBar({
+  completed, confirming, watchedEnough, checkpointPending, checkpointPassed, checkpoint, lessonTest, nextAction, onGoToCheckpoint, onJump,
+}: {
+  completed: boolean; confirming: boolean; watchedEnough: boolean; checkpointPending: boolean; checkpointPassed: boolean;
+  checkpoint: { atSec: number } | null; lessonTest: Props["lessonTest"]; nextAction: PlayerAction | null;
+  onGoToCheckpoint: () => void; onJump: () => void;
+}) {
+  if (confirming) return null;
+  if (completed) {
+    if (lessonTest && !lessonTest.done && lessonTest.available)
+      return (
+        <div className="border-b bg-primary/5 px-4 py-3 lg:border-b-0 lg:border-t">
+          <Link href={lessonTest.href} className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+            <CheckCircle2 className="h-4 w-4" /> ทำแบบทดสอบท้ายคลิป
+          </Link>
+        </div>
+      );
+    if (nextAction)
+      return (
+        <div className="border-b bg-primary/5 px-4 py-3 lg:border-b-0 lg:border-t">
+          <Link href={nextAction.href} className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+            {nextAction.label} <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      );
+    return null;
+  }
+  if (checkpointPending && watchedEnough && !checkpointPassed && checkpoint)
+    return (
+      <div className="border-b bg-warning/5 px-4 py-3 lg:border-b-0 lg:border-t">
+        <button type="button" onClick={onGoToCheckpoint} className="inline-flex h-9 items-center gap-2 rounded-md bg-warning px-4 text-sm font-semibold text-warning-foreground hover:bg-warning/90">
+          <CircleHelp className="h-4 w-4" /> ตอบคำถามระหว่างคลิป ({clock(checkpoint.atSec)})
+        </button>
+      </div>
+    );
+  if (!watchedEnough)
+    return (
+      <div className="border-b bg-muted/40 px-4 py-3 lg:border-b-0 lg:border-t">
+        <button type="button" onClick={onJump} className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-muted">
+          <FastForward className="h-4 w-4" /> ดูช่วงที่ยังขาดอยู่
+        </button>
+      </div>
+    );
+  return null;
 }
 
 function LessonChecklist({

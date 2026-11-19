@@ -18,12 +18,14 @@ export interface AnnouncementInput {
   body: string;
   kind: AnnouncementKind;
   programId: string | null;
+  cohortId: string | null;
   location: string | null;
   eventStartsAt: Date | null;
   eventEndsAt: Date | null;
   publishAt: Date;
   expiresAt: Date | null;
   isPinned: boolean;
+  scheduledBroadcastAt: Date | null;
 }
 
 function checkInput(i: AnnouncementInput) {
@@ -31,6 +33,7 @@ function checkInput(i: AnnouncementInput) {
   if (i.eventEndsAt && !i.eventStartsAt) problems.push("กรุณาระบุวันเริ่มกิจกรรม");
   if (i.eventStartsAt && i.eventEndsAt && i.eventEndsAt < i.eventStartsAt) problems.push("วันสิ้นสุดกิจกรรมต้องไม่ก่อนวันเริ่ม");
   if (i.expiresAt && i.expiresAt <= i.publishAt) problems.push("วันหมดอายุประกาศต้องอยู่หลังวันเผยแพร่");
+  if (i.cohortId && !i.programId) problems.push("เลือกหลักสูตรรวมก่อนกำหนดรอบ");
   if (problems.length) throw new HttpError(422, "ANNOUNCEMENT_INVALID", problems.join(" · "));
 }
 
@@ -40,12 +43,14 @@ const columns = (i: AnnouncementInput) => ({
   body: i.body.trim(),
   kind: i.kind,
   program_id: i.programId,
+  cohort_id: i.cohortId,
   location: i.location?.trim() || null,
   event_starts_at: i.eventStartsAt,
   event_ends_at: i.eventEndsAt,
   publish_at: i.publishAt,
   expires_at: i.expiresAt,
   is_pinned: i.isPinned,
+  scheduled_broadcast_at: i.scheduledBroadcastAt,
 });
 
 async function checkProgram(programId: string | null) {
@@ -106,12 +111,42 @@ export async function deleteAnnouncement(user: CurrentUser, id: string) {
   if (Number(r.numDeletedRows) === 0) throw new HttpError(409, "ANNOUNCEMENT_BROADCAST", "ประกาศที่ส่งอีเมลแล้วลบไม่ได้ ใช้การเก็บเข้าคลังแทน");
 }
 
-/**
- * Email a published announcement once to every active, verified user. Category "course_update": the worker skips
- * users who turned course updates off and addresses on the suppression list.
- */
-export async function broadcastAnnouncement(user: CurrentUser, id: string, meta: { ip: string }) {
+/** Returns the number of users who would receive this announcement's broadcast email. */
+export async function getAnnouncementRecipientCount(user: CurrentUser, id: string) {
   assertAdmin(user);
+  const { db } = ctx();
+  const a = await db.selectFrom("announcements").select(["cohort_id"]).where("id", "=", id).executeTakeFirst();
+  if (!a) throw new HttpError(404, "NOT_FOUND");
+  let q = db
+    .selectFrom("users as u")
+    .leftJoin("email_preferences as ep", "ep.user_id", "u.id")
+    .select(sql<number>`count(*)::int`.as("n"))
+    .where("u.status", "=", "active")
+    .where("u.email_verified_at", "is not", null)
+    .where("u.is_system_owner", "=", false)
+    .where(sql<boolean>`coalesce(ep.course_updates_enabled, true)`);
+  if (a.cohort_id) {
+    q = q.where((eb) =>
+      eb.exists(
+        eb.selectFrom("cohort_registrations as cr")
+          .select("cr.id")
+          .where("cr.cohort_id", "=", a.cohort_id!)
+          .where("cr.status", "=", "approved")
+          .whereRef("cr.user_id", "=", "u.id"),
+      ),
+    );
+  }
+  const r = await q.executeTakeFirstOrThrow();
+  return { count: r.n };
+}
+
+/**
+ * Email a published announcement once. If the announcement has a cohort_id, only approved
+ * registrants of that cohort receive it. Category "course_update": the worker skips users
+ * who turned course updates off and addresses on the suppression list.
+ */
+export async function broadcastAnnouncement(user: CurrentUser | null, id: string, meta: { ip: string }) {
+  if (user) assertAdmin(user);
   const { db, env } = ctx();
   const a = await db.selectFrom("announcements").selectAll().where("id", "=", id).executeTakeFirst();
   if (!a) throw new HttpError(404, "NOT_FOUND");
@@ -124,15 +159,26 @@ export async function broadcastAnnouncement(user: CurrentUser, id: string, meta:
     // Claim the broadcast first: a double click can't send twice
     const claimed = await trx.updateTable("announcements").set({ broadcast_at: new Date() }).where("id", "=", id).where("broadcast_at", "is", null).executeTakeFirst();
     if (Number(claimed.numUpdatedRows) === 0) throw new HttpError(409, "ANNOUNCEMENT_ALREADY_BROADCAST", "ส่งอีเมลประกาศนี้ไปแล้ว");
-    const recipients = await trx
+    let recipientsQ = trx
       .selectFrom("users as u")
       .leftJoin("email_preferences as ep", "ep.user_id", "u.id")
       .select(["u.id", "u.email", "ep.preferred_locale"])
       .where("u.status", "=", "active")
       .where("u.email_verified_at", "is not", null)
       .where("u.is_system_owner", "=", false)
-      .where(sql<boolean>`coalesce(ep.course_updates_enabled, true)`)
-      .execute();
+      .where(sql<boolean>`coalesce(ep.course_updates_enabled, true)`);
+    if (a.cohort_id) {
+      recipientsQ = recipientsQ.where((eb) =>
+        eb.exists(
+          eb.selectFrom("cohort_registrations as cr")
+            .select("cr.id")
+            .where("cr.cohort_id", "=", a.cohort_id!)
+            .where("cr.status", "=", "approved")
+            .whereRef("cr.user_id", "=", "u.id"),
+        ),
+      );
+    }
+    const recipients = await recipientsQ.execute();
     const category = emailCategory("announcement");
     for (let i = 0; i < recipients.length; i += 500) {
       const chunk = recipients.slice(i, i + 500);
@@ -162,8 +208,31 @@ export async function broadcastAnnouncement(user: CurrentUser, id: string, meta:
     }
     return recipients.length;
   });
-  await audit(db, { action: "announcement.broadcast", userId: user.id, entityType: "announcement", entityId: id, ip: meta.ip, details: { recipients: queued } });
+  if (user) await audit(db, { action: "announcement.broadcast", userId: user.id, entityType: "announcement", entityId: id, ip: meta.ip, details: { recipients: queued } });
   return { queued };
+}
+
+/** Process all scheduled broadcasts that are due now. Called by worker cron. */
+export async function processScheduledBroadcasts(meta: { ip: string }) {
+  const { db } = ctx();
+  const due = await db
+    .selectFrom("announcements")
+    .select("id")
+    .where("visibility", "=", "published")
+    .where("broadcast_at", "is", null)
+    .where("scheduled_broadcast_at", "is not", null)
+    .where("scheduled_broadcast_at", "<=", new Date())
+    .execute();
+  const results: Array<{ id: string; queued?: number; error?: string }> = [];
+  for (const { id } of due) {
+    try {
+      const r = await broadcastAnnouncement(null, id, meta);
+      results.push({ id, queued: r.queued });
+    } catch (e) {
+      results.push({ id, error: e instanceof Error ? e.message : "unknown" });
+    }
+  }
+  return results;
 }
 
 // ---------------------------------------------------------------- public

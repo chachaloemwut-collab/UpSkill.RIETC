@@ -72,7 +72,7 @@ export async function getApplyContext(user: CurrentUser, courseId: string) {
 
 // ------------------------------------------------------------------ attached files
 
-const FILE_COLUMNS = ["id", "doc_key", "original_name", "content_type", "size_bytes", "created_at"] as const;
+const FILE_COLUMNS = ["id", "doc_key", "page_no", "original_name", "content_type", "size_bytes", "created_at", "superseded_at"] as const;
 
 async function pendingFilesOf(userId: string, courseId: string) {
   return ctx()
@@ -85,36 +85,65 @@ async function pendingFilesOf(userId: string, courseId: string) {
     .execute();
 }
 
-/** Upload one document file before submitting (replaces an earlier file for the same document). */
-export async function uploadApplicationFile(user: CurrentUser, courseId: string, docKey: string, bytes: Uint8Array, rawName: string) {
+/** Upload a document file. Supports multi-page slots (pageNo 1..maxPages) and re-upload after admin request. */
+export async function uploadApplicationFile(user: CurrentUser, courseId: string, docKey: string, bytes: Uint8Array, rawName: string, pageNo = 1) {
   const { db, env } = ctx();
   const course = await loadEnrollableCourse(user, courseId);
   const settings = parseApplicationSettings(course.application_settings);
   if (!settings.enabled || settings.documentUploads === "off") throw new HttpError(409, "UPLOADS_NOT_ENABLED", "หลักสูตรนี้ไม่ได้เปิดให้แนบไฟล์");
-  if (!settings.documents.some((d) => d.key === docKey)) throw new HttpError(400, "UNKNOWN_DOCUMENT");
+  const docSpec = settings.documents.find((d) => d.key === docKey);
+  if (!docSpec) throw new HttpError(400, "UNKNOWN_DOCUMENT");
+  const maxPages = docSpec.maxPages ?? 1;
+  if (pageNo < 1 || pageNo > maxPages) throw new HttpError(400, "INVALID_PAGE", `เอกสารนี้รองรับสูงสุด ${maxPages} หน้า`);
   if (bytes.byteLength === 0) throw new HttpError(400, "EMPTY_FILE", "ไฟล์ว่างเปล่า");
   if (bytes.byteLength > APPLICATION_FILE_MAX_BYTES) throw new HttpError(413, "FILE_TOO_LARGE", "ไฟล์ใหญ่เกิน 5 MB");
   const type = sniffApplicationFile(bytes);
   if (!type) throw new HttpError(415, "UNSUPPORTED_FILE", "รองรับเฉพาะไฟล์ PDF, JPG หรือ PNG");
-  if (await getMyApplication(user.id, courseId)) throw new HttpError(409, "APPLICATION_EXISTS", "ส่งใบสมัครแล้ว แก้ไขไฟล์ไม่ได้");
-  const pending = await pendingFilesOf(user.id, courseId);
-  if (pending.length >= APPLICATION_FILE_MAX_PENDING) throw new HttpError(409, "TOO_MANY_FILES", "แนบไฟล์ได้ไม่เกิน 20 ไฟล์");
+
+  const app = await getMyApplication(user.id, courseId);
+  if (app) {
+    // Re-upload is only allowed when admin has requested it for this specific document
+    const docState = (app.documents as Record<string, { reupload_requested?: boolean }>)[docKey];
+    if (!docState?.reupload_requested) throw new HttpError(409, "APPLICATION_EXISTS", "ส่งใบสมัครแล้ว แก้ไขไฟล์ไม่ได้");
+  } else {
+    const pending = await pendingFilesOf(user.id, courseId);
+    if (pending.length >= APPLICATION_FILE_MAX_PENDING) throw new HttpError(409, "TOO_MANY_FILES", "แนบไฟล์ได้ไม่เกิน 20 ไฟล์");
+  }
 
   const id = randomUUID();
   const storageKey = `${courseId}/${user.id}/${id}.${APPLICATION_FILE_EXT[type]}`;
   const storage = createApplicationFileStorage(env);
   await storage.save(storageKey, bytes, type);
-  const row = await db
+
+  if (app) {
+    // Supersede the old file for this doc+page and add the new version
+    await db.updateTable("course_application_files")
+      .set({ superseded_at: new Date() })
+      .where("application_id", "=", app.id)
+      .where("doc_key", "=", docKey)
+      .where("page_no", "=", pageNo)
+      .where("superseded_at", "is", null)
+      .execute();
+    // Clear the re-upload request flag
+    const docs = { ...((app.documents ?? {}) as Record<string, Record<string, unknown>>) };
+    if (docs[docKey]) docs[docKey] = { ...docs[docKey], reupload_requested: false };
+    await db.updateTable("course_applications").set({ documents: JSON.stringify(docs) }).where("id", "=", app.id).execute();
+  } else {
+    // For pending uploads: replace the same page (one file per page per doc)
+    const pending = await pendingFilesOf(user.id, courseId);
+    for (const old of pending.filter((f) => f.doc_key === docKey && f.page_no === pageNo)) await removePendingFile(user.id, courseId, old.id);
+  }
+
+  return db
     .insertInto("course_application_files")
     .values({
-      id, course_id: courseId, user_id: user.id, doc_key: docKey, original_name: cleanFileName(rawName, type),
+      id, course_id: courseId, user_id: user.id, doc_key: docKey, page_no: pageNo,
+      original_name: cleanFileName(rawName, type),
       content_type: type, size_bytes: bytes.byteLength, sha256: createHash("sha256").update(bytes).digest(), storage_key: storageKey,
+      ...(app ? { application_id: app.id } : {}),
     })
     .returning(FILE_COLUMNS)
     .executeTakeFirstOrThrow();
-  // One file per document: drop older pending files for the same document
-  for (const old of pending.filter((f) => f.doc_key === docKey)) await removePendingFile(user.id, courseId, old.id);
-  return row;
 }
 
 async function removePendingFile(userId: string, courseId: string, fileId: string) {
@@ -274,6 +303,20 @@ export async function listApplications(manager: CurrentUser, courseId: string) {
         .execute();
       return apps.map((a) => ({ ...a, files: files.filter((f) => f.application_id === a.id) }));
     });
+}
+
+/** Request the applicant to re-upload a specific document (I-10). */
+export async function requestDocumentReupload(manager: CurrentUser, courseId: string, applicationId: string, docKey: string, meta: { ip: string }) {
+  const course = await loadOwnedCourse(manager, courseId);
+  const { db } = ctx();
+  const app = await db.selectFrom("course_applications").select(["id", "documents", "status"]).where("id", "=", applicationId).where("course_id", "=", courseId).executeTakeFirst();
+  if (!app) throw new HttpError(404, "NOT_FOUND");
+  if (app.status === "approved") throw new HttpError(409, "ALREADY_APPROVED", "ใบสมัครที่อนุมัติแล้วขอเอกสารเพิ่มไม่ได้");
+  const docs = { ...((app.documents ?? {}) as Record<string, Record<string, unknown>>) };
+  if (!docs[docKey]) throw new HttpError(400, "UNKNOWN_DOCUMENT");
+  docs[docKey] = { ...docs[docKey], reupload_requested: true };
+  await db.updateTable("course_applications").set({ documents: JSON.stringify(docs), updated_at: new Date() }).where("id", "=", app.id).execute();
+  await audit(db, { action: "course.application_reviewed", userId: manager.id, entityType: "course", entityId: course.id, ip: meta.ip, details: { applicationId, action: "reupload_requested", docKey } });
 }
 
 export interface ApplicationReview {

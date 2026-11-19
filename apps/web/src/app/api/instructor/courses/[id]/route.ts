@@ -3,6 +3,7 @@ import { route } from "@/server/http";
 import { updateCourse } from "@/server/courses/instructor.service";
 import { uuidParam } from "@/server/params";
 
+
 const Body = z.strictObject({
   title: z.string().trim().min(3).max(255).optional(),
   description: z.string().max(10_000).nullable().optional(),
@@ -30,8 +31,8 @@ const Body = z.strictObject({
   application_settings: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const PATCH = route<typeof Body, { id: string }>({ auth: "required", roles: ["instructor", "admin"], body: Body }, async ({ params, body, user }) => {
+export const PATCH = route<typeof Body, { id: string }>({ auth: "required", roles: ["instructor", "admin"], body: Body }, async ({ params, body, user, ip }) => {
   const patch = Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined));
-  await updateCourse(user!, uuidParam(params.id), patch);
+  await updateCourse(user!, uuidParam(params.id), patch, ip);
   return { ok: true };
 });

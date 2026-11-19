@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Award,
   Check,
+  Copy,
   CheckCircle2,
   Circle,
   CircleHelp,
@@ -122,6 +123,15 @@ export interface EditorData {
   }>;
   devManualDuration: boolean;
   publishRules: { minTotalDurationSec: number; minQuestions: number };
+  courseDefaults?: {
+    min_watch_percentage: number;
+    passing_quiz_score: number;
+    max_quiz_attempts_per_day: number;
+    quiz_time_limit_min: number;
+    is_sequential_locked: boolean;
+    navigation_mode: string;
+    completion_rule: string;
+  };
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -158,7 +168,8 @@ export function CourseEditor({ data }: { data: EditorData }) {
   const lessonQuestions = questions.filter((question) => question.assessment_type === "lesson");
   const averageRule = course.completion_rule === "lesson_tests_average";
   const base = `/api/instructor/courses/${course.id}`;
-  const checks = [
+  const brokenLessons = lessons.filter((l) => l.video_status !== "active");
+  const checks: Array<{ ok: boolean; label: string; brokenLessons?: typeof brokenLessons }> = [
     { ok: lessons.length > 0, label: "มีบทเรียนอย่างน้อย 1 บท" },
     {
       ok: course.total_duration_sec >= publishRules.minTotalDurationSec,
@@ -174,8 +185,9 @@ export function CourseEditor({ data }: { data: EditorData }) {
           label: `Post-test ≥ ${publishRules.minQuestions} ข้อ (ตอนนี้ ${postQuestions.length})`,
         },
     {
-      ok: lessons.length > 0 && lessons.every((l) => l.video_status === "active"),
+      ok: brokenLessons.length === 0,
       label: "วิดีโอทุกบทใช้งานได้",
+      brokenLessons: brokenLessons.length > 0 ? brokenLessons : undefined,
     },
   ];
 
@@ -236,7 +248,7 @@ export function CourseEditor({ data }: { data: EditorData }) {
         </TabsContent>
 
         <TabsContent value="settings" className="mt-4">
-          <SettingsSection base={base} course={course} />
+          <SettingsSection base={base} course={course} courseDefaults={data.courseDefaults} />
         </TabsContent>
       </Tabs>
 
@@ -254,7 +266,7 @@ function PublishSection({
 }: {
   base: string;
   course: EditorData["course"];
-  checks: Array<{ ok: boolean; label: string }>;
+  checks: Array<{ ok: boolean; label: string; brokenLessons?: Array<{ id: string; title: string }> }>;
 }) {
   const a = useAction();
   const set = (visibility: string) =>
@@ -288,12 +300,40 @@ function PublishSection({
             ) : (
               <Circle className="mt-0.5 h-4 w-4 shrink-0" />
             )}
-            {c.label}
+            <span>
+              {c.label}
+              {!c.ok && c.brokenLessons && c.brokenLessons.length > 0 && (
+                <span className="mt-1 flex flex-col gap-0.5">
+                  {c.brokenLessons.map((l) => (
+                    <a
+                      key={l.id}
+                      href={`#lesson-${l.id}`}
+                      className="text-xs text-destructive underline underline-offset-2 hover:text-destructive/80"
+                    >
+                      {l.title}
+                    </a>
+                  ))}
+                </span>
+              )}
+            </span>
           </li>
         ))}
       </ul>
       {course.visibility === "suspended" ? (
         <Alert variant="destructive" title="หลักสูตรถูกระงับโดยผู้ดูแลระบบ" />
+      ) : course.visibility === "enrollment_closed" ? (
+        <div className="grid gap-2">
+          <Alert title="ปิดรับสมัครใหม่แล้ว">ผู้เรียนที่ลงทะเบียนไว้แล้วยังเข้าเรียนและรับใบรับรองได้ตามปกติ</Alert>
+          <Button loading={a.busy} onClick={() => set("published")}>
+            <Rocket className="h-4 w-4" /> เปิดรับสมัครอีกครั้ง
+          </Button>
+          <Button variant="ghost" disabled={a.busy} onClick={() => set("draft")}>
+            กลับเป็นฉบับร่าง
+          </Button>
+          <Button variant="outline" className="text-muted-foreground hover:text-foreground" disabled={a.busy} onClick={() => set("archived")}>
+            <Archive className="h-4 w-4" /> ย้ายเข้าคลัง (ปิดถาวร)
+          </Button>
+        </div>
       ) : (
         <div className="grid gap-2">
           {course.visibility !== "published" && (
@@ -304,6 +344,11 @@ function PublishSection({
           {course.visibility !== "unlisted" && (
             <Button variant="outline" disabled={a.busy} onClick={() => set("unlisted")}>
               เผยแพร่แบบลิงก์เท่านั้น
+            </Button>
+          )}
+          {course.visibility !== "enrollment_closed" && course.visibility !== "draft" && course.visibility !== "archived" && (
+            <Button variant="outline" disabled={a.busy} onClick={() => set("enrollment_closed")}>
+              ปิดรับสมัครใหม่ (ผู้เรียนเดิมเรียนต่อได้)
             </Button>
           )}
           {course.visibility !== "draft" && (
@@ -333,17 +378,55 @@ function PublishSection({
   );
 }
 
-function SettingsSection({ base, course }: { base: string; course: EditorData["course"] }) {
+type CertPreset = { id: string; title: string; credential_name_th: string; credential_name_en: string | null; credential_type: string; credential_template_key: string; credential_text_align: string; credential_validity_days: number | null; credential_signer_name: string | null; credential_signer_title: string | null; credential_achievement_th: string; credential_achievement_en: string | null; credential_background_url: string | null };
+
+function SettingsSection({ base, course, courseDefaults }: { base: string; course: EditorData["course"]; courseDefaults?: EditorData["courseDefaults"] }) {
   const a = useAction();
+  const toast = useToast();
 
   // Form states for live certificate preview
   const [certEnabled, setCertEnabled] = useState(course.credential_enabled);
   const [certTitleTh, setCertTitleTh] = useState(course.credential_name_th);
+  const [certNameEn, setCertNameEn] = useState(course.credential_name_en ?? "");
+  const [certType, setCertType] = useState(course.credential_type);
   const [certSigner, setCertSigner] = useState(course.credential_signer_name ?? "");
   const [certSignerTitle, setCertSignerTitle] = useState(course.credential_signer_title ?? "");
   const [certTemplate, setCertTemplate] = useState(course.credential_template_key);
   const [certAlign, setCertAlign] = useState(course.credential_text_align);
+  const [certValidityDays, setCertValidityDays] = useState(course.credential_validity_days ?? "");
   const [certAchievement, setCertAchievement] = useState(course.credential_achievement_th);
+  const [certAchievementEn, setCertAchievementEn] = useState(course.credential_achievement_en ?? "");
+  const [certBgUrl, setCertBgUrl] = useState(course.credential_background_url ?? "");
+
+  // Preset loading
+  const [presets, setPresets] = useState<CertPreset[] | null>(null);
+  const [loadingPresets, setLoadingPresets] = useState(false);
+
+  async function fetchPresets() {
+    if (presets) return;
+    setLoadingPresets(true);
+    const r = await api<CertPreset[]>(`/api/instructor/courses/cert-presets?exclude=${course.id}`);
+    setLoadingPresets(false);
+    if (r.ok) setPresets(r.data);
+    else toast({ title: "โหลดรายวิชาไม่สำเร็จ", variant: "destructive" });
+  }
+
+  function applyPreset(id: string) {
+    const p = presets?.find((x) => x.id === id);
+    if (!p) return;
+    setCertTitleTh(p.credential_name_th);
+    setCertNameEn(p.credential_name_en ?? "");
+    setCertType(p.credential_type);
+    setCertTemplate(p.credential_template_key);
+    setCertAlign(p.credential_text_align);
+    setCertValidityDays(p.credential_validity_days ?? "");
+    setCertSigner(p.credential_signer_name ?? "");
+    setCertSignerTitle(p.credential_signer_title ?? "");
+    setCertAchievement(p.credential_achievement_th);
+    setCertAchievementEn(p.credential_achievement_en ?? "");
+    setCertBgUrl(p.credential_background_url ?? "");
+    toast({ title: "โหลดค่าเทมเพลตแล้ว", description: `จากวิชา "${p.title}" — ตรวจสอบและบันทึกอีกครั้ง` });
+  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -411,6 +494,12 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
             <Textarea name="description" defaultValue={course.description ?? ""} rows={4} />
           </Field>
 
+          {courseDefaults && (
+            <p className="text-xs text-muted-foreground rounded bg-muted/50 px-3 py-1.5">
+              <span className="font-medium">ค่าเริ่มต้นระบบ:</span>{" "}
+              ดูวิดีโอขั้นต่ำ {courseDefaults.min_watch_percentage}% · คะแนนผ่าน {courseDefaults.passing_quiz_score}% · สอบ {courseDefaults.max_quiz_attempts_per_day} ครั้ง/วัน · {courseDefaults.quiz_time_limit_min} นาที
+            </p>
+          )}
           <div className="grid items-start gap-4 sm:grid-cols-2">
             <Field label="ดูวิดีโอขั้นต่ำ (%)" hint="50–100%">
               <Input
@@ -488,6 +577,19 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
             <p className="mt-1 text-xs text-muted-foreground">
               กำหนดรูปแบบและการจัดวางสำหรับใบประกาศนียบัตรที่ออกให้ผู้เรียนเมื่อผ่านเกณฑ์
             </p>
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-dashed bg-muted/40 p-3">
+              <Copy className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">สำเนาค่าจากวิชาอื่น:</span>
+              <Select
+                className="h-7 max-w-xs flex-1 text-xs"
+                defaultValue=""
+                onFocus={() => void fetchPresets()}
+                onChange={(e) => { if (e.target.value) applyPreset(e.target.value); e.target.value = ""; }}
+              >
+                <option value="" disabled>{loadingPresets ? "กำลังโหลด…" : presets ? "— เลือกวิชา —" : "— คลิกเพื่อดูรายการ —"}</option>
+                {(presets ?? []).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+              </Select>
+            </div>
           </div>
 
           <Checkbox
@@ -511,7 +613,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
               <Input
                 name="credential_name_en"
                 maxLength={120}
-                defaultValue={course.credential_name_en ?? ""}
+                value={certNameEn}
+                onChange={(e) => setCertNameEn(e.target.value)}
               />
             </Field>
             <Field label="รหัสประเภทเอกสาร">
@@ -520,7 +623,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
                 required
                 pattern="[a-z0-9_]+"
                 maxLength={40}
-                defaultValue={course.credential_type}
+                value={certType}
+                onChange={(e) => setCertType(e.target.value)}
               />
             </Field>
             <Field label="รูปแบบเทมเพลต">
@@ -551,7 +655,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
                 type="number"
                 min={1}
                 max={36500}
-                defaultValue={course.credential_validity_days ?? ""}
+                value={certValidityDays}
+                onChange={(e) => setCertValidityDays(e.target.value)}
               />
             </Field>
             <Field label="ชื่อผู้ลงนาม" hint="เว้นว่างเพื่อใช้ชื่อผู้สอน">
@@ -584,7 +689,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
               <Input
                 name="credential_achievement_en"
                 maxLength={255}
-                defaultValue={course.credential_achievement_en ?? ""}
+                value={certAchievementEn}
+                onChange={(e) => setCertAchievementEn(e.target.value)}
               />
             </Field>
             <div className="sm:col-span-2">
@@ -594,7 +700,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
                   type="url"
                   placeholder="https://..."
                   maxLength={500}
-                  defaultValue={course.credential_background_url ?? ""}
+                  value={certBgUrl}
+                  onChange={(e) => setCertBgUrl(e.target.value)}
                 />
               </Field>
             </div>
@@ -687,9 +794,13 @@ function LessonsSection({
   devManualDuration: boolean;
 }) {
   const a = useAction();
+  const router = useRouter();
   const [replacing, setReplacing] = useState<string | null>(null);
   const [detailsFor, setDetailsFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<EditorData["lessons"][number] | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchResults, setBatchResults] = useState<Array<{ url: string; ok: boolean; msg?: string }> | null>(null);
 
   // Checkpoint Dialog state
   const [checkpointLesson, setCheckpointLesson] = useState<EditorData["lessons"][number] | null>(
@@ -782,7 +893,7 @@ function LessonsSection({
               const hasCheckpoint = !!l.checkpoint_question;
 
               return (
-                <li key={l.id} className="grid gap-3 px-4 py-3.5 hover:bg-muted/10 transition-colors">
+                <li key={l.id} id={`lesson-${l.id}`} className="grid gap-3 px-4 py-3.5 hover:bg-muted/10 transition-colors">
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold tabular-nums text-foreground">
                       {l.sequence_order}
@@ -981,11 +1092,71 @@ function LessonsSection({
 
       {/* Add Lesson Form with Live Thumbnail Preview */}
       <Card className="p-5 shadow-sm">
-        <form onSubmit={onAdd} className="grid gap-4">
+        <div className="flex items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
             <SquarePlay className="h-5 w-5 text-red-600 dark:text-red-400" />
             <h3 className="font-semibold text-foreground">เพิ่มบทเรียนใหม่จาก YouTube</h3>
           </div>
+          <Button
+            type="button"
+            variant={batchMode ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => { setBatchMode(!batchMode); setBatchResults(null); }}
+          >
+            {batchMode ? "เพิ่มทีละบท" : "วางหลายลิงก์พร้อมกัน"}
+          </Button>
+        </div>
+
+        {batchMode && (
+          <form
+            className="grid gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              const raw = String(f.get("urls") ?? "");
+              const urls = raw.split(/[\n\r]+/).map((u) => u.trim()).filter(Boolean);
+              if (urls.length === 0) return;
+              setBatchBusy(true);
+              const results: Array<{ url: string; ok: boolean; msg?: string }> = [];
+              for (const url of urls) {
+                const r = await api(`${base}/lessons`, { body: { url } });
+                results.push({ url, ok: r.ok, msg: r.ok ? undefined : r.message });
+              }
+              setBatchBusy(false);
+              setBatchResults(results);
+              if (results.some((r) => r.ok)) router.refresh();
+            }}
+          >
+            <Field
+              label="ลิงก์ YouTube (หลายบรรทัด)"
+              hint="วางหนึ่ง URL ต่อบรรทัด ระบบจะดึงชื่อและความยาวอัตโนมัติ"
+            >
+              <Textarea
+                name="urls"
+                rows={5}
+                placeholder={"https://www.youtube.com/watch?v=AAAA\nhttps://youtu.be/BBBB\nhttps://www.youtube.com/watch?v=CCCC"}
+                className="font-mono text-xs"
+                required
+              />
+            </Field>
+            {batchResults && (
+              <ul className="grid gap-1 rounded-md border bg-muted/30 p-3 text-xs">
+                {batchResults.map((r, i) => (
+                  <li key={i} className={cn("flex items-start gap-1.5", r.ok ? "text-success" : "text-destructive")}>
+                    {r.ok ? <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+                    <span className="truncate font-mono">{r.url}</span>
+                    {r.msg && <span className="shrink-0 text-muted-foreground">— {r.msg}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button type="submit" loading={batchBusy} className="justify-self-start">
+              <Plus className="h-4 w-4" /> เพิ่มทั้งหมด
+            </Button>
+          </form>
+        )}
+
+        {!batchMode && <form onSubmit={onAdd} className="grid gap-4">
 
           <Field
             label="ลิงก์ YouTube"
@@ -1066,7 +1237,7 @@ function LessonsSection({
           <Button type="submit" loading={a.busy} className="justify-self-start font-medium">
             <Plus className="h-4 w-4" /> เพิ่มบทเรียน
           </Button>
-        </form>
+        </form>}
       </Card>
 
       {/* Checkpoint Dialog Modal */}

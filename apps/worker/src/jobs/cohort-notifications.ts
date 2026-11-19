@@ -2,8 +2,10 @@
 // email go out once even if a run repeats or overlaps.
 import { sql, type Database } from "@upskill/db";
 import { addWorkerEmail } from "./process-email-outbox.ts";
+import { isAutomationPaused } from "./automation-flags.ts";
 
 export async function enqueueCohortStartingEmails(db: Database, appOrigin: string) {
+  if (await isAutomationPaused(db, "cohort_notifications")) return;
   const rows = await db
     .selectFrom("cohort_registrations as r")
     .innerJoin("program_cohorts as c", "c.id", "r.cohort_id")
@@ -35,6 +37,7 @@ export async function enqueueCohortStartingEmails(db: Database, appOrigin: strin
 
 // Tell watchers when a cohort's registration window opens. Same cadence as the starting emails.
 export async function enqueueCohortOpenEmails(db: Database, appOrigin: string) {
+  if (await isAutomationPaused(db, "cohort_notifications")) return;
   const rows = await db
     .selectFrom("cohort_watches as w")
     .innerJoin("program_cohorts as c", "c.id", "w.cohort_id")

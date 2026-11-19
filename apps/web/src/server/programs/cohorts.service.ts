@@ -23,6 +23,7 @@ import { audit } from "../audit";
 import type { CurrentUser } from "../auth/session";
 import { assertAdmin, cohortTimeline, formatThaiDateTime } from "./shared";
 import { assertProfileComplete } from "../auth/profile.service";
+import { getAutomationFlags } from "../automation.service";
 
 type Executor = Database | Tx;
 export type RegistrationStatus = "pending" | "approved" | "rejected" | "waitlisted" | "cancelled";
@@ -37,6 +38,8 @@ export interface CohortInput {
   waitlistEnabled: boolean;
   requiresApproval: boolean;
   eligibility: unknown;
+  clientUpdatedAt?: Date;
+  waitlistAcceptanceHours?: number | null;
 }
 
 /** Approved and pending registrations both hold a seat until an admin decides */
@@ -138,6 +141,9 @@ export async function updateCohort(user: CurrentUser, cohortId: string, input: C
     .execute(async (trx) => {
       const c = await loadCohort(trx, cohortId, true);
       if (c.status === "cancelled") throw new HttpError(409, "COHORT_CANCELLED");
+      if (input.clientUpdatedAt && Math.abs(input.clientUpdatedAt.getTime() - new Date(c.updated_at).getTime()) > 500) {
+        throw new HttpError(409, "CONFLICT", "ข้อมูลนี้ถูกแก้ไขโดยผู้ใช้คนอื่นแล้ว กรุณาโหลดหน้าใหม่เพื่อดูข้อมูลล่าสุด");
+      }
       if (input.capacity !== null) {
         const approved = await trx
           .selectFrom("cohort_registrations")
@@ -159,12 +165,38 @@ export async function updateCohort(user: CurrentUser, cohortId: string, input: C
           waitlist_enabled: input.waitlistEnabled,
           requires_approval: input.requiresApproval,
           eligibility: JSON.stringify(rules),
+          ...(input.waitlistAcceptanceHours !== undefined ? { waitlist_acceptance_hours: input.waitlistAcceptanceHours } : {}),
         })
         .where("id", "=", cohortId)
         .execute();
       // More seats (or approval switched off) may let people off the waitlist
       await promoteWaitlist(trx, cohortId);
     });
+}
+
+/** Shift all date fields on a cohort by a given number of days. Preserves relative spacing. */
+export async function shiftCohortDates(user: CurrentUser, cohortId: string, days: number) {
+  assertAdmin(user);
+  if (!Number.isInteger(days) || days === 0 || Math.abs(days) > 365) throw new HttpError(422, "INVALID_DAYS", "จำนวนวันต้องเป็นจำนวนเต็มที่ไม่ใช่ศูนย์ และไม่เกิน 365");
+  const { db } = ctx();
+  const c = await loadCohort(db, cohortId);
+  if (c.status === "cancelled") throw new HttpError(409, "COHORT_CANCELLED");
+  const ms = days * 86_400_000;
+  const shift = (d: Date) => new Date(d.getTime() + ms);
+  const newDates = {
+    registration_opens_at: shift(c.registration_opens_at),
+    registration_closes_at: shift(c.registration_closes_at),
+    starts_at: shift(c.starts_at),
+    ends_at: shift(c.ends_at),
+  };
+  checkDates({
+    registrationOpensAt: newDates.registration_opens_at,
+    registrationClosesAt: newDates.registration_closes_at,
+    startsAt: newDates.starts_at,
+    endsAt: newDates.ends_at,
+  } as CohortInput);
+  await db.updateTable("program_cohorts").set(newDates).where("id", "=", cohortId).execute();
+  return newDates;
 }
 
 export async function publishCohort(user: CurrentUser, cohortId: string, meta: { ip: string }) {
@@ -251,8 +283,11 @@ async function notifyApproved(trx: Tx, reg: { id: string; userId: string; email:
 /**
  * Move people from the waitlist into free seats, oldest application first. Caller holds the cohort lock.
  * Without approval they are approved and enrolled; with approval they join the review queue.
+ * Skipped when the waitlist_promotion automation is paused — seats stay reserved for manual admin action.
  */
 async function promoteWaitlist(trx: Tx, cohortId: string) {
+  const flags = await getAutomationFlags();
+  if (flags.paused.includes("waitlist_promotion")) return;
   const c = await loadCohort(trx, cohortId);
   if (c.status !== "published" || c.ends_at <= new Date()) return;
   const program = await loadProgramOf(trx, c.program_id);
@@ -269,7 +304,7 @@ async function promoteWaitlist(trx: Tx, cohortId: string) {
       .executeTakeFirst();
     if (!next) return;
     if (c.requires_approval) {
-      await trx.updateTable("cohort_registrations").set({ status: "pending" }).where("id", "=", next.id).execute();
+      await trx.updateTable("cohort_registrations").set({ status: "pending", waitlist_offer_sent_at: new Date() }).where("id", "=", next.id).execute();
     } else {
       await trx.updateTable("cohort_registrations").set({ status: "approved", decided_at: new Date(), decided_by: null }).where("id", "=", next.id).execute();
       await enrollFromCohort(trx, next.user_id, cohortId, c.program_id);
@@ -495,23 +530,91 @@ function csvCell(v: string | null | undefined): string {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
-export async function exportRegistrationsCsv(user: CurrentUser, cohortId: string, meta: { ip: string }): Promise<{ filename: string; csv: string }> {
+const EXPORT_COLS = {
+  email: "อีเมล",
+  name: "ชื่อ-นามสกุล",
+  phone: "เบอร์โทรศัพท์",
+  province: "จังหวัด",
+  status: "สถานะ",
+  applied_at: "วันที่สมัคร",
+  decided_at: "วันที่พิจารณา",
+  decision_note: "หมายเหตุ",
+} as const;
+
+export const EXPORT_COL_KEYS = Object.keys(EXPORT_COLS) as (keyof typeof EXPORT_COLS)[];
+
+export async function exportRegistrationsCsv(
+  user: CurrentUser,
+  cohortId: string,
+  meta: { ip: string; cols?: string[] },
+): Promise<{ filename: string; csv: string }> {
   const { cohort, registrations } = await getCohortForAdmin(user, cohortId);
   const form = cohort.rules.applicationForm;
-  const header = ["อีเมล", "ชื่อ-นามสกุล", "เบอร์โทรศัพท์", "จังหวัด", "สถานะ", "วันที่สมัคร", "วันที่พิจารณา", "หมายเหตุ", ...form.map((f) => f.label)];
+
+  const allowedCols = new Set(meta.cols ?? EXPORT_COL_KEYS);
+  const formKeys = meta.cols
+    ? meta.cols.filter((c) => c.startsWith("form_")).map((c) => c.slice(5))
+    : form.map((f) => f.key);
+
+  const activeCols = EXPORT_COL_KEYS.filter((k) => allowedCols.has(k));
+  const activeFormFields = form.filter((f) => formKeys.includes(f.key));
+
+  const header = [...activeCols.map((k) => EXPORT_COLS[k]), ...activeFormFields.map((f) => f.label)];
+
   const rows = registrations.map((r) => [
-    r.email,
-    r.name,
-    r.phone,
-    r.province,
-    STATUS_TH[r.status] ?? r.status,
-    formatThaiDateTime(r.applied_at),
-    r.decided_at ? formatThaiDateTime(r.decided_at) : "",
-    r.decision_note,
-    ...form.map((f) => r.answers[f.key] ?? ""),
+    ...activeCols.map((k) => {
+      if (k === "email") return r.email;
+      if (k === "name") return r.name;
+      if (k === "phone") return r.phone;
+      if (k === "province") return r.province;
+      if (k === "status") return STATUS_TH[r.status] ?? r.status;
+      if (k === "applied_at") return formatThaiDateTime(r.applied_at);
+      if (k === "decided_at") return r.decided_at ? formatThaiDateTime(r.decided_at) : "";
+      if (k === "decision_note") return r.decision_note;
+      return "";
+    }),
+    ...activeFormFields.map((f) => r.answers[f.key] ?? ""),
   ]);
-  await audit(ctx().db, { action: "cohort.registrations_exported", userId: user.id, entityType: "cohort", entityId: cohortId, ip: meta.ip, details: { rows: rows.length } });
-  // BOM so Excel opens Thai text as UTF-8
+
+  await audit(ctx().db, { action: "cohort.registrations_exported", userId: user.id, entityType: "cohort", entityId: cohortId, ip: meta.ip, details: { rows: rows.length, cols: header.length } });
   const csv = "﻿" + [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
   return { filename: `registrations-${cohortId.slice(0, 8)}.csv`, csv };
+}
+
+/** Worker: expire pending seats offered from the waitlist that passed their acceptance deadline */
+export async function expireWaitlistOffers() {
+  const { db } = ctx();
+  const expired = await db
+    .selectFrom("cohort_registrations as r")
+    .innerJoin("program_cohorts as c", "c.id", "r.cohort_id")
+    .select(["r.id", "r.cohort_id"])
+    .where("r.status", "=", "pending")
+    .where("r.waitlist_offer_sent_at", "is not", null)
+    .whereRef(
+      sql<Date>`r.waitlist_offer_sent_at + (c.waitlist_acceptance_hours * interval '1 hour')`,
+      "<",
+      sql<Date>`now()`,
+    )
+    .execute();
+  for (const row of expired) {
+    await db.transaction().execute(async (trx) => {
+      const updated = await trx.updateTable("cohort_registrations")
+        .set({ status: "waitlisted", waitlist_offer_sent_at: null })
+        .where("id", "=", row.id)
+        .where("status", "=", "pending")
+        .executeTakeFirst();
+      if (Number(updated.numUpdatedRows) > 0) await promoteWaitlist(trx, row.cohort_id);
+    });
+  }
+  return { expired: expired.length };
+}
+
+/** Admin: manually promote the next waitlisted applicant for a cohort */
+export async function promoteNextWaitlisted(user: CurrentUser, cohortId: string) {
+  const { db } = ctx();
+  await db.transaction().execute(async (trx) => {
+    await loadCohort(trx, cohortId, true);
+    await promoteWaitlist(trx, cohortId);
+  });
+  return { ok: true };
 }

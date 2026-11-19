@@ -7,16 +7,20 @@ export const isoDate = z.iso.datetime({ offset: true }).transform((s) => new Dat
 const ruleField = z.strictObject({
   key: z.string().max(40),
   label: z.string().max(120),
-  type: z.enum(["text", "textarea"]),
+  type: z.enum(["text", "textarea", "select", "date", "number"]),
   required: z.boolean(),
+  options: z.array(z.string().max(120)).max(20).optional(),
+  showIf: z.strictObject({ field: z.string().max(40), value: z.string().max(120) }).optional(),
 });
 
 /** Shape only: values are normalized again by parseEligibilityRules (packages/core) */
 export const EligibilityBody = z.strictObject({
   emailDomains: z.array(z.string().max(253)).max(20).default([]),
   groupIds: z.array(z.uuid()).max(20).default([]),
+  groupMode: z.enum(["any", "all"]).default("any"),
   requireLegalName: z.boolean().default(false),
   prerequisiteCourseIds: z.array(z.uuid()).max(20).default([]),
+  prerequisiteMode: z.enum(["any", "all"]).default("all"),
   applicationForm: z.array(ruleField).max(10).default([]),
 });
 
@@ -30,6 +34,8 @@ export const CohortBody = z.strictObject({
   waitlistEnabled: z.boolean(),
   requiresApproval: z.boolean(),
   eligibility: EligibilityBody,
+  clientUpdatedAt: isoDate.optional(),
+  waitlistAcceptanceHours: z.number().int().min(1).max(720).nullable().optional(),
 });
 
 export const AnnouncementBody = z.strictObject({
@@ -38,10 +44,12 @@ export const AnnouncementBody = z.strictObject({
   body: z.string().trim().min(1).max(20_000),
   kind: z.enum(["event", "news", "notice"]),
   programId: z.uuid().nullable(),
+  cohortId: z.uuid().nullable(),
   location: z.string().trim().max(255).nullable(),
   eventStartsAt: isoDate.nullable(),
   eventEndsAt: isoDate.nullable(),
   publishAt: isoDate,
   expiresAt: isoDate.nullable(),
   isPinned: z.boolean(),
+  scheduledBroadcastAt: isoDate.nullable(),
 });

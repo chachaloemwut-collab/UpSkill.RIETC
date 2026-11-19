@@ -21,7 +21,10 @@ export default async function EditAnnouncementPage({ params }: { params: Promise
   const user = await requireAdminPage();
   const id = uuidOr404((await params).id);
   const a = await or404(getAnnouncementForAdmin(user, id));
-  const programs = await ctx().db.selectFrom("programs").select(["id", "title"]).where("visibility", "<>", "archived").orderBy("title").execute();
+  const [programs, cohorts] = await Promise.all([
+    ctx().db.selectFrom("programs").select(["id", "title"]).where("visibility", "<>", "archived").orderBy("title").execute(),
+    ctx().db.selectFrom("program_cohorts").select(["id", "title", "program_id"]).where("status", "<>", "cancelled").orderBy("title").execute(),
+  ]);
   const vis = VIS[a.visibility];
   return (
     <>
@@ -34,7 +37,7 @@ export default async function EditAnnouncementPage({ params }: { params: Promise
       </PageHeader>
       {a.broadcast_at && <div className="mb-4"><Alert variant="success" title={`ส่งอีเมลประชาสัมพันธ์แล้วเมื่อ ${formatDateTimeTh(a.broadcast_at)}`} /></div>}
       <Card className="p-5">
-        <AnnouncementForm programs={programs} defaults={a} />
+        <AnnouncementForm programs={programs} cohorts={cohorts} defaults={a} />
       </Card>
     </>
   );

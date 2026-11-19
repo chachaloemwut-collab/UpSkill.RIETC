@@ -5,15 +5,17 @@ import { ChevronRight, GraduationCap } from "lucide-react";
 import { Badge, Card, EmptyState, Table } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { CreateProgramDialog } from "@/components/admin/programs/ProgramActions";
+import { CategoryManager } from "@/components/admin/programs/CategoryManager";
 import { PROGRAM_VISIBILITY, formatDateTh, youtubeThumb } from "@/lib/format";
 import { listProgramsAdmin } from "@/server/programs/programs.service";
+import { listProgramCategories } from "@/server/programs/categories.service";
 import { requireAdminPage } from "@/server/programs/admin-page";
 
 export const metadata: Metadata = { title: "หลักสูตรอบรม", robots: { index: false } };
 
 export default async function AdminProgramsPage() {
   const user = await requireAdminPage();
-  const programs = await listProgramsAdmin(user);
+  const [programs, categories] = await Promise.all([listProgramsAdmin(user), listProgramCategories(user)]);
   return (
     <>
       <PageHeader
@@ -21,6 +23,7 @@ export default async function AdminProgramsPage() {
         title="หลักสูตรอบรม"
         description="รวมรายวิชาเป็นหลักสูตร เปิดรอบอบรมพร้อมวันเปิด-ปิดรับสมัคร และกำหนดเงื่อนไขผู้เข้าร่วม"
       >
+        <CategoryManager initialCategories={categories} />
         <CreateProgramDialog />
       </PageHeader>
       <Card>
