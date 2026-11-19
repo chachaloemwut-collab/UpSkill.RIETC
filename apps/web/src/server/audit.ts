@@ -21,6 +21,8 @@ export type AuditAction =
   | "user.legal_name_locked"
   | "user.legal_name_unlocked"
   | "user.pdpa_consent"
+  | "course.updated"
+  | "course.restored"
   | "course.published"
   | "course.archived"
   | "course.application_submitted"

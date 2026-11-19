@@ -176,6 +176,9 @@ export async function createCourse(
   return c;
 }
 
+const COURSE_RESTORABLE_FIELDS = ["title", "description"] as const;
+type CourseRestorableField = (typeof COURSE_RESTORABLE_FIELDS)[number];
+
 export async function updateCourse(
   user: CurrentUser,
   courseId: string,
@@ -204,16 +207,97 @@ export async function updateCourse(
     course_type: "certified_training" | "short_course";
     application_settings: unknown;
   }>,
+  ip?: string,
 ) {
+  const { db } = ctx();
   await loadOwnedCourse(user, courseId);
   if (Object.keys(patch).length === 0) return;
+
+  const changedRestorable = (Object.keys(patch) as string[]).filter((k) =>
+    (COURSE_RESTORABLE_FIELDS as readonly string[]).includes(k),
+  ) as CourseRestorableField[];
+
+  let before: Partial<Record<CourseRestorableField, string | null>> = {};
+  if (changedRestorable.length > 0) {
+    const row = await db.selectFrom("courses").select(changedRestorable).where("id", "=", courseId).executeTakeFirst();
+    if (row) before = row as typeof before;
+  }
+
   const { application_settings, ...rest } = patch;
-  await ctx()
-    .db.updateTable("courses")
-    // Settings are normalized by the core parser, so nothing it doesn't understand is ever stored
+  await db
+    .updateTable("courses")
     .set({ ...rest, ...(application_settings !== undefined ? { application_settings: JSON.stringify(parseApplicationSettings(application_settings)) } : {}) })
     .where("id", "=", courseId)
     .execute();
+
+  if (ip && changedRestorable.length > 0) {
+    const after: Partial<Record<CourseRestorableField, string | null>> = {};
+    for (const f of changedRestorable) after[f] = (patch as Record<string, string | null>)[f] ?? null;
+    await audit(db, { action: "course.updated", userId: user!.id, entityType: "course", entityId: courseId, ip, details: { before, after } });
+  }
+}
+
+/** List recent audit history for a course (last 100 entries). */
+export async function getCourseHistory(user: CurrentUser, courseId: string) {
+  await loadOwnedCourse(user, courseId);
+  return ctx()
+    .db.selectFrom("audit_logs")
+    .select(["id", "action", "user_id", "details", "created_at"])
+    .where("entity_type", "=", "course")
+    .where("entity_id", "=", courseId)
+    .orderBy("created_at", "desc")
+    .limit(100)
+    .execute();
+}
+
+/**
+ * Restore restorable fields (title, description) from a specific audit_log entry's before-state.
+ * Creates a new audit entry with action "course.restored" and a reference to the source entry.
+ * Does NOT restore: completion rules, quiz scores, enrollment settings, credential config.
+ */
+export async function restoreCourseDraft(
+  user: CurrentUser,
+  courseId: string,
+  auditLogId: number | string,
+  fields: CourseRestorableField[],
+  ip: string,
+) {
+  const { db } = ctx();
+  await loadOwnedCourse(user, courseId);
+
+  const sanitized = fields.filter((f) => (COURSE_RESTORABLE_FIELDS as readonly string[]).includes(f));
+  if (sanitized.length === 0) throw new HttpError(400, "NO_RESTORABLE_FIELDS");
+
+  const entry = await db
+    .selectFrom("audit_logs")
+    .select(["id", "details"])
+    .where("id", "=", String(auditLogId))
+    .where("entity_type", "=", "course")
+    .where("entity_id", "=", courseId)
+    .executeTakeFirst();
+  if (!entry) throw new HttpError(404, "HISTORY_ENTRY_NOT_FOUND");
+
+  const details = entry.details as Record<string, unknown>;
+  const before = (details.before ?? {}) as Record<string, string | null>;
+
+  const patch: Record<string, string | null> = {};
+  for (const f of sanitized) {
+    if (!(f in before)) throw new HttpError(409, "FIELD_NOT_IN_SNAPSHOT", `ไม่มีค่าก่อนหน้าสำหรับ ${f} ในรายการประวัตินี้`);
+    patch[f] = before[f] ?? null;
+  }
+
+  if (Object.keys(patch).length === 0) return { restored: [] };
+
+  await db.updateTable("courses").set(patch).where("id", "=", courseId).execute();
+  await audit(db, {
+    action: "course.restored",
+    userId: user!.id,
+    entityType: "course",
+    entityId: courseId,
+    ip,
+    details: { restoredFrom: String(auditLogId), fields: sanitized, restored: patch },
+  });
+  return { restored: sanitized };
 }
 
 async function lookupVideo(videoId: string, devDurationSec?: number): Promise<{ durationSec: number; title: string; isPublic: boolean }> {
