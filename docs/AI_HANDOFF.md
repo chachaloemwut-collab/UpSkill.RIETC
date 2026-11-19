@@ -114,3 +114,23 @@
 - Production live check: ตรวจ superadmin login ในเบราว์เซอร์ (ไม่ใช้ curl — ต้องมี CSRF header)
 - ยังไม่ได้ทำ (audit items ที่เหลือ): A02, A03, A04, A09, A10; B/G/I modules
 - ยังรอการตัดสินใจ: ลบ/เพิกถอน TEST cert CERT-2026-CZVY-1K37-EK19 ของ developer account บน production
+
+## 2026-11-19T09:54:42+00:00 (16:54 Asia/Bangkok) — Claude Code: release 7b986f7 (audit batch 5 + regression fixes)
+
+- Released 7b986f7 (live เดิม 5e60fe5): audit batch 5 ac01b20 (PR #34) + PR #35 + PR #36; migrations 0027–0037
+  ขึ้นพร้อมกัน (additive ทั้งหมด: 0029 ขยาย visibility check แบบ superset, 0033 คอลัมน์ใหม่มี default)
+- main CI 44498962539 ✅ → Deploy Jasmine 44499568019 ✅ → `released 7b986f7 ✓` (status file last_attempt ok)
+- แก้ก่อน release (batch 5 ทำ e2e แดง):
+  - 0036: GRANT `upskill_app` บนตารางที่สร้างหลัง 0002 (`system_settings` ฯลฯ) — สาเหตุ 500 ตอนสร้างคอร์ส
+  - quiz tags ส่ง JSON string cast `::text[]` → `malformed array literal` ทุกครั้งที่เพิ่ม/แก้คำถาม
+  - announcements: `cohortId`/`scheduledBroadcastAt` default null (เดิมไม่ส่ง = 400)
+  - 0037 + fallback: default คอร์สใหม่กลับเป็น linear / ผ่าน 80 / ล็อกลำดับบท / quiz 30 นาที
+    (0032 ทำให้หลวมลงโดยไม่ตั้งใจ; อัปเดตเฉพาะเมื่อ admin ยังไม่เคยบันทึก) — admin ปรับเองได้ที่หน้า course defaults
+  - migrate runner: โหมด `MIGRATION_SKIP_ROLE_GRANTS=1` ตัด GRANT ใต้ `ALTER DEFAULT PRIVILEGES` แล้วเหลือ prefix ค้าง
+    → 0036 จะ syntax error บน production; แก้ + CI รัน migration โหมด single-role ทุกครั้ง
+- เหตุการณ์: 8d91a07 ถูก push ตรงเข้า main (ผิดกติกา → branch-guard แดง) แก้ด้วยการ merge PR #35 ทับ;
+  release b807f86 ถูกหยุดระหว่าง build image ก่อน upload manifest เมื่อพบปัญหา runner — production ไม่ถูกแตะ
+- Live check (read-only): `/api/health` ok, `/login` 200, route ใหม่ (`/api/admin/settings/course-defaults`,
+  `/api/admin/categories`, lesson activities) 404→401
+- ยังไม่ได้ทำ: ล็อกอิน superadmin หนึ่งครั้ง — session นี้ไม่มีรหัสผ่าน (ไม่เก็บไว้ที่ใดโดยเจตนา) เจ้าของต้องตรวจเอง
+- agent-work lease ค้าง (owner human, 2026-11-18 16:23 UTC, stale) — ไม่ได้ยึด/ปิด
