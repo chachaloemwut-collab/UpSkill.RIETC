@@ -125,8 +125,9 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
     },
     {
       icon: Target,
-      label: "ผลการทดสอบ",
-      value: <span className="font-mono tabular-nums font-semibold">{data.quizScore}%</span>,
+      label: "ผลการอบรม",
+      // Public page: show the outcome, not the score (passing is what earns the document)
+      value: <span className="font-semibold text-emerald-600 dark:text-emerald-400">ผ่านเกณฑ์ของหลักสูตร</span>,
     },
     {
       icon: BadgeCheck,
