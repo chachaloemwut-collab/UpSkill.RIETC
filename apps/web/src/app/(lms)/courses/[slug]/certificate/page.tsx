@@ -67,7 +67,6 @@ export default async function CertificatePage({ params }: { params: Promise<{ sl
             record: {
               recipientName: snap.recipient_name_snapshot,
               studyText: formatStudyDurationTh(snap.total_actual_study_sec),
-              score: String(snap.quiz_score_snapshot),
               issuedAt: new Date(snap.issued_at).toISOString(),
               expiresAt: snap.expires_at ? new Date(snap.expires_at).toISOString() : null,
               code: snap.certificate_code,

@@ -1,6 +1,8 @@
 import { QrCode } from "lucide-react";
 import {
   CERTIFICATE_DISPLAY_DEFAULTS,
+  DEFAULT_ISSUER_EN,
+  DEFAULT_ISSUER_TH,
   certificateKicker,
   certificatePattern,
   formalThaiDate,
@@ -15,7 +17,6 @@ const BRAND = "UpskillReskill.RIETC";
 export interface CertificatePreviewRecord {
   recipientName: string;
   studyText: string;
-  score: string | number;
   issuedAt: string | Date;
   expiresAt?: string | Date | null;
   code: string;
@@ -58,7 +59,6 @@ export function CertificatePreview({
   const r: CertificatePreviewRecord = record ?? {
     recipientName: "นายสมชาย พัฒนาวิชาชีพ",
     studyText: "2 ชั่วโมง 15 นาที",
-    score: "92.50",
     issuedAt: new Date(),
     code: "UR-2026-XXXX-XXXX",
   };
@@ -88,36 +88,33 @@ export function CertificatePreview({
 
         <div
           className="absolute flex flex-col justify-center"
-          style={{ left: "10cqw", right: "10cqw", top: "6cqw", bottom: "19.5cqw", textAlign: left ? "left" : "center", alignItems: left ? "flex-start" : "center" }}
+          style={{ left: "10cqw", right: "10cqw", top: "5.6cqw", bottom: "19.2cqw", textAlign: left ? "left" : "center", alignItems: left ? "flex-start" : "center" }}
         >
-          <svg viewBox="0 0 40 40" style={{ width: "5cqw", height: "5cqw" }} aria-hidden>
-            <circle cx="20" cy="20" r="18.5" fill="none" stroke={p.frame} strokeWidth="1.4" strokeDasharray="1 1.3" />
-            <circle cx="20" cy="20" r="12.5" fill={p.bg} stroke={p.accent} strokeWidth=".8" />
-            <circle cx="20" cy="20" r="8.5" fill="none" stroke={p.accent} strokeWidth=".5" strokeDasharray=".8 .8" />
-            <circle cx="20" cy="20" r="2.2" fill={p.frame} />
-          </svg>
-          <p style={issuer ? { fontSize: "1.75cqw", fontFamily: prompt, marginTop: "0.6cqw" } : { fontSize: "1.1cqw", letterSpacing: "0.38em", textTransform: "uppercase", color: p.muted, fontFamily: prompt, marginTop: "0.6cqw" }}>
-            {issuer || BRAND}
-          </p>
-          <p className="font-semibold" style={{ fontSize: documentName.length <= 12 ? "4.4cqw" : "3.3cqw", lineHeight: 1.2, color: p.title, fontFamily: prompt, marginTop: "0.3cqw" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- static emblem, same file the PDF embeds */}
+          <img src="/brand/rietc-emblem.png" alt="" style={{ width: "7.6cqw", height: "7.6cqw", objectFit: "contain" }} />
+          <p className="font-semibold" style={{ fontSize: "1.95cqw", lineHeight: 1.25, fontFamily: prompt, marginTop: "0.6cqw" }}>{issuer}</p>
+          {issuer === DEFAULT_ISSUER_TH && (
+            <p style={{ fontSize: "0.95cqw", letterSpacing: "0.3em", textTransform: "uppercase", color: p.muted, fontFamily: prompt }}>{DEFAULT_ISSUER_EN}</p>
+          )}
+          <p className="font-semibold" style={{ fontSize: documentName.length <= 12 ? "3.9cqw" : "3cqw", lineHeight: 1.2, color: p.title, fontFamily: prompt, marginTop: "0.8cqw" }}>
             {documentName || "วุฒิบัตร"}
           </p>
           <p style={{ fontSize: "1.2cqw", letterSpacing: "0.34em", color: p.accent, textTransform: "uppercase", fontFamily: prompt, marginTop: "0.2cqw" }}>
             {certificateKicker(documentType)}
           </p>
-          <p style={{ fontSize: "1.8cqw", color: p.muted, marginTop: "1.4cqw" }}>ให้ไว้เพื่อแสดงว่า</p>
+          <p style={{ fontSize: "1.8cqw", marginTop: "1.2cqw" }}>{documentName.length <= 16 ? `${documentName}ฉบับนี้ให้ไว้เพื่อแสดงว่า` : "ให้ไว้เพื่อแสดงว่า"}</p>
           <p className="font-semibold" style={{ fontSize: r.recipientName.length > 30 ? "3.4cqw" : "4.2cqw", lineHeight: 1.3, fontFamily: prompt }}>
             {r.recipientName}
           </p>
           <div style={{ height: "0.12cqw", width: "46cqw", background: p.accent, marginTop: "0.3cqw" }} aria-hidden />
-          <p style={{ fontSize: "1.8cqw", marginTop: "0.9cqw" }}>{achievement || "ได้ผ่านการอบรมและการประเมินผลตามเกณฑ์ของ"}</p>
+          <p style={{ fontSize: "1.8cqw", marginTop: "0.7cqw" }}>{achievement || "ได้ผ่านการอบรมออนไลน์"}</p>
           <p className="font-semibold" style={{ fontSize: courseTitle.length > 60 ? "1.9cqw" : "2.4cqw", lineHeight: 1.35, color: p.title, fontFamily: prompt }}>
             {documentType === "program" ? "หลักสูตรอบรม" : "หลักสูตร"} {courseTitle}
           </p>
           <p style={{ fontSize: "1.6cqw", color: p.muted, marginTop: "0.7cqw" }}>
             {isTest
-              ? "เอกสารสำหรับทดสอบระบบ ไม่มีเวลาเรียนและผลการประเมินจริง"
-              : `รวมเวลาเรียน ${thaiDigits(r.studyText)} · ผลการประเมินร้อยละ ${thaiDigits(Number(r.score).toFixed(2))}`}
+              ? "เอกสารสำหรับทดสอบระบบ ไม่มีเวลาเรียนจริง"
+              : `จำนวนชั่วโมงการอบรม ${thaiDigits(r.studyText)}`}
           </p>
           <p style={{ fontSize: "1.7cqw", fontFamily: prompt, marginTop: "1.1cqw" }}>ให้ไว้ ณ วันที่ {formalThaiDate(issued)}</p>
           {r.expiresAt && <p style={{ fontSize: "1.3cqw", color: p.muted }}>มีผลถึงวันที่ {formalThaiDate(new Date(r.expiresAt))}</p>}
@@ -152,7 +149,7 @@ export function CertificatePreview({
           ) : (
             <div className="absolute bottom-0 right-0 text-right" style={{ width: "24cqw", fontSize: "1.1cqw", lineHeight: 1.5, color: p.muted }}>
               <b className="block" style={{ color: p.title, fontFamily: prompt }}>รับรองด้วยลายมือชื่อดิจิทัล</b>
-              เอกสารฉบับนี้ออกโดยระบบ {BRAND}
+              เอกสารฉบับนี้ออกผ่านระบบ {BRAND}
               <br />
               ลงนามอิเล็กทรอนิกส์ด้วย Ed25519
             </div>

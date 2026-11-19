@@ -423,8 +423,8 @@ export function CertificateDisplayForm({ defaults }: { defaults: { show_signer: 
   return (
     <form onSubmit={submit} className="grid gap-4 p-5">
       {error && <Alert variant="destructive" title={error} />}
-      <Field label="ชื่อหน่วยงานผู้ออกเอกสาร" hint="พิมพ์เหนือชื่อเอกสาร เว้นว่างเพื่อใช้ชื่อระบบ">
-        <Input name="issuer_name" maxLength={160} defaultValue={defaults.issuer_name} placeholder="เช่น ชื่อสถาบันหรือหน่วยงาน" />
+      <Field label="ชื่อหน่วยงานผู้ออกเอกสาร" hint="พิมพ์ใต้ตราวิทยาลัย เว้นว่างเพื่อใช้ชื่อวิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง">
+        <Input name="issuer_name" maxLength={160} defaultValue={defaults.issuer_name} />
       </Field>
       <Checkbox
         name="show_signer"

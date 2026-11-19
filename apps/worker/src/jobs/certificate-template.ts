@@ -10,6 +10,8 @@ import {
   certificatePattern,
   formalThaiDate,
   thaiDigits,
+  DEFAULT_ISSUER_EN,
+  DEFAULT_ISSUER_TH,
   type CertificateDisplay,
   type CertificatePalette,
 } from "@upskill/core/certificate-patterns";
@@ -27,6 +29,7 @@ export interface CertificateView {
   signerTitle: string | null;
   achievement: string | null;
   studySec: number;
+  /** Kept on the record (verification page); never printed — passing is what earns the document */
   quizScore: string | number;
   issuedAt: Date;
   expiresAt: Date | null;
@@ -45,6 +48,8 @@ export interface CertificateAssets {
   verifyUrl: string;
   /** Optional background image as a data: URL ("" for none) */
   backgroundDataUrl: string;
+  /** Issuing college's emblem as a data: URL ("" falls back to a drawn medallion) */
+  emblemDataUrl?: string;
 }
 
 const BRAND = "UpskillReskill.RIETC";
@@ -170,15 +175,17 @@ export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): 
   const showSigner = c.display.show_signer && !!c.signerName.trim();
   const issuer = c.display.issuer_name.trim();
   const coursePrefix = c.documentType === "program" ? "หลักสูตรอบรม" : "หลักสูตร";
-  const achievement = c.achievement ?? "ได้ผ่านการอบรมและการประเมินผลตามเกณฑ์ของ";
-  const nameSize = fit(c.recipientName, [[26, 36], [34, 31], [44, 26]], 22);
+  const achievement = c.achievement ?? "ได้ผ่านการอบรมออนไลน์";
+  // "วุฒิบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า" (the wording of Thai online-training certificates); long custom names keep it short
+  const present = [...c.documentName].length <= 16 ? `${c.documentName}ฉบับนี้ให้ไว้เพื่อแสดงว่า` : "ให้ไว้เพื่อแสดงว่า";
+  const nameSize = fit(c.recipientName, [[26, 33], [34, 29], [44, 25]], 21);
   const courseText = `${coursePrefix} ${c.courseTitle}`;
   const courseSize = fit(courseText, [[50, 18], [70, 15.5], [95, 13.5]], 12);
-  const titleSize = fit(c.documentName, [[12, 38], [36, 28], [56, 23]], 19);
+  const titleSize = fit(c.documentName, [[12, 32], [36, 25], [56, 21]], 18);
   const year = String(Number(c.issuedAt.toLocaleDateString("en-US", { year: "numeric", timeZone: "Asia/Bangkok" })) + 543);
   const detail = isTest
-    ? "เอกสารสำหรับทดสอบระบบ ไม่มีเวลาเรียนและผลการประเมินจริง"
-    : `รวมเวลาเรียน ${thaiDigits(formatStudyDurationTh(c.studySec))} · ผลการประเมินร้อยละ ${thaiDigits(Number(c.quizScore).toFixed(2))}`;
+    ? "เอกสารสำหรับทดสอบระบบ ไม่มีเวลาเรียนจริง"
+    : `จำนวนชั่วโมงการอบรม ${thaiDigits(formatStudyDurationTh(c.studySec))}`;
 
   return `<!doctype html><html lang="th"><head><meta charset="utf-8"><style>
     ${a.fontCss}
@@ -193,14 +200,15 @@ export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): 
     .test-badge { position: absolute; top: 19mm; right: 22mm; border: 2px dashed #b91c1c; background: rgba(254,242,242,.95); color: #b91c1c; padding: 4px 14px; font-weight: 700; font-size: 11pt; border-radius: 4px; text-align: center; line-height: 1.25; z-index: 10; }
     .test-badge span { font-size: 7.5pt; font-weight: 400; }
 
-    .content { position: absolute; left: 30mm; right: 30mm; top: 18mm; bottom: 58mm; display: flex; flex-direction: column; justify-content: center; align-items: ${left ? "flex-start" : "center"}; text-align: ${left ? "left" : "center"}; }
-    .emblem { width: 15mm; height: 15mm; display: block; }
-    .issuer { margin-top: 2mm; font-family: "Prompt", sans-serif; font-weight: 500; font-size: ${issuer ? "12.5pt" : "8pt"}; ${issuer ? "" : "letter-spacing: .38em; text-transform: uppercase;"} color: ${issuer ? p.ink : p.muted}; }
-    h1 { font-family: "Prompt", sans-serif; font-weight: 600; font-size: ${titleSize}pt; line-height: 1.2; color: ${p.title}; margin: 1.5mm 0 0; letter-spacing: .02em; }
+    .content { position: absolute; left: 30mm; right: 30mm; top: 17mm; bottom: 57mm; display: flex; flex-direction: column; justify-content: center; align-items: ${left ? "flex-start" : "center"}; text-align: ${left ? "left" : "center"}; }
+    .emblem { width: 23mm; height: 23mm; display: block; object-fit: contain; }
+    .issuer { margin-top: 2mm; font-family: "Prompt", sans-serif; font-weight: 600; font-size: 14pt; line-height: 1.25; color: ${p.ink}; }
+    .issuer-en { font-family: "Prompt", sans-serif; font-weight: 500; font-size: 6.8pt; letter-spacing: .3em; text-transform: uppercase; color: ${p.muted}; margin-top: .6mm; }
+    h1 { font-family: "Prompt", sans-serif; font-weight: 600; font-size: ${titleSize}pt; line-height: 1.2; color: ${p.title}; margin: 2.5mm 0 0; letter-spacing: .02em; }
     .kicker { margin-top: .8mm; font-family: "Prompt", sans-serif; font-weight: 500; font-size: 8.5pt; letter-spacing: .34em; text-transform: uppercase; color: ${p.accent}; }
     .kicker::before, .kicker::after { content: ""; display: inline-block; width: 12mm; height: .3mm; background: ${p.accent}; vertical-align: middle; margin: 0 4mm; opacity: .8; }
     ${left ? ".kicker::before { display: none; }" : ""}
-    .present { font-size: 13pt; color: ${p.muted}; margin-top: 5mm; }
+    .present { font-size: 13pt; color: ${p.ink}; margin-top: 4mm; }
     .name { font-family: "Prompt", sans-serif; font-weight: 600; font-size: ${nameSize}pt; line-height: 1.3; color: ${p.ink}; margin-top: 1mm; }
     .divider { display: block; margin-top: .8mm; }
     .achieve { font-size: 13pt; margin-top: 3mm; color: ${p.ink}; }
@@ -230,11 +238,12 @@ export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): 
     ${isTest ? `<div class="watermark">TEST / DEVELOPMENT · สำหรับทดสอบระบบเท่านั้น · มิใช่การสำเร็จการศึกษาจริง</div>` : ""}
     ${isTest ? `<div class="test-badge">TEST / DEVELOPMENT<br><span>สำหรับทดสอบระบบเท่านั้น · มิใช่การสำเร็จการศึกษาจริง</span></div>` : ""}
     <div class="content">
-      ${emblem(p)}
-      <div class="issuer">${esc(issuer || BRAND)}</div>
+      ${a.emblemDataUrl ? `<img class="emblem" src="${a.emblemDataUrl}" alt="">` : emblem(p)}
+      <div class="issuer">${esc(issuer)}</div>
+      ${issuer === DEFAULT_ISSUER_TH ? `<div class="issuer-en">${DEFAULT_ISSUER_EN}</div>` : ""}
       <h1>${esc(c.documentName)}</h1>
       <div class="kicker">${esc(certificateKicker(c.documentType))}</div>
-      <div class="present">ให้ไว้เพื่อแสดงว่า</div>
+      <div class="present">${esc(present)}</div>
       <div class="name">${esc(c.recipientName)}</div>
       ${divider(p, 140)}
       <div class="achieve">${esc(achievement)}</div>
@@ -248,7 +257,7 @@ export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): 
       ${seal(p, thaiDigits(year), isTest)}
       ${showSigner
         ? `<div class="sign"><div class="line"></div><div class="n">${esc(c.signerName)}</div><div class="r">${c.signerTitle ? esc(c.signerTitle) : "ผู้ลงนาม"}</div></div>`
-        : `<div class="attest"><b>รับรองด้วยลายมือชื่อดิจิทัล</b>เอกสารฉบับนี้ออกโดยระบบ ${esc(BRAND)}<br>ลงนามอิเล็กทรอนิกส์ด้วย Ed25519<br>ตรวจสอบความถูกต้องได้ด้วย QR Code</div>`}
+        : `<div class="attest"><b>รับรองด้วยลายมือชื่อดิจิทัล</b>เอกสารฉบับนี้ออกผ่านระบบ ${esc(BRAND)}<br>ลงนามอิเล็กทรอนิกส์ด้วย Ed25519<br>ตรวจสอบความถูกต้องได้ด้วย QR Code</div>`}
     </div>
     <div class="foot">${isTest ? `<b style="color:#b91c1c">[TEST / DEVELOPMENT]</b> · ` : ""}เอกสารต้นฉบับดิจิทัล ลงนามด้วย Ed25519 · ตรวจสอบที่ ${esc(a.verifyUrl.replace(/^https?:\/\//, ""))} · ลายนิ้วมือภาพ <span class="digest">${esc(c.visualDigest || "-")}</span></div>
   </div></body></html>`;

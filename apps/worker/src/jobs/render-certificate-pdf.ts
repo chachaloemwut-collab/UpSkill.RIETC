@@ -17,6 +17,7 @@ import { buildCertificateHtml } from "./certificate-template.ts";
 import { parseCertificateDisplay } from "@upskill/core/certificate-patterns";
 
 const FONT_DIR = new URL("../../assets/fonts/", import.meta.url);
+const EMBLEM = new URL("../../assets/brand/rietc-emblem.png", import.meta.url);
 
 async function fontFace(family: string, file: string, weight: number): Promise<string> {
   try {
@@ -45,6 +46,13 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
       fontFace("Prompt", "Prompt-SemiBold.ttf", 600),
     ])
   ).join("\n");
+
+  const emblemDataUrl = await readFile(EMBLEM)
+    .then((b) => `data:image/png;base64,${b.toString("base64")}`)
+    .catch(() => {
+      logger.warn("college emblem missing (assets/brand/rietc-emblem.png); rendering the drawn medallion");
+      return "";
+    });
 
   // Optional background image: fetched once here (https only, configured by instructors/admins)
   // and embedded as a data URL, so the Playwright context can stay fully network-blocked.
@@ -81,7 +89,7 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
       visualDigest: c.visual_digest,
       display,
     },
-    { fontCss, qrDataUrl: qr, verifyUrl, backgroundDataUrl },
+    { fontCss, qrDataUrl: qr, verifyUrl, backgroundDataUrl, emblemDataUrl },
   );
 
   const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });

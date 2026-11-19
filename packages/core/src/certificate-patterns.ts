@@ -43,21 +43,25 @@ export const certificateKicker = (type: string) => KICKERS[type] ?? `Certificate
  * Site-wide certificate layout options (system_settings key "certificate_display").
  * show_signer: print a named person's signature block. Off by default: the document is issued and
  *   digitally signed by the system, not by a person, until the institution decides otherwise.
- * issuer_name: issuing body printed above the document name ("" = the platform brand).
+ * issuer_name: issuing body printed under the emblem (defaults to the college).
  */
 export interface CertificateDisplay {
   show_signer: boolean;
   issuer_name: string;
 }
 
-export const CERTIFICATE_DISPLAY_DEFAULTS: CertificateDisplay = { show_signer: false, issuer_name: "" };
+/** The college that issues every document on this platform */
+export const DEFAULT_ISSUER_TH = "วิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง";
+export const DEFAULT_ISSUER_EN = "Rayong Industrial Estate Technical College";
+
+export const CERTIFICATE_DISPLAY_DEFAULTS: CertificateDisplay = { show_signer: false, issuer_name: DEFAULT_ISSUER_TH };
 
 /** Tolerant parser for the stored JSON value (missing row or fields fall back to the defaults). */
 export function parseCertificateDisplay(value: unknown): CertificateDisplay {
   const v = (value && typeof value === "object" ? value : {}) as Partial<Record<keyof CertificateDisplay, unknown>>;
   return {
     show_signer: typeof v.show_signer === "boolean" ? v.show_signer : CERTIFICATE_DISPLAY_DEFAULTS.show_signer,
-    issuer_name: typeof v.issuer_name === "string" ? v.issuer_name.trim().slice(0, 160) : CERTIFICATE_DISPLAY_DEFAULTS.issuer_name,
+    issuer_name: typeof v.issuer_name === "string" && v.issuer_name.trim() ? v.issuer_name.trim().slice(0, 160) : CERTIFICATE_DISPLAY_DEFAULTS.issuer_name,
   };
 }
 

@@ -5,7 +5,7 @@ import { buildCertificateHtml, type CertificateView } from "./certificate-templa
 const view: CertificateView = {
   code: "UR-2026-AAAA-BBBB",
   documentType: "completion",
-  documentName: "เกียรติบัตร",
+  documentName: "วุฒิบัตร",
   recipientName: "สมหญิง ใจดี",
   courseTitle: "หลักสูตรทดสอบ",
   signerName: "ดร.ผู้ลงนาม",
@@ -18,7 +18,7 @@ const view: CertificateView = {
   template: "standard",
   textAlign: "center",
   visualDigest: "abcd-1234",
-  display: { show_signer: false, issuer_name: "" },
+  display: { show_signer: false, issuer_name: "วิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง" },
 };
 const assets = { fontCss: "", qrDataUrl: "data:image/png;base64,AA==", verifyUrl: "https://example.test/verify/UR-2026-AAAA-BBBB", backgroundDataUrl: "" };
 
@@ -36,14 +36,21 @@ describe("certificate artwork", () => {
     assert.ok(html.includes("&lt;i&gt;"));
   });
 
-  it("uses formal Thai wording with Thai digits", () => {
+  it("uses the online-training วุฒิบัตร wording and never prints the score", () => {
     const html = buildCertificateHtml(view, assets);
-    assert.ok(html.includes("ให้ไว้เพื่อแสดงว่า"));
-    assert.ok(html.includes("รวมเวลาเรียน ๒ ชั่วโมง ๑๕ นาที"));
-    assert.ok(html.includes("ผลการประเมินร้อยละ ๙๒.๕๐"));
+    assert.ok(html.includes("วิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง"));
+    assert.ok(html.includes("Rayong Industrial Estate Technical College"));
+    assert.ok(html.includes("วุฒิบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า"));
+    assert.ok(html.includes("ได้ผ่านการอบรมออนไลน์"));
+    assert.ok(html.includes("จำนวนชั่วโมงการอบรม ๒ ชั่วโมง ๑๕ นาที"));
     assert.ok(html.includes("ให้ไว้ ณ วันที่ ๑๙ พฤศจิกายน พ.ศ. ๒๕๖๙"));
-    assert.ok(html.includes(">๒๕๖๙<"));
+    assert.ok(!html.includes("ร้อยละ") && !html.includes("คะแนน") && !html.includes("ผลการประเมิน") && !html.includes("๙๒"));
     assert.ok(!html.includes("TEST / DEVELOPMENT"));
+  });
+
+  it("prints the college emblem when provided", () => {
+    const html = buildCertificateHtml(view, { ...assets, emblemDataUrl: "data:image/png;base64,EMBLEM" });
+    assert.ok(html.includes(`<img class="emblem" src="data:image/png;base64,EMBLEM"`));
   });
 
   it("hides the signer unless the site setting turns it on", () => {
@@ -61,14 +68,14 @@ describe("certificate artwork", () => {
     assert.ok(html.includes("TEST / DEVELOPMENT"));
     assert.ok(html.includes("มิใช่การสำเร็จการศึกษาจริง"));
     assert.ok(html.includes("NOT A REAL CREDENTIAL"));
-    assert.ok(!html.includes("ร้อยละ"));
+    assert.ok(!html.includes("จำนวนชั่วโมงการอบรม"));
   });
 
   it("falls back to the standard pattern and shrinks long names", () => {
     const short = buildCertificateHtml(view, assets);
     const long = buildCertificateHtml({ ...view, template: "unknown", recipientName: "ก".repeat(60) }, assets);
-    assert.ok(short.includes("font-size: 36pt"));
-    assert.ok(long.includes("font-size: 22pt"));
+    assert.ok(short.includes("font-size: 33pt"));
+    assert.ok(long.includes("font-size: 21pt"));
     assert.ok(long.includes("#4a2a9c"));
   });
 });
