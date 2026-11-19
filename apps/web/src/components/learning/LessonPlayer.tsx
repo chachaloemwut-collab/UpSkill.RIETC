@@ -9,7 +9,7 @@
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight, CheckCircle2, Circle, CircleHelp, ClipboardCopy, FastForward, Flag, HelpCircle, Lock, Maximize, Minimize, RotateCcw, Share2, Snail, Tv, Volume2, VolumeX, X,
 } from "lucide-react";
@@ -506,7 +506,7 @@ export function LessonPlayer({
 
   // H04: start countdown when completed + nextAction arrive and autoplay is on
   useEffect(() => {
-    if (completed && nextAction && autoplayNext && ended) setCountdown(5);
+    if (completed && nextAction && autoplayNext && ended) startTransition(() => setCountdown(5));
   }, [completed, nextAction, autoplayNext, ended]);
 
   // H04: decrement countdown each second
@@ -850,7 +850,7 @@ export function LessonPlayer({
               <h3 className="font-semibold">แจ้งปัญหาคลิปนี้</h3>
               <button type="button" onClick={() => setReportOpen(false)} className="rounded p-1 hover:bg-muted"><X className="h-4 w-4" /></button>
             </div>
-            <p className="text-sm text-muted-foreground">ข้อมูลนี้จะช่วยให้ผู้ดูแลระบบแก้ไขปัญหาได้เร็วขึ้น กด "คัดลอก" แล้วส่งให้ผู้ดูแล</p>
+            <p className="text-sm text-muted-foreground">ข้อมูลนี้จะช่วยให้ผู้ดูแลระบบแก้ไขปัญหาได้เร็วขึ้น กด &ldquo;คัดลอก&rdquo; แล้วส่งให้ผู้ดูแล</p>
             <pre className="overflow-x-auto rounded bg-muted p-3 text-xs font-mono select-all whitespace-pre-wrap break-all">
               {[
                 `lessonId: ${lessonId}`,

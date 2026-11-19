@@ -1,5 +1,6 @@
 import { sql, type Database, type JsonValue, type Tx } from "@upskill/db";
 import { emailCategory, type EmailJob } from "@upskill/infra/mailer";
+import { isAutomationPaused } from "./automation-flags.ts";
 
 type Sender = (job: EmailJob) => Promise<{ messageId: string | null }>;
 type SenderProvider = () => Promise<Sender | null>;
@@ -113,6 +114,7 @@ export async function processEmailOutbox(db: Database, getSender: SenderProvider
 }
 
 export async function enqueueAssignmentReminders(db: Database, appOrigin: string) {
+  if (await isAutomationPaused(db, "assignment_reminders")) return;
   const rows = await db
     .selectFrom("course_assignment_recipients as r")
     .innerJoin("course_assignments as a", "a.id", "r.assignment_id")

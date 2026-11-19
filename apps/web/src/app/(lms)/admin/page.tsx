@@ -1,20 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Award, BadgeCheck, Ban, BookOpen, CalendarCheck, ClipboardList, Flag, GraduationCap, Mail, Megaphone, Settings, ShieldAlert, UserCog, Users } from "lucide-react";
+import { Award, BadgeCheck, Ban, BookOpen, CalendarCheck, ClipboardList, Flag, GraduationCap, Mail, Megaphone, Rss, Settings, ShieldAlert, UserCog, Users } from "lucide-react";
 import { Badge, Card, EmptyState, Table, Tabs, TabsContent, TabsList, TabsTrigger, buttonClass } from "@/components/ui";
 import { AdminCreateCourseDialog } from "@/components/admin/CourseOwnerActions";
 import { AdminInvitations } from "@/components/admin/AdminInvitations";
 import { listInstructors } from "@/server/courses/instructor.service";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
-import { CourseAdminControls, CourseDefaultsForm, EmailSettingsForm, GoogleOAuthSettingsForm, RemoveSuppressionButton, RetryEmailButton, RevokeCertificateForm, TestEmailSettingsForm, UserAdminForm } from "@/components/admin/AdminActions";
+import { AutomationPanel, CourseAdminControls, CourseDefaultsForm, EmailSettingsForm, GoogleOAuthSettingsForm, RemoveSuppressionButton, RetryEmailButton, RevokeCertificateForm, TestEmailSettingsForm, UserAdminForm } from "@/components/admin/AdminActions";
 import { VISIBILITY, formatDateTimeTh } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { adminOverview } from "@/server/admin/admin.service";
 import { getEmailSettingsView } from "@/server/admin/email-settings.service";
 import { getGoogleOAuthSettingsView } from "@/server/settings/google-oauth.service";
 import { getCourseDefaults } from "@/server/system-settings.service";
+import { getAutomationFlags, getAutomationBacklog } from "@/server/automation.service";
 
 export const metadata: Metadata = { title: "ผู้ดูแลระบบ", robots: { index: false } };
 
@@ -23,7 +24,7 @@ const REASONS: Record<string, string> = { POSITION_JUMP: "กรอข้าม 
 export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") redirect("/");
-  const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings, googleSettings, instructors, courseDefaults] = await Promise.all([adminOverview(), getEmailSettingsView(), getGoogleOAuthSettingsView(), listInstructors(), getCourseDefaults()]);
+  const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings, googleSettings, instructors, courseDefaults, automationFlags, automationBacklog] = await Promise.all([adminOverview(), getEmailSettingsView(), getGoogleOAuthSettingsView(), listInstructors(), getCourseDefaults(), getAutomationFlags(), getAutomationBacklog()]);
 
   return (
     <>
@@ -214,7 +215,7 @@ export default async function AdminPage() {
             {suppressions.length ? <Table><thead><tr><th>อีเมล</th><th>เหตุผล</th><th>เมื่อ</th><th /></tr></thead><tbody>{suppressions.map((item) => <tr key={item.email}><td>{item.email}</td><td>{item.reason}</td><td>{formatDateTimeTh(item.created_at)}</td><td className="text-right"><RemoveSuppressionButton email={item.email} /></td></tr>)}</tbody></Table> : <p className="p-5 text-sm text-muted-foreground">ไม่มีอีเมลที่ถูกระงับ</p>}
           </Card>
         </TabsContent>
-        <TabsContent value="settings" className="mt-4">
+        <TabsContent value="settings" className="mt-4 grid gap-6">
           <Card className="max-w-2xl">
             <div className="flex items-center gap-3 border-b px-5 py-4">
               <Settings className="h-5 w-5" />
@@ -224,6 +225,16 @@ export default async function AdminPage() {
               </div>
             </div>
             <CourseDefaultsForm defaults={courseDefaults} />
+          </Card>
+          <Card className="max-w-2xl">
+            <div className="flex items-center gap-3 border-b px-5 py-4">
+              <Rss className="h-5 w-5" />
+              <div>
+                <h3 className="font-semibold">งานอัตโนมัติ</h3>
+                <p className="text-xs text-muted-foreground">พัก/เปิดการทำงานอัตโนมัติ และดู backlog ปัจจุบัน</p>
+              </div>
+            </div>
+            <AutomationPanel paused={automationFlags.paused} backlog={automationBacklog} />
           </Card>
         </TabsContent>
       </Tabs>

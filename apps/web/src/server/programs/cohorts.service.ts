@@ -23,6 +23,7 @@ import { audit } from "../audit";
 import type { CurrentUser } from "../auth/session";
 import { assertAdmin, cohortTimeline, formatThaiDateTime } from "./shared";
 import { assertProfileComplete } from "../auth/profile.service";
+import { getAutomationFlags } from "../automation.service";
 
 type Executor = Database | Tx;
 export type RegistrationStatus = "pending" | "approved" | "rejected" | "waitlisted" | "cancelled";
@@ -282,8 +283,11 @@ async function notifyApproved(trx: Tx, reg: { id: string; userId: string; email:
 /**
  * Move people from the waitlist into free seats, oldest application first. Caller holds the cohort lock.
  * Without approval they are approved and enrolled; with approval they join the review queue.
+ * Skipped when the waitlist_promotion automation is paused — seats stay reserved for manual admin action.
  */
 async function promoteWaitlist(trx: Tx, cohortId: string) {
+  const flags = await getAutomationFlags();
+  if (flags.paused.includes("waitlist_promotion")) return;
   const c = await loadCohort(trx, cohortId);
   if (c.status !== "published" || c.ends_at <= new Date()) return;
   const program = await loadProgramOf(trx, c.program_id);

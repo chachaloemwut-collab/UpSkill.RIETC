@@ -1,10 +1,10 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Ban, BadgeCheck, ExternalLink, MoreHorizontal, Pencil, RotateCcw, Save, Send, UserCog } from "lucide-react";
+import { Ban, BadgeCheck, ExternalLink, MoreHorizontal, Pause, Pencil, Play, RotateCcw, Save, Send, UserCog } from "lucide-react";
 import { api } from "@/lib/api";
 import { ReassignInstructorDialog, type InstructorOption } from "./CourseOwnerActions";
-import { Alert, AlertDialog, Button, Checkbox, DropdownMenu, Field, Input, PasswordInput, Select, Textarea, useToast } from "@/components/ui";
+import { Alert, AlertDialog, Badge, Button, Checkbox, DropdownMenu, Field, Input, PasswordInput, Select, Textarea, useToast } from "@/components/ui";
 
 type EmailSettingsDefaults = {
   enabled: boolean;
@@ -400,5 +400,82 @@ export function CourseDefaultsForm({ defaults }: { defaults: CourseDefaultsData 
         <Button type="submit" loading={busy}><Save className="h-4 w-4" /> บันทึก</Button>
       </div>
     </form>
+  );
+}
+
+type AutomationName = "assignment_reminders" | "cohort_notifications" | "waitlist_promotion";
+
+const AUTOMATION_LABELS: Record<AutomationName, { title: string; description: string }> = {
+  assignment_reminders: { title: "เตือนกำหนดส่งงาน", description: "แจ้งผู้เรียนอัตโนมัติเมื่องานครบกำหนดภายใน 24 ชั่วโมง" },
+  cohort_notifications: { title: "แจ้งเตือนรอบอบรม", description: "แจ้งผู้ที่อนุมัติแล้วก่อนรอบเริ่ม และแจ้งผู้ติดตามเมื่อเปิดรับสมัคร" },
+  waitlist_promotion: { title: "เลื่อนรายชื่อสำรองอัตโนมัติ", description: "เมื่อมีที่นั่งว่าง ระบบเลื่อนผู้รอคิวโดยอัตโนมัติโดยไม่ต้องผู้ดูแลดำเนินการ" },
+};
+
+export function AutomationPanel({
+  paused,
+  backlog,
+}: {
+  paused: AutomationName[];
+  backlog: { email_pending: number; waitlist_pending: number; pdf_failed: number };
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [localPaused, setLocalPaused] = useState<AutomationName[]>(paused);
+  const [busy, setBusy] = useState<AutomationName | null>(null);
+
+  async function toggle(name: AutomationName) {
+    const willPause = !localPaused.includes(name);
+    setBusy(name);
+    const r = await api<{ paused: AutomationName[] }>("/api/admin/settings/automations", { method: "PATCH", body: { name, paused: willPause } });
+    setBusy(null);
+    if (r.ok) {
+      setLocalPaused(r.data.paused);
+      toast({ title: willPause ? `พักงาน "${AUTOMATION_LABELS[name].title}" แล้ว` : `เปิดงาน "${AUTOMATION_LABELS[name].title}" แล้ว`, variant: "success" });
+      router.refresh();
+    } else toast({ title: "เปลี่ยนสถานะไม่สำเร็จ", description: r.message, variant: "destructive" });
+  }
+
+  const names: AutomationName[] = ["assignment_reminders", "cohort_notifications", "waitlist_promotion"];
+  return (
+    <div className="divide-y">
+      <div className="grid grid-cols-3 gap-4 px-5 py-4 text-sm">
+        <div className="text-center">
+          <div className="text-2xl font-semibold tabular-nums">{backlog.email_pending}</div>
+          <div className="text-xs text-muted-foreground">อีเมลรอส่ง</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-semibold tabular-nums">{backlog.waitlist_pending}</div>
+          <div className="text-xs text-muted-foreground">ผู้รอรายชื่อสำรอง</div>
+        </div>
+        <div className="text-center">
+          <div className={`text-2xl font-semibold tabular-nums ${backlog.pdf_failed > 0 ? "text-destructive" : ""}`}>{backlog.pdf_failed}</div>
+          <div className="text-xs text-muted-foreground">PDF ล้มเหลว</div>
+        </div>
+      </div>
+      {names.map((name) => {
+        const isPaused = localPaused.includes(name);
+        const info = AUTOMATION_LABELS[name];
+        return (
+          <div key={name} className="flex items-center justify-between gap-4 px-5 py-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">{info.title}</span>
+                <Badge variant={isPaused ? "warning" : "success"}>{isPaused ? "พัก" : "เปิด"}</Badge>
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">{info.description}</p>
+            </div>
+            <Button
+              variant={isPaused ? "default" : "outline"}
+              size="sm"
+              loading={busy === name}
+              onClick={() => void toggle(name)}
+            >
+              {isPaused ? <><Play className="h-3.5 w-3.5" /> เปิดใหม่</> : <><Pause className="h-3.5 w-3.5" /> พัก</>}
+            </Button>
+          </div>
+        );
+      })}
+      <p className="px-5 py-3 text-xs text-muted-foreground">การพักงานไม่ยกเลิกสิ่งที่ส่งไปแล้ว • การเปิดใหม่ไม่ส่งย้อนหลังอัตโนมัติ</p>
+    </div>
   );
 }
