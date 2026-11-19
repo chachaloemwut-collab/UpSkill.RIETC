@@ -621,7 +621,7 @@ export async function getCourseLearnerProgressDetail(
 }
 
 /** Spec 5.3 #2 anti-farming rules are checked here, before a course can be published */
-export async function setVisibility(user: CurrentUser, courseId: string, visibility: "draft" | "published" | "unlisted" | "archived", meta: { ip: string }) {
+export async function setVisibility(user: CurrentUser, courseId: string, visibility: "draft" | "published" | "unlisted" | "archived" | "enrollment_closed", meta: { ip: string }) {
   const c = await loadOwnedCourse(user, courseId);
   if (c.visibility === "suspended" && user.role !== "admin") throw new HttpError(403, "COURSE_SUSPENDED", "หลักสูตรถูกระงับโดยผู้ดูแลระบบ");
   const { db, env } = ctx();
@@ -650,7 +650,7 @@ export async function setVisibility(user: CurrentUser, courseId: string, visibil
   }
 
   const changedAt = new Date();
-  const statusLabels = { draft: "ฉบับร่าง", published: "เผยแพร่", unlisted: "ไม่แสดงในคลังหลักสูตร", archived: "ปิดหลักสูตร / เข้าคลัง" } as const;
+  const statusLabels = { draft: "ฉบับร่าง", published: "เผยแพร่", unlisted: "ไม่แสดงในคลังหลักสูตร", archived: "ปิดหลักสูตร / เข้าคลัง", enrollment_closed: "ปิดรับสมัครใหม่" } as const;
   await db.transaction().execute(async (trx) => {
     await trx
       .updateTable("courses")

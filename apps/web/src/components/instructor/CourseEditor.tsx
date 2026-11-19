@@ -311,6 +311,19 @@ function PublishSection({
       </ul>
       {course.visibility === "suspended" ? (
         <Alert variant="destructive" title="หลักสูตรถูกระงับโดยผู้ดูแลระบบ" />
+      ) : course.visibility === "enrollment_closed" ? (
+        <div className="grid gap-2">
+          <Alert title="ปิดรับสมัครใหม่แล้ว">ผู้เรียนที่ลงทะเบียนไว้แล้วยังเข้าเรียนและรับใบรับรองได้ตามปกติ</Alert>
+          <Button loading={a.busy} onClick={() => set("published")}>
+            <Rocket className="h-4 w-4" /> เปิดรับสมัครอีกครั้ง
+          </Button>
+          <Button variant="ghost" disabled={a.busy} onClick={() => set("draft")}>
+            กลับเป็นฉบับร่าง
+          </Button>
+          <Button variant="outline" className="text-muted-foreground hover:text-foreground" disabled={a.busy} onClick={() => set("archived")}>
+            <Archive className="h-4 w-4" /> ย้ายเข้าคลัง (ปิดถาวร)
+          </Button>
+        </div>
       ) : (
         <div className="grid gap-2">
           {course.visibility !== "published" && (
@@ -321,6 +334,11 @@ function PublishSection({
           {course.visibility !== "unlisted" && (
             <Button variant="outline" disabled={a.busy} onClick={() => set("unlisted")}>
               เผยแพร่แบบลิงก์เท่านั้น
+            </Button>
+          )}
+          {course.visibility !== "enrollment_closed" && course.visibility !== "draft" && course.visibility !== "archived" && (
+            <Button variant="outline" disabled={a.busy} onClick={() => set("enrollment_closed")}>
+              ปิดรับสมัครใหม่ (ผู้เรียนเดิมเรียนต่อได้)
             </Button>
           )}
           {course.visibility !== "draft" && (
@@ -704,9 +722,13 @@ function LessonsSection({
   devManualDuration: boolean;
 }) {
   const a = useAction();
+  const router = useRouter();
   const [replacing, setReplacing] = useState<string | null>(null);
   const [detailsFor, setDetailsFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<EditorData["lessons"][number] | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchResults, setBatchResults] = useState<Array<{ url: string; ok: boolean; msg?: string }> | null>(null);
 
   // Checkpoint Dialog state
   const [checkpointLesson, setCheckpointLesson] = useState<EditorData["lessons"][number] | null>(
@@ -998,11 +1020,71 @@ function LessonsSection({
 
       {/* Add Lesson Form with Live Thumbnail Preview */}
       <Card className="p-5 shadow-sm">
-        <form onSubmit={onAdd} className="grid gap-4">
+        <div className="flex items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
             <SquarePlay className="h-5 w-5 text-red-600 dark:text-red-400" />
             <h3 className="font-semibold text-foreground">เพิ่มบทเรียนใหม่จาก YouTube</h3>
           </div>
+          <Button
+            type="button"
+            variant={batchMode ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => { setBatchMode(!batchMode); setBatchResults(null); }}
+          >
+            {batchMode ? "เพิ่มทีละบท" : "วางหลายลิงก์พร้อมกัน"}
+          </Button>
+        </div>
+
+        {batchMode && (
+          <form
+            className="grid gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              const raw = String(f.get("urls") ?? "");
+              const urls = raw.split(/[\n\r]+/).map((u) => u.trim()).filter(Boolean);
+              if (urls.length === 0) return;
+              setBatchBusy(true);
+              const results: Array<{ url: string; ok: boolean; msg?: string }> = [];
+              for (const url of urls) {
+                const r = await api(`${base}/lessons`, { body: { url } });
+                results.push({ url, ok: r.ok, msg: r.ok ? undefined : r.message });
+              }
+              setBatchBusy(false);
+              setBatchResults(results);
+              if (results.some((r) => r.ok)) router.refresh();
+            }}
+          >
+            <Field
+              label="ลิงก์ YouTube (หลายบรรทัด)"
+              hint="วางหนึ่ง URL ต่อบรรทัด ระบบจะดึงชื่อและความยาวอัตโนมัติ"
+            >
+              <Textarea
+                name="urls"
+                rows={5}
+                placeholder={"https://www.youtube.com/watch?v=AAAA\nhttps://youtu.be/BBBB\nhttps://www.youtube.com/watch?v=CCCC"}
+                className="font-mono text-xs"
+                required
+              />
+            </Field>
+            {batchResults && (
+              <ul className="grid gap-1 rounded-md border bg-muted/30 p-3 text-xs">
+                {batchResults.map((r, i) => (
+                  <li key={i} className={cn("flex items-start gap-1.5", r.ok ? "text-success" : "text-destructive")}>
+                    {r.ok ? <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+                    <span className="truncate font-mono">{r.url}</span>
+                    {r.msg && <span className="shrink-0 text-muted-foreground">— {r.msg}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button type="submit" loading={batchBusy} className="justify-self-start">
+              <Plus className="h-4 w-4" /> เพิ่มทั้งหมด
+            </Button>
+          </form>
+        )}
+
+        {!batchMode && <form onSubmit={onAdd} className="grid gap-4">
 
           <Field
             label="ลิงก์ YouTube"
@@ -1083,7 +1165,7 @@ function LessonsSection({
           <Button type="submit" loading={a.busy} className="justify-self-start font-medium">
             <Plus className="h-4 w-4" /> เพิ่มบทเรียน
           </Button>
-        </form>
+        </form>}
       </Card>
 
       {/* Checkpoint Dialog Modal */}

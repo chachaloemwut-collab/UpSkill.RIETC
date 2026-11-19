@@ -27,6 +27,7 @@ export const VISIBILITY: Record<string, { label: string; variant: "secondary" | 
   unlisted: { label: "เฉพาะผู้มีลิงก์", variant: "warning" },
   suspended: { label: "ถูกระงับ", variant: "destructive" },
   archived: { label: "ปิดหลักสูตร / เข้าคลัง", variant: "outline" },
+  enrollment_closed: { label: "ปิดรับสมัครใหม่", variant: "warning" },
 };
 
 export function displayName(email: string): string {
