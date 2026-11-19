@@ -18,6 +18,7 @@ export type CohortDefaults = {
   waitlist_enabled: boolean;
   requires_approval: boolean;
   rules: Rules;
+  updated_at?: Date | string;
 };
 type Option = { id: string; name: string };
 
@@ -62,6 +63,7 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
       waitlistEnabled: f.get("waitlistEnabled") === "on",
       requiresApproval: f.get("requiresApproval") === "on",
       eligibility: { ...rules, applicationForm: fields.map((x, i) => ({ ...x, key: x.key || `q${i + 1}`, label: x.label.trim() })) },
+      ...(defaults.updated_at ? { clientUpdatedAt: new Date(defaults.updated_at).toISOString() } : {}),
     });
   }
   const setField = (i: number, patch: Partial<FormField>) => setRules((r) => ({ ...r, applicationForm: r.applicationForm.map((x, j) => (j === i ? { ...x, ...patch } : x)) }));

@@ -37,6 +37,7 @@ export interface CohortInput {
   waitlistEnabled: boolean;
   requiresApproval: boolean;
   eligibility: unknown;
+  clientUpdatedAt?: Date;
 }
 
 /** Approved and pending registrations both hold a seat until an admin decides */
@@ -138,6 +139,9 @@ export async function updateCohort(user: CurrentUser, cohortId: string, input: C
     .execute(async (trx) => {
       const c = await loadCohort(trx, cohortId, true);
       if (c.status === "cancelled") throw new HttpError(409, "COHORT_CANCELLED");
+      if (input.clientUpdatedAt && Math.abs(input.clientUpdatedAt.getTime() - new Date(c.updated_at).getTime()) > 500) {
+        throw new HttpError(409, "CONFLICT", "ข้อมูลนี้ถูกแก้ไขโดยผู้ใช้คนอื่นแล้ว กรุณาโหลดหน้าใหม่เพื่อดูข้อมูลล่าสุด");
+      }
       if (input.capacity !== null) {
         const approved = await trx
           .selectFrom("cohort_registrations")

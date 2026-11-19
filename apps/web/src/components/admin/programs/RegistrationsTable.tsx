@@ -26,8 +26,10 @@ export function RegistrationsTable({ cohortId, registrations, form, cancelled }:
   const [filter, setFilter] = useState(() => searchParams.get("regStatus") ?? "pending");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [rejecting, setRejecting] = useState(false);
+  const [approving, setApproving] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ decision: string; changed: number; total: number } | null>(null);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: registrations.length };
@@ -45,8 +47,9 @@ export function RegistrationsTable({ cohortId, registrations, form, cancelled }:
     const r = await api<{ changed: number }>(`/api/admin/cohorts/${cohortId}/registrations`, { method: "PATCH", body: { ids, decision, ...(decisionNote ? { note: decisionNote } : {}) } });
     setBusy(false);
     if (r.ok) {
-      toast({ title: decision === "approve" ? `อนุมัติแล้ว ${r.data.changed} คน` : `ไม่อนุมัติ ${r.data.changed} คน`, description: "ระบบส่งอีเมลแจ้งผลให้ผู้สมัครแล้ว", variant: "success" });
+      setBulkResult({ decision, changed: r.data.changed, total: ids.length });
       setSelected(new Set());
+      setApproving(false);
       setRejecting(false);
       setNote("");
       router.refresh();
@@ -90,7 +93,7 @@ export function RegistrationsTable({ cohortId, registrations, form, cancelled }:
       {picked.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
           <span>เลือก {picked.length} คน</span>
-          <Button size="sm" loading={busy} disabled={!canApprove} onClick={() => void decide("approve", picked.map((r) => r.id))}><Check className="h-4 w-4" /> อนุมัติ</Button>
+          <Button size="sm" loading={busy} disabled={!canApprove} onClick={() => setApproving(true)}><Check className="h-4 w-4" /> อนุมัติ</Button>
           <Button size="sm" variant="outline" disabled={!canReject || busy} onClick={() => setRejecting(true)}><X className="h-4 w-4" /> ไม่อนุมัติ</Button>
         </div>
       )}
@@ -144,8 +147,33 @@ export function RegistrationsTable({ cohortId, registrations, form, cancelled }:
         </div>
       )}
 
+      <Dialog open={approving} onOpenChange={setApproving} title={`ยืนยันอนุมัติ ${picked.length} คน`} description="ผู้สมัครจะได้รับอีเมลแจ้งผลและสิทธิ์เข้าเรียนในรอบนี้">
+        <div className="grid gap-4">
+          <div className="max-h-48 overflow-y-auto rounded border">
+            {picked.map((r) => (
+              <div key={r.id} className="flex items-baseline gap-2 border-b px-3 py-2 last:border-0 text-sm">
+                <span className="font-medium">{r.name ?? "—"}</span>
+                <span className="text-muted-foreground text-xs">{r.email}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setApproving(false)}>ยกเลิก</Button>
+            <Button loading={busy} onClick={() => void decide("approve", picked.map((r) => r.id))}>ยืนยันอนุมัติ</Button>
+          </div>
+        </div>
+      </Dialog>
+
       <Dialog open={rejecting} onOpenChange={setRejecting} title="ไม่อนุมัติใบสมัคร" description="ผู้สมัครจะได้รับอีเมลแจ้งผล หากได้รับอนุมัติไปแล้ว สิทธิ์เข้าเรียนจากรอบนี้จะถูกเพิกถอน">
         <div className="grid gap-4">
+          <div className="max-h-36 overflow-y-auto rounded border text-sm">
+            {picked.map((r) => (
+              <div key={r.id} className="flex items-baseline gap-2 border-b px-3 py-1.5 last:border-0">
+                <span className="font-medium">{r.name ?? "—"}</span>
+                <span className="text-muted-foreground text-xs">{r.email}</span>
+              </div>
+            ))}
+          </div>
           <Field label="หมายเหตุถึงผู้สมัคร" hint="ไม่บังคับ แสดงในอีเมลและหน้าหลักสูตรของผู้สมัคร">
             <Textarea value={note} onChange={(e) => setNote(e.currentTarget.value)} rows={3} maxLength={2000} />
           </Field>
@@ -154,6 +182,21 @@ export function RegistrationsTable({ cohortId, registrations, form, cancelled }:
             <Button variant="destructive" loading={busy} onClick={() => void decide("reject", [...selected], note.trim() || undefined)}>ยืนยันไม่อนุมัติ</Button>
           </div>
         </div>
+      </Dialog>
+
+      <Dialog open={!!bulkResult} onOpenChange={(o) => { if (!o) setBulkResult(null); }} title="ผลดำเนินการ">
+        {bulkResult && (
+          <div className="grid gap-4">
+            <p className="text-sm">
+              {bulkResult.decision === "approve" ? "อนุมัติสำเร็จ" : "ไม่อนุมัติสำเร็จ"}{" "}
+              <span className="font-semibold">{bulkResult.changed}</span> คน
+              {bulkResult.changed < bulkResult.total && ` (ข้ามไป ${bulkResult.total - bulkResult.changed} คนที่สถานะเปลี่ยนแล้ว)`}
+            </p>
+            <div className="flex justify-end">
+              <Button onClick={() => setBulkResult(null)}>ตกลง</Button>
+            </div>
+          </div>
+        )}
       </Dialog>
     </div>
   );
