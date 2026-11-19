@@ -504,6 +504,16 @@ export interface QuizAttempts {
   user_answers: Json | null;
 }
 
+export interface QuizLockoutResets {
+  assessment_type: string;
+  enrollment_id: string;
+  granted_by: string;
+  id: Generated<string>;
+  lesson_id: string | null;
+  reason: string | null;
+  reset_at: Generated<Timestamp>;
+}
+
 export interface QuizQuestions {
   assessment_type: Generated<string>;
   correct_option_id: string;
@@ -648,6 +658,7 @@ export interface DB {
   program_courses: ProgramCourses;
   programs: Programs;
   quiz_attempts: QuizAttempts;
+  quiz_lockout_resets: QuizLockoutResets;
   quiz_questions: QuizQuestions;
   user_api_tokens: UserApiTokens;
   user_emails: UserEmails;

@@ -167,6 +167,10 @@ export async function adminManualIssueCertificate(
     .executeTakeFirst();
   if (!course) throw new HttpError(404, "COURSE_NOT_FOUND", "ไม่พบหลักสูตรนี้");
   if (!course.credential_enabled) throw new HttpError(400, "CREDENTIAL_NOT_ENABLED", "หลักสูตรนี้ไม่ได้เปิดใช้งานใบรับรอง");
+  // A04: validate before any writes so a draft course or missing name does not leave enrollment=completed with no cert
+  if (course.visibility === "draft") throw new HttpError(400, "COURSE_DRAFT", "หลักสูตรอยู่ในสถานะร่าง ออกใบรับรองไม่ได้");
+  const userNameForCert = user.legal_full_name_th ?? user.legal_full_name_en ?? (user.email.includes("@") ? user.email.split("@")[0] : null);
+  if (!userNameForCert) throw new HttpError(409, "LEGAL_NAME_MISSING", "ผู้ใช้ไม่มีชื่อสำหรับออกใบรับรอง กรุณาให้ผู้ใช้กรอกชื่อก่อน");
 
   // Ensure legal name is locked
   if (!user.legal_name_locked_at) {

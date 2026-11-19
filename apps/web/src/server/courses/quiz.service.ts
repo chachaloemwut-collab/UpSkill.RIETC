@@ -139,12 +139,23 @@ export async function startAssessment(userId: string, courseId: string, target: 
       await trx.updateTable("quiz_attempts").set({ submitted_at: new Date(), user_answers: "{}", score_percentage: "0", is_passed: false }).where("id", "=", open.id).execute();
     }
 
+    // A03: use the latest lockout-reset timestamp (if any) as the window start instead of a fixed 24h
+    let resetQuery = trx
+      .selectFrom("quiz_lockout_resets")
+      .select(sql<Date | null>`max(reset_at)`.as("latest"))
+      .where("enrollment_id", "=", e.id)
+      .where("assessment_type", "=", target.kind)
+      .where("reset_at", ">", sql<Date>`now() - interval '24 hours'`);
+    resetQuery = lessonId ? resetQuery.where("lesson_id", "=", lessonId) : resetQuery.where("lesson_id", "is", null);
+    const { latest: resetAt } = await resetQuery.executeTakeFirstOrThrow();
+    const windowStart = resetAt ? sql<Date>`${resetAt}::timestamptz` : sql<Date>`now() - interval '24 hours'`;
+
     let recentQuery = trx
       .selectFrom("quiz_attempts")
       .select(sql<number>`count(*)::int`.as("n"))
       .where("enrollment_id", "=", e.id)
       .where("assessment_type", "=", target.kind)
-      .where("started_at", ">", sql<Date>`now() - interval '24 hours'`);
+      .where("started_at", ">", windowStart);
     recentQuery = lessonId ? recentQuery.where("lesson_id", "=", lessonId) : recentQuery.where("lesson_id", "is", null);
     const recent = await recentQuery.executeTakeFirstOrThrow();
     if (recent.n >= e.max_quiz_attempts_per_day) throw new HttpError(429, "QUIZ_ATTEMPT_LIMIT");

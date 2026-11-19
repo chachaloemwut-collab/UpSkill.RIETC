@@ -199,11 +199,13 @@ export async function issueProgramCertificate(input: { userId: string; programId
     .execute();
   if (requiredCourseIds.length === 0) throw new HttpError(403, "PROGRAM_EMPTY");
 
+  // A10: accept any completed enrollment for the required courses regardless of cohort_id.
+  // The cohort membership is already verified above (approved registration). Requiring cohort_id
+  // to match caused users who completed courses before joining a cohort to be blocked permanently.
   const completed = await db
     .selectFrom("enrollments")
     .select(["course_id"])
     .where("user_id", "=", input.userId)
-    .where("cohort_id", "=", reg.cohort_id)
     .where("status", "=", "completed")
     .execute();
   const done = new Set(completed.map((e) => e.course_id));
@@ -229,14 +231,14 @@ export async function issueProgramCertificate(input: { userId: string; programId
     .where("pc.program_id", "=", input.programId)
     .where("pc.is_required", "=", true)
     .where("e.user_id", "=", input.userId)
-    .where("e.cohort_id", "=", reg.cohort_id)
     .executeTakeFirstOrThrow();
   // Score per required course by that course's own completion rule (post-test best, or the combined
   // end-of-lesson score), then the plain average. A missing score is an error, never silently 0.
   const required = await db
     .selectFrom("program_courses as pc")
     .innerJoin("courses as c", "c.id", "pc.course_id")
-    .innerJoin("enrollments as e", (j) => j.onRef("e.course_id", "=", "c.id").on("e.user_id", "=", input.userId).on("e.cohort_id", "=", reg.cohort_id))
+    // A10: join on user_id only (not cohort_id) so pre-cohort completions are counted
+    .innerJoin("enrollments as e", (j) => j.onRef("e.course_id", "=", "c.id").on("e.user_id", "=", input.userId).on("e.status", "=", "completed"))
     .select(["c.id as course_id", "c.completion_rule", "c.passing_quiz_score", "e.id as enrollment_id"])
     .where("pc.program_id", "=", input.programId)
     .where("pc.is_required", "=", true)

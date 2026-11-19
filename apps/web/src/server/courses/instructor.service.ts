@@ -294,13 +294,11 @@ export async function setLessonCheckpoint(
 }
 
 export async function deleteLesson(user: CurrentUser, courseId: string, lessonId: string) {
-  const c = await loadOwnedCourse(user, courseId);
+  await loadOwnedCourse(user, courseId);
   const { db } = ctx();
-  // Deleting a lesson after publishing would silently erase learners' progress
-  if (c.visibility !== "draft") {
-    const n = await db.selectFrom("enrollments").select(sql<number>`count(*)::int`.as("n")).where("course_id", "=", courseId).executeTakeFirstOrThrow();
-    if (n.n > 0) throw new HttpError(409, "COURSE_HAS_LEARNERS", "หลักสูตรมีผู้เรียนแล้ว ไม่สามารถลบบทเรียนได้ (เปลี่ยนวิดีโอแทนได้)");
-  }
+  // A09: check regardless of visibility — course can be reverted to draft after learners enrolled
+  const n = await db.selectFrom("enrollments").select(sql<number>`count(*)::int`.as("n")).where("course_id", "=", courseId).executeTakeFirstOrThrow();
+  if (n.n > 0) throw new HttpError(409, "COURSE_HAS_LEARNERS", "หลักสูตรมีผู้เรียนแล้ว ไม่สามารถลบบทเรียนได้ (เปลี่ยนวิดีโอแทนได้)");
   await db.transaction().execute(async (trx) => {
     const del = await trx.deleteFrom("lessons").where("id", "=", lessonId).where("course_id", "=", courseId).returning("sequence_order").executeTakeFirst();
     if (!del) throw new HttpError(404, "NOT_FOUND");
@@ -490,6 +488,7 @@ export async function resetCourseLearnerQuizAttempts(
   courseId: string,
   enrollmentId: string,
   meta: { ip: string },
+  options?: { assessmentType?: "pre" | "lesson" | "post"; lessonId?: string; reason?: string },
 ) {
   await loadOwnedCourse(user, courseId);
   const { db } = ctx();
@@ -501,21 +500,31 @@ export async function resetCourseLearnerQuizAttempts(
     .executeTakeFirst();
   if (!enrollment) throw new HttpError(404, "NOT_FOUND", "ไม่พบการลงทะเบียนนี้ในหลักสูตร");
 
+  const assessmentType = options?.assessmentType ?? "post";
+  const lessonId = options?.lessonId ?? null;
+
   await db.transaction().execute(async (trx) => {
-    // If an attempt is stuck open (submitted_at IS NULL), close it so uq_quiz_attempt_open is cleared
-    await trx
+    // Close any stuck-open attempt so uq_quiz_attempt_open is cleared (safe regardless of type)
+    let closeQuery = trx
       .updateTable("quiz_attempts")
-      .set({ submitted_at: new Date() })
+      .set({ submitted_at: new Date(), user_answers: "{}", score_percentage: "0", is_passed: false })
       .where("enrollment_id", "=", enrollmentId)
       .where("submitted_at", "is", null)
-      .execute();
+      .where("assessment_type", "=", assessmentType);
+    if (lessonId) closeQuery = closeQuery.where("lesson_id", "=", lessonId);
+    await closeQuery.execute();
 
-    // Shift started_at of attempts in the last 24h by 25h backward to reset the daily counter
+    // A03: insert a lockout-reset record so the next startAssessment call uses this timestamp
+    // as the window start instead of now()-24h, without touching historical attempt timestamps.
     await trx
-      .updateTable("quiz_attempts")
-      .set({ started_at: sql<Date>`started_at - interval '25 hours'` })
-      .where("enrollment_id", "=", enrollmentId)
-      .where("started_at", ">", sql<Date>`now() - interval '24 hours'`)
+      .insertInto("quiz_lockout_resets")
+      .values({
+        enrollment_id: enrollmentId,
+        assessment_type: assessmentType,
+        lesson_id: lessonId ?? undefined,
+        granted_by: user.id,
+        reason: options?.reason ?? null,
+      })
       .execute();
   });
 
@@ -525,7 +534,7 @@ export async function resetCourseLearnerQuizAttempts(
     entityType: "course",
     entityId: courseId,
     ip: meta.ip,
-    details: { enrollmentId, targetUserId: enrollment.user_id },
+    details: { enrollmentId, targetUserId: enrollment.user_id, assessmentType, lessonId },
   });
 
   return { ok: true };
