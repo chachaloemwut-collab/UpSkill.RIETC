@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { BadgeCheck, KeyRound, LogOut, Save } from "lucide-react";
+import { BadgeCheck, LogOut, Save } from "lucide-react";
 import { Button, Select } from "@/components/ui";
 
-/** Admin account actions on the user detail page: role/status, verify email, force password reset, revoke sessions. */
+/** Admin account actions on the user detail page: role/status, verify email, revoke sessions (passwords: PasswordAdminPanel). */
 export function UserAdminActions({ userId, currentRole, currentStatus, protectedUser, emailVerified }: { userId: string; currentRole: string; currentStatus: string; protectedUser: boolean; emailVerified: boolean }) {
   const router = useRouter();
   const [role, setRole] = useState(currentRole);
@@ -60,9 +60,6 @@ export function UserAdminActions({ userId, currentRole, currentStatus, protected
             <BadgeCheck className="h-4 w-4" /> ยืนยันอีเมลให้
           </Button>
         )}
-        <Button variant="outline" size="sm" loading={busy} onClick={() => void run("reset-password", "ส่งอีเมลตั้งรหัสผ่านใหม่ให้ผู้ใช้คนนี้? ผู้ใช้จะถูกออกจากระบบ")}>
-          <KeyRound className="h-4 w-4" /> บังคับตั้งรหัสผ่านใหม่
-        </Button>
         <Button variant="outline" size="sm" loading={busy} onClick={() => void run("sessions/revoke", "บังคับออกจากระบบทุกอุปกรณ์ของผู้ใช้คนนี้?")}>
           <LogOut className="h-4 w-4" /> ออกจากระบบทุกอุปกรณ์
         </Button>

@@ -21,6 +21,8 @@ const MESSAGES: Record<string, string> = {
   EMAIL_NOT_VERIFIED_GOOGLE: "อีเมล Google นี้ยังไม่ได้ยืนยัน",
   GOOGLE_ACCOUNT_IN_USE: "บัญชี Google นี้ถูกผูกกับผู้ใช้อื่นแล้ว",
   SYSTEM_OWNER_PROTECTED: "บัญชีเจ้าของระบบได้รับการป้องกันและไม่สามารถลดสิทธิ์หรือระงับได้",
+  USER_NOT_ACTIVE: "บัญชีนี้ไม่ได้อยู่ในสถานะใช้งาน",
+  NO_EMAIL: "บัญชีนี้ไม่มีอีเมลที่ส่งได้",
   SMTP_PASSWORD_REQUIRED: "ต้องระบุรหัสผ่าน SMTP เมื่อกำหนดชื่อผู้ใช้",
   EMAIL_SENDING_DISABLED: "การส่งอีเมลถูกปิดอยู่",
   EMAIL_TEST_FAILED: "ทดสอบส่งอีเมลไม่สำเร็จ กรุณาตรวจสอบค่าการเชื่อมต่อ",

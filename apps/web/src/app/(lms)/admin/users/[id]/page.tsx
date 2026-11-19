@@ -5,6 +5,8 @@ import { Award, BellRing, ChevronRight, Clock, Fingerprint, GraduationCap, Histo
 import { Badge, Card } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { UserAdminActions } from "@/components/admin/UserAdminActions";
+import { PasswordAdminPanel } from "@/components/admin/PasswordAdminPanel";
+import { listPasswordResets } from "@/server/admin/password.service";
 import { LegalNameAdminCard } from "@/components/admin/LegalNameAdminCard";
 import { EnrollmentAdminActions } from "@/components/admin/EnrollmentAdminActions";
 import { ROLE_LABEL, formatDateTimeTh } from "@/lib/format";
@@ -25,6 +27,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   const d = await getUserDetailAdmin(id).catch(() => null);
   if (!d) notFound();
   const u = d.user;
+  const resets = u.is_system_owner ? [] : await listPasswordResets(u.id);
   const name = u.legal_full_name_th ?? u.legal_full_name_en ?? u.username ?? u.email;
 
   return (
@@ -52,6 +55,33 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           <h2 className="mb-3 flex items-center gap-2 font-semibold"><UserRound className="h-5 w-5" /> การจัดการบัญชี</h2>
           <UserAdminActions userId={u.id} currentRole={u.role} currentStatus={u.status} protectedUser={u.is_system_owner} emailVerified={Boolean(u.email_verified_at)} />
         </Card>
+
+        {!u.is_system_owner && (
+          <Card className="p-6">
+            <h2 className="mb-1 flex items-center gap-2 font-semibold"><KeyRound className="h-5 w-5" /> รหัสผ่านและการเข้าสู่ระบบ</h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              {u.has_password ? `ตั้งรหัสผ่านล่าสุด ${u.password_updated_at ? formatDateTimeTh(u.password_updated_at) : "-"}` : "บัญชีนี้ยังไม่มีรหัสผ่าน (เข้าสู่ระบบด้วย Google)"}
+              {" · "}ผู้ใช้กู้รหัสผ่านเองได้ที่หน้า “ลืมรหัสผ่าน” ด้วยอีเมลหรือชื่อผู้ใช้
+            </p>
+            <PasswordAdminPanel userId={u.id} email={u.email} emailVerified={Boolean(u.email_verified_at)} mustChange={u.must_change_password} />
+            {resets.length > 0 && (
+              <div className="mt-5">
+                <h3 className="mb-2 text-sm font-medium">ประวัติคำขอตั้งรหัสผ่าน</h3>
+                <ul className="divide-y rounded-lg border text-sm">
+                  {resets.map((r) => (
+                    <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                      <span>{RESET_METHOD[r.reset_method] ?? r.reset_method}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDateTimeTh(r.created_at)} ·{" "}
+                        {r.used_at ? `ใช้แล้ว ${formatDateTimeTh(r.used_at)}` : new Date(r.expires_at) < new Date() ? "หมดอายุ" : "ยังใช้ได้"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Card>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="p-6">
@@ -280,6 +310,13 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
     </div>
   );
 }
+
+const RESET_METHOD: Record<string, string> = {
+  email_link: "ลิงก์ทางอีเมล",
+  google_reauth: "ยืนยันตัวตนด้วย Google",
+  admin_link: "ลิงก์ที่ผู้ดูแลสร้าง",
+  forced_change: "บังคับเปลี่ยนหลังใช้รหัสชั่วคราว",
+};
 
 function Row({ label, value, full }: { label: string; value: string | null | undefined; full?: boolean }) {
   return (

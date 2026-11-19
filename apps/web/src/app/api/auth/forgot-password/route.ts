@@ -4,7 +4,8 @@ import { route } from "@/server/http";
 import { emailKey } from "@/server/rate-keys";
 import { forgotPassword } from "@/server/auth/auth.service";
 
-const Body = z.strictObject({ email: z.email().max(254) });
+// "email" keeps its name for old clients; it may also be a username (same rule as the login form)
+const Body = z.strictObject({ email: z.union([z.email().max(254), z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9._-]{2,31}$/)]) });
 
 // Per-account limit prevents mail-bombing a victim's inbox; it applies to unknown emails too (no enumeration)
 export const POST = route<typeof Body>(
@@ -18,6 +19,6 @@ export const POST = route<typeof Body>(
   },
   async ({ body }) => {
     await forgotPassword(body.email);
-    return { ok: true, message: "หากมีบัญชีนี้อยู่ เราได้ส่งลิงก์ตั้งรหัสผ่านใหม่ไปทางอีเมลแล้ว" };
+    return { ok: true, message: "หากมีบัญชีนี้อยู่ เราได้ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลของบัญชีแล้ว (ลิงก์ใช้ได้ 15 นาที) หากไม่พบ ให้ดูในโฟลเดอร์จดหมายขยะ" };
   },
 );
