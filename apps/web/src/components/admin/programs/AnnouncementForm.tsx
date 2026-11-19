@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Archive, Globe, Mail, Save, Trash2, EyeOff } from "lucide-react";
+import { Archive, Globe, Mail, Save, Trash2, EyeOff, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import { fromBangkokInput, toBangkokInput } from "@/lib/format";
 import { Alert, AlertDialog, Button, Checkbox, Field, Input, Select, Textarea, useToast } from "@/components/ui";
@@ -13,19 +13,41 @@ export type AnnouncementDefaults = {
   body: string;
   kind: string;
   program_id: string | null;
+  cohort_id: string | null;
   location: string | null;
   event_starts_at: Date | string | null;
   event_ends_at: Date | string | null;
   publish_at: Date | string | null;
   expires_at: Date | string | null;
   is_pinned: boolean;
+  scheduled_broadcast_at?: Date | string | null;
 };
 
-export function AnnouncementForm({ defaults, programs }: { defaults: AnnouncementDefaults; programs: Array<{ id: string; title: string }> }) {
+type Cohort = { id: string; title: string; program_id: string };
+
+export function AnnouncementForm({ defaults, programs, cohorts }: {
+  defaults: AnnouncementDefaults;
+  programs: Array<{ id: string; title: string }>;
+  cohorts: Cohort[];
+}) {
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [programId, setProgramId] = useState(defaults.program_id ?? "");
+  const [recipientCount, setRecipientCount] = useState<number | null>(null);
+  const [countLoading, setCountLoading] = useState(false);
+
+  const programCohorts = cohorts.filter((c) => c.program_id === programId);
+
+  async function fetchRecipientCount() {
+    if (!defaults.id) return;
+    setCountLoading(true);
+    const r = await api<{ count: number }>(`/api/admin/announcements/${defaults.id}/recipients`);
+    setCountLoading(false);
+    if (r.ok) setRecipientCount(r.data.count);
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -37,12 +59,14 @@ export function AnnouncementForm({ defaults, programs }: { defaults: Announcemen
       body: f.get("body"),
       kind: f.get("kind"),
       programId: String(f.get("programId") ?? "") || null,
+      cohortId: String(f.get("cohortId") ?? "") || null,
       location: String(f.get("location") ?? "").trim() || null,
       eventStartsAt: fromBangkokInput(f.get("eventStartsAt")),
       eventEndsAt: fromBangkokInput(f.get("eventEndsAt")),
       publishAt,
       expiresAt: fromBangkokInput(f.get("expiresAt")),
       isPinned: f.get("isPinned") === "on",
+      scheduledBroadcastAt: fromBangkokInput(f.get("scheduledBroadcastAt")),
     };
     setBusy(true);
     setError(null);
@@ -73,13 +97,30 @@ export function AnnouncementForm({ defaults, programs }: { defaults: Announcemen
         <Textarea name="body" defaultValue={defaults.body} rows={12} maxLength={20000} required />
       </Field>
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="เชื่อมกับหลักสูตรอบรม" hint="แสดงปุ่มไปยังหน้าหลักสูตร">
-          <Select name="programId" defaultValue={defaults.program_id ?? ""}>
+        <Field label="เชื่อมกับหลักสูตรรวม" hint="แสดงปุ่มไปยังหน้าหลักสูตร">
+          <Select name="programId" value={programId} onChange={(e) => { setProgramId(e.currentTarget.value); setRecipientCount(null); }}>
             <option value="">ไม่เชื่อม</option>
             {programs.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </Select>
         </Field>
+        <Field label="จำกัดส่งอีเมลเฉพาะรอบ" hint={programId ? "ผู้ที่ได้รับอนุมัติเข้ารอบนี้เท่านั้น" : "เลือกหลักสูตรรวมก่อน"}>
+          <Select name="cohortId" defaultValue={defaults.cohort_id ?? ""} disabled={!programId || programCohorts.length === 0}>
+            <option value="">ส่งทุกคน (ไม่จำกัดรอบ)</option>
+            {programCohorts.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+          </Select>
+        </Field>
         <Field label="สถานที่" hint="ไม่บังคับ เช่น ห้องประชุม 1 หรือ ออนไลน์"><Input name="location" defaultValue={defaults.location ?? ""} maxLength={255} /></Field>
+        <Field label="ส่งอีเมลอัตโนมัติเมื่อถึงเวลา" hint="เว้นว่าง = ส่งด้วยตนเอง">
+          <div className="flex gap-2">
+            <Input type="datetime-local" name="scheduledBroadcastAt" defaultValue={toBangkokInput(defaults.scheduled_broadcast_at)} className="flex-1" />
+            {defaults.id && (
+              <Button type="button" variant="outline" size="sm" loading={countLoading} onClick={() => void fetchRecipientCount()} title="ดูจำนวนผู้รับโดยประมาณ">
+                <Users className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          {recipientCount !== null && <p className="mt-1 text-xs text-muted-foreground">ผู้รับโดยประมาณ {recipientCount.toLocaleString("th-TH")} คน</p>}
+        </Field>
         <Field label="วันเริ่มกิจกรรม" hint="ไม่บังคับ"><Input type="datetime-local" name="eventStartsAt" defaultValue={toBangkokInput(defaults.event_starts_at)} /></Field>
         <Field label="วันสิ้นสุดกิจกรรม" hint="ไม่บังคับ"><Input type="datetime-local" name="eventEndsAt" defaultValue={toBangkokInput(defaults.event_ends_at)} /></Field>
         <Field label="เริ่มแสดงประกาศ (เวลาไทย)"><Input type="datetime-local" name="publishAt" defaultValue={toBangkokInput(defaults.publish_at ?? new Date())} required /></Field>

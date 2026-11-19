@@ -182,3 +182,14 @@ export async function cancelAssignment(user: CurrentUser, assignmentId: string, 
   });
   await audit(db, { action: "course.assignment_cancelled", userId: user.id, entityType: "course", entityId: assignment.course_id, ip, details: { assignmentId } });
 }
+
+export async function updateAssignmentDue(user: CurrentUser, assignmentId: string, dueAt: Date | null) {
+  const { db } = ctx();
+  let query = db.selectFrom("course_assignments").select(["id", "status"]).where("id", "=", assignmentId);
+  if (user.role !== "admin") query = query.where("assigned_by", "=", user.id);
+  const assignment = await query.executeTakeFirst();
+  if (!assignment) throw new HttpError(404, "NOT_FOUND");
+  if (assignment.status === "cancelled") throw new HttpError(409, "ASSIGNMENT_CANCELLED");
+  await db.updateTable("course_assignments").set({ due_at: dueAt }).where("id", "=", assignmentId).execute();
+  return { ok: true };
+}

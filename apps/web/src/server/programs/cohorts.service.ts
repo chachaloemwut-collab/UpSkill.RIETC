@@ -167,6 +167,31 @@ export async function updateCohort(user: CurrentUser, cohortId: string, input: C
     });
 }
 
+/** Shift all date fields on a cohort by a given number of days. Preserves relative spacing. */
+export async function shiftCohortDates(user: CurrentUser, cohortId: string, days: number) {
+  assertAdmin(user);
+  if (!Number.isInteger(days) || days === 0 || Math.abs(days) > 365) throw new HttpError(422, "INVALID_DAYS", "จำนวนวันต้องเป็นจำนวนเต็มที่ไม่ใช่ศูนย์ และไม่เกิน 365");
+  const { db } = ctx();
+  const c = await loadCohort(db, cohortId);
+  if (c.status === "cancelled") throw new HttpError(409, "COHORT_CANCELLED");
+  const ms = days * 86_400_000;
+  const shift = (d: Date) => new Date(d.getTime() + ms);
+  const newDates = {
+    registration_opens_at: shift(c.registration_opens_at),
+    registration_closes_at: shift(c.registration_closes_at),
+    starts_at: shift(c.starts_at),
+    ends_at: shift(c.ends_at),
+  };
+  checkDates({
+    registrationOpensAt: newDates.registration_opens_at,
+    registrationClosesAt: newDates.registration_closes_at,
+    startsAt: newDates.starts_at,
+    endsAt: newDates.ends_at,
+  } as CohortInput);
+  await db.updateTable("program_cohorts").set(newDates).where("id", "=", cohortId).execute();
+  return newDates;
+}
+
 export async function publishCohort(user: CurrentUser, cohortId: string, meta: { ip: string }) {
   assertAdmin(user);
   const { db } = ctx();

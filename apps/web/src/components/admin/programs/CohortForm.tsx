@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Ban, Globe, Plus, Save, Trash2 } from "lucide-react";
+import { Ban, CalendarClock, Globe, Plus, Save, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { fromBangkokInput, toBangkokInput } from "@/lib/format";
 import { Alert, AlertDialog, Button, Checkbox, Dialog, Field, Input, MultiSelect, Select, TagInput, useToast } from "@/components/ui";
@@ -175,6 +175,46 @@ export function EditCohortForm({ cohortId, defaults, groups, courses }: { cohort
     } else setError(r.message);
   }
   return <CohortFields defaults={defaults} groups={groups} courses={courses} onSubmit={onSubmit} busy={busy} error={error} submitLabel="บันทึกรอบอบรม" />;
+}
+
+/** Shift all dates on a cohort by a given number of days */
+export function ShiftDatesButton({ cohortId }: { cohortId: string }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [days, setDays] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const n = parseInt(days, 10);
+  const valid = !isNaN(n) && n !== 0 && Math.abs(n) <= 365;
+  async function shift() {
+    setBusy(true); setError(null);
+    const r = await api(`/api/admin/cohorts/${cohortId}/shift-dates`, { method: "POST", body: { days: n } });
+    setBusy(false);
+    if (r.ok) {
+      toast({ title: `เลื่อนวันทั้งหมด ${n > 0 ? "+" : ""}${n} วันแล้ว`, variant: "success" });
+      setOpen(false); setDays("");
+      router.refresh();
+    } else setError(r.message);
+  }
+  return (
+    <>
+      <Button variant="outline" onClick={() => setOpen(true)}><CalendarClock className="h-4 w-4" /> เลื่อนวันทั้งหมด</Button>
+      <Dialog open={open} onOpenChange={setOpen} title="เลื่อนวันทั้งหมด" description="เลื่อนวันเปิดรับสมัคร ปิดรับสมัคร เริ่มอบรม และสิ้นสุดอบรมพร้อมกัน">
+        {error && <div className="mb-4"><Alert variant="destructive" title={error} /></div>}
+        <div className="grid gap-4">
+          <Field label="จำนวนวัน" hint="ตัวเลขบวก = เลื่อนไปหน้า · ตัวเลขลบ = ย้อนกลับ">
+            <Input type="number" value={days} onChange={(e) => setDays(e.currentTarget.value)} min={-365} max={365} placeholder="เช่น 7 หรือ -3" />
+          </Field>
+          {valid && <p className="text-sm text-muted-foreground">วันทั้งหมดจะ{n > 0 ? "เลื่อนไปข้างหน้า" : "ย้อนกลับ"} {Math.abs(n)} วัน</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>
+            <Button loading={busy} disabled={!valid} onClick={() => void shift()}>ยืนยัน</Button>
+          </div>
+        </div>
+      </Dialog>
+    </>
+  );
 }
 
 export function CohortStatusActions({ cohortId, status }: { cohortId: string; status: string }) {

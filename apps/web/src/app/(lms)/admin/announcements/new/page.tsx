@@ -11,7 +11,10 @@ export const metadata: Metadata = { title: "เขียนประกาศ", 
 
 export default async function NewAnnouncementPage() {
   await requireAdminPage();
-  const programs = await ctx().db.selectFrom("programs").select(["id", "title"]).where("visibility", "<>", "archived").orderBy("title").execute();
+  const [programs, cohorts] = await Promise.all([
+    ctx().db.selectFrom("programs").select(["id", "title"]).where("visibility", "<>", "archived").orderBy("title").execute(),
+    ctx().db.selectFrom("program_cohorts").select(["id", "title", "program_id"]).where("status", "<>", "cancelled").orderBy("title").execute(),
+  ]);
   return (
     <>
       <PageHeader
@@ -22,7 +25,8 @@ export default async function NewAnnouncementPage() {
       <Card className="p-5">
         <AnnouncementForm
           programs={programs}
-          defaults={{ title: "", summary: null, body: "", kind: "event", program_id: null, location: null, event_starts_at: null, event_ends_at: null, publish_at: null, expires_at: null, is_pinned: false }}
+          cohorts={cohorts}
+          defaults={{ title: "", summary: null, body: "", kind: "event", program_id: null, cohort_id: null, location: null, event_starts_at: null, event_ends_at: null, publish_at: null, expires_at: null, is_pinned: false }}
         />
       </Card>
     </>

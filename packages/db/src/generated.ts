@@ -42,6 +42,7 @@ export interface Announcements {
   location: string | null;
   program_id: string | null;
   publish_at: Generated<Timestamp>;
+  scheduled_broadcast_at: Timestamp | null;
   slug: string;
   summary: string | null;
   title: string;

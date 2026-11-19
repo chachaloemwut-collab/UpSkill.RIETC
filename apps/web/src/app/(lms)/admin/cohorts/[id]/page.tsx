@@ -4,7 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { Alert, Badge, Card, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
-import { CohortStatusActions, EditCohortForm } from "@/components/admin/programs/CohortForm";
+import { CohortStatusActions, EditCohortForm, ShiftDatesButton } from "@/components/admin/programs/CohortForm";
 import { RegistrationsTable } from "@/components/admin/programs/RegistrationsTable";
 import { COHORT_PHASE, formatDateTimeTh } from "@/lib/format";
 import { ctx } from "@/server/context";
@@ -40,6 +40,7 @@ export default async function AdminCohortPage({ params }: { params: Promise<{ id
         title={<span className="flex flex-wrap items-center gap-3">{cohort.title}<Badge variant={phase?.variant ?? "secondary"}>{phase?.label ?? cohort.phase}</Badge></span>}
         description={`รับสมัคร ${formatDateTimeTh(cohort.registration_opens_at)} – ${formatDateTimeTh(cohort.registration_closes_at)} · อบรม ${formatDateTimeTh(cohort.starts_at)} – ${formatDateTimeTh(cohort.ends_at)}`}
       >
+        {cohort.status !== "cancelled" && <ShiftDatesButton cohortId={cohort.id} />}
         <CohortStatusActions cohortId={cohort.id} status={cohort.status} />
       </PageHeader>
 

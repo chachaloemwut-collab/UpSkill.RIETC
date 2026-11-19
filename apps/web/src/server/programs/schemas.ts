@@ -38,10 +38,12 @@ export const AnnouncementBody = z.strictObject({
   body: z.string().trim().min(1).max(20_000),
   kind: z.enum(["event", "news", "notice"]),
   programId: z.uuid().nullable(),
+  cohortId: z.uuid().nullable(),
   location: z.string().trim().max(255).nullable(),
   eventStartsAt: isoDate.nullable(),
   eventEndsAt: isoDate.nullable(),
   publishAt: isoDate,
   expiresAt: isoDate.nullable(),
   isPinned: z.boolean(),
+  scheduledBroadcastAt: isoDate.nullable(),
 });
