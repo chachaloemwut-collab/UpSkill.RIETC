@@ -406,6 +406,37 @@ export interface LearningSessions {
   user_id: string;
 }
 
+export interface LessonActivities {
+  activity_type: string;
+  content: Generated<Json>;
+  created_at: Generated<Timestamp>;
+  draft_content: Json | null;
+  draft_policy: Json | null;
+  id: Generated<string>;
+  is_active: Generated<boolean>;
+  lesson_id: string;
+  policy: Generated<Json>;
+  position_sec: number;
+  published_at: Timestamp | null;
+  sequence_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface LessonActivityResults {
+  activity_id: string;
+  answer_data: Generated<Json>;
+  attempt_count: Generated<number>;
+  correct_on_attempt: number | null;
+  created_at: Generated<Timestamp>;
+  enrollment_id: string;
+  id: Generated<string>;
+  locked_at: Timestamp | null;
+  passed_at: Timestamp | null;
+  score: number | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface LessonProgress {
   accumulated_valid_sec: Generated<number>;
   cheat_flag_count: Generated<number>;
@@ -681,6 +712,8 @@ export interface DB {
   learning_group_members: LearningGroupMembers;
   learning_groups: LearningGroups;
   learning_sessions: LearningSessions;
+  lesson_activities: LessonActivities;
+  lesson_activity_results: LessonActivityResults;
   lesson_progress: LessonProgress;
   lessons: Lessons;
   password_reset_tokens: PasswordResetTokens;

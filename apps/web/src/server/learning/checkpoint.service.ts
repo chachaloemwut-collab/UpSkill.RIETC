@@ -5,6 +5,7 @@ import { ctx } from "../context";
 import { HttpError } from "../http";
 import { tryCompleteByLessonTests } from "../courses/completion.service";
 import { asNavigationMode } from "./heartbeat.service";
+import { submitActivityAnswer, getLessonActivityStates } from "./activity-learner.service";
 
 export const CHECKPOINT_POINTS = 10;
 export const CHECKPOINT_PENALTY_PER_WRONG = 2;
@@ -42,8 +43,36 @@ export function checkpointRewatchRange(atSec: number, durationSec: number) {
  * - wrong on attempt 3    → checkpoint locks and only the minute before the question is marked unwatched;
  *                           starting the lesson again re-arms the checkpoint
  */
-export async function submitCheckpointAnswer(userId: string, lessonId: string, optionIndex: number): Promise<CheckpointAnswer> {
+export async function submitCheckpointAnswer(userId: string, lessonId: string, optionIndex: number, enrollmentId?: string): Promise<CheckpointAnswer> {
   const { db } = ctx();
+
+  // If a lesson_activities row exists, delegate to the new multi-activity system.
+  // Look up the enrollment if not provided (backward-compat call sites omit it).
+  const resolvedEnrollmentId =
+    enrollmentId ??
+    (
+      await db
+        .selectFrom("enrollments as e")
+        .innerJoin("lessons as l", "l.course_id", "e.course_id")
+        .select("e.id")
+        .where("l.id", "=", lessonId)
+        .where("e.user_id", "=", userId)
+        .executeTakeFirst()
+    )?.id;
+
+  if (resolvedEnrollmentId) {
+    const activity = await db
+      .selectFrom("lesson_activities")
+      .select(["id"])
+      .where("lesson_id", "=", lessonId)
+      .where("activity_type", "=", "question")
+      .where("is_active", "=", true)
+      .orderBy("position_sec", "asc")
+      .limit(1)
+      .executeTakeFirst();
+    if (activity) return submitActivityAnswer(userId, resolvedEnrollmentId, activity.id, optionIndex);
+  }
+
   const lesson = await db
     .selectFrom("lessons")
     .select(["id", "checkpoint_question", "checkpoint_correct_index", "checkpoint_at_sec", "duration_sec"])
@@ -156,9 +185,46 @@ async function completeLessonIfWatched(userId: string, lessonId: string): Promis
 }
 
 /** State passed to the player so a passed checkpoint is not asked again after a page reload. */
-export async function getCheckpointState(userId: string, lessonId: string) {
-  const row = await ctx()
-    .db.selectFrom("checkpoint_attempts")
+export async function getCheckpointState(userId: string, lessonId: string, enrollmentId?: string) {
+  const { db } = ctx();
+
+  // New multi-activity path: return all activity states for the lesson.
+  // Resolve enrollmentId if not passed.
+  const resolvedEnrollmentId =
+    enrollmentId ??
+    (
+      await db
+        .selectFrom("enrollments as e")
+        .innerJoin("lessons as l", "l.course_id", "e.course_id")
+        .select("e.id")
+        .where("l.id", "=", lessonId)
+        .where("e.user_id", "=", userId)
+        .executeTakeFirst()
+    )?.id;
+
+  if (resolvedEnrollmentId) {
+    const activities = await getLessonActivityStates(resolvedEnrollmentId, lessonId);
+    if (activities.length > 0) {
+      // Backward-compat shape: use the first question activity
+      const q = activities.find((a) => a.activityType === "question");
+      if (q) {
+        return {
+          passed: q.state.passed,
+          locked: q.state.locked,
+          score: q.state.score,
+          attemptsUsed: q.state.attemptsUsed,
+          attemptsLeft: q.state.locked ? 0 : Math.max(0, CHECKPOINT_MAX_ATTEMPTS - q.state.attemptsUsed),
+          // Extended: all activities
+          activities,
+        };
+      }
+      return null;
+    }
+  }
+
+  // Legacy fallback: checkpoint_attempts table
+  const row = await db
+    .selectFrom("checkpoint_attempts")
     .select(["score", "passed_at", "locked_at", "attempt_count"])
     .where("user_id", "=", userId)
     .where("lesson_id", "=", lessonId)
