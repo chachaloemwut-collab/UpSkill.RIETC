@@ -82,6 +82,59 @@ export async function updateGroupMember(user: CurrentUser, groupId: string, emai
   }
 }
 
+export type BulkImportRow = { email: string; status: "added" | "already_member" | "not_found" | "duplicate" };
+
+/**
+ * Bulk-import members into a learning group from a list of emails.
+ * With preview = true, returns what would happen without changing anything.
+ * With preview = false, adds all resolved members (idempotent: skips existing).
+ */
+export async function bulkImportGroupMembers(
+  user: CurrentUser,
+  groupId: string,
+  rawEmails: string[],
+  options: { preview: boolean },
+): Promise<{ rows: BulkImportRow[]; added: number }> {
+  const { db } = ctx();
+  await ownedGroup(user, groupId);
+
+  // Normalize and deduplicate, tracking which inputs were duplicates
+  const seen = new Set<string>();
+  const rows: BulkImportRow[] = [];
+  const unique: string[] = [];
+  for (const raw of rawEmails) {
+    const e = raw.trim().toLowerCase();
+    if (!e) continue;
+    if (seen.has(e)) { rows.push({ email: e, status: "duplicate" }); continue; }
+    seen.add(e);
+    unique.push(e);
+  }
+  if (unique.length === 0) return { rows, added: 0 };
+
+  // Batch-fetch existing users and current group membership
+  const [users, existing] = await Promise.all([
+    db.selectFrom("users").select(["id", "email"]).where("email", "in", unique).where("status", "=", "active").execute(),
+    db.selectFrom("learning_group_members as gm").innerJoin("users as u", "u.id", "gm.user_id").select("u.email").where("gm.group_id", "=", groupId).execute(),
+  ]);
+  const userMap = new Map(users.map((u) => [u.email, u.id]));
+  const memberSet = new Set(existing.map((e) => e.email));
+
+  for (const email of unique) {
+    if (!userMap.has(email)) { rows.push({ email, status: "not_found" }); continue; }
+    if (memberSet.has(email)) { rows.push({ email, status: "already_member" }); continue; }
+    rows.push({ email, status: "added" });
+  }
+
+  if (!options.preview) {
+    const toAdd = rows.filter((r) => r.status === "added").map((r) => ({ group_id: groupId, user_id: userMap.get(r.email)! }));
+    if (toAdd.length > 0) {
+      await db.insertInto("learning_group_members").values(toAdd).onConflict((oc) => oc.columns(["group_id", "user_id"]).doNothing()).execute();
+    }
+  }
+
+  return { rows, added: rows.filter((r) => r.status === "added").length };
+}
+
 export async function assignCourse(
   user: CurrentUser,
   input: { courseId: string; targetType: "user" | "group"; target: string; dueAt?: Date; note?: string },

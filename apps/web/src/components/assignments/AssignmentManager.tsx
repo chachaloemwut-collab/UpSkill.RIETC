@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import { toBangkokInput } from "@/lib/format";
 import { Badge, Button, Card, Dialog, Field, Input, Select, Table, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, useToast } from "@/components/ui";
 
+type BulkRow = { email: string; status: "added" | "already_member" | "not_found" | "duplicate" };
+
 interface Assignment { id: string; status: string; due_at: Date | string | null; note: string | null; course_title: string; target_name: string; recipient_count: number; completed_count: number }
 interface Props {
   courses: Array<{ id: string; title: string }>;
@@ -21,8 +23,7 @@ export function AssignmentManager({ courses, groups, assignments }: Props) {
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkEmails, setBulkEmails] = useState("");
   const [bulkGroupId, setBulkGroupId] = useState("");
-  const [bulkOperation, setBulkOperation] = useState<"add" | "remove">("add");
-  const [bulkResults, setBulkResults] = useState<Array<{ email: string; ok: boolean; msg?: string }>>([]);
+  const [bulkPreview, setBulkPreview] = useState<{ rows: BulkRow[]; added: number } | null>(null);
   const [editingDue, setEditingDue] = useState<{ id: string; due_at: Date | string | null } | null>(null);
   const [newDue, setNewDue] = useState("");
 
@@ -44,18 +45,32 @@ export function AssignmentManager({ courses, groups, assignments }: Props) {
     if (result.ok) { event.currentTarget.reset(); done("ปรับสมาชิกกลุ่มแล้ว"); } else failed(result.message);
   }
 
-  async function bulkMember() {
-    const emails = bulkEmails.split(/[\n\r,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean);
+  function parseBulkEmails() {
+    return bulkEmails.split(/[\n\r,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean);
+  }
+
+  async function bulkRunPreview() {
+    const emails = parseBulkEmails();
     if (!bulkGroupId || emails.length === 0) return;
     setBusy(true);
-    const results: typeof bulkResults = [];
-    for (const email of emails) {
-      const r = await api(`/api/manage/groups/${bulkGroupId}/members`, { body: { email, operation: bulkOperation } });
-      results.push({ email, ok: r.ok, msg: r.ok ? undefined : r.message });
-    }
+    setBulkPreview(null);
+    const r = await api(`/api/manage/groups/${bulkGroupId}/members/bulk`, { body: { emails, preview: true } });
     setBusy(false);
-    setBulkResults(results);
-    if (results.some((r) => r.ok)) router.refresh();
+    if (r.ok) setBulkPreview(r as unknown as { rows: BulkRow[]; added: number });
+    else failed(r.message);
+  }
+
+  async function bulkCommit() {
+    const emails = parseBulkEmails();
+    if (!bulkGroupId || emails.length === 0 || !bulkPreview) return;
+    setBusy(true);
+    const r = await api(`/api/manage/groups/${bulkGroupId}/members/bulk`, { body: { emails, preview: false } });
+    setBusy(false);
+    if (r.ok) {
+      setBulkPreview(null);
+      setBulkEmails("");
+      done(`เพิ่มสมาชิก ${(r as unknown as { added: number }).added} คนแล้ว`);
+    } else failed(r.message);
   }
 
   async function assign(event: FormEvent<HTMLFormElement>) {
@@ -135,7 +150,7 @@ export function AssignmentManager({ courses, groups, assignments }: Props) {
         <Card className="p-6 grid gap-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">ปรับสมาชิกกลุ่ม</span>
-            <Button type="button" variant="ghost" size="sm" onClick={() => { setBulkMode(!bulkMode); setBulkResults([]); }}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => { setBulkMode(!bulkMode); setBulkPreview(null); }}>
               <Clipboard className="h-4 w-4 mr-1" />{bulkMode ? "รายเดียว" : "วางรายการ"}
             </Button>
           </div>
@@ -149,29 +164,33 @@ export function AssignmentManager({ courses, groups, assignments }: Props) {
           ) : (
             <div className="grid gap-4">
               <Field label="กลุ่ม">
-                <Select value={bulkGroupId} onChange={(e) => setBulkGroupId(e.currentTarget.value)}>
+                <Select value={bulkGroupId} onChange={(e) => { setBulkGroupId(e.currentTarget.value); setBulkPreview(null); }}>
                   <option value="">เลือกกลุ่ม</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.member_count})</option>)}
                 </Select>
               </Field>
               <Field label="อีเมล" hint="หลายรายการคั่นด้วยบรรทัดใหม่ จุลภาค หรือเซมิโคลอน">
-                <Textarea value={bulkEmails} onChange={(e) => setBulkEmails(e.currentTarget.value)} rows={6} placeholder={"user1@example.com\nuser2@example.com"} />
+                <Textarea value={bulkEmails} onChange={(e) => { setBulkEmails(e.currentTarget.value); setBulkPreview(null); }} rows={6} placeholder={"user1@example.com\nuser2@example.com"} />
               </Field>
-              <Field label="รายการ">
-                <Select value={bulkOperation} onChange={(e) => setBulkOperation(e.currentTarget.value as "add" | "remove")}>
-                  <option value="add">เพิ่มเข้ากลุ่ม</option>
-                  <option value="remove">นำออกจากกลุ่ม</option>
-                </Select>
-              </Field>
-              <Button loading={busy} disabled={!bulkGroupId || !bulkEmails.trim()} className="justify-self-start" onClick={() => void bulkMember()}>
-                บันทึกสมาชิกทั้งหมด
-              </Button>
-              {bulkResults.length > 0 && (
-                <div className="grid gap-1 text-sm">
-                  {bulkResults.map((r) => (
-                    <div key={r.email} className={r.ok ? "text-green-600" : "text-destructive"}>
-                      {r.ok ? "✓" : "✗"} {r.email}{r.msg && ` — ${r.msg}`}
-                    </div>
-                  ))}
+              <div className="flex items-center gap-2">
+                <Button loading={busy} disabled={!bulkGroupId || !bulkEmails.trim()} variant="outline" onClick={() => void bulkRunPreview()}>
+                  ดูตัวอย่าง
+                </Button>
+                {bulkPreview && bulkPreview.added > 0 && (
+                  <Button loading={busy} onClick={() => void bulkCommit()}>
+                    ยืนยันเพิ่ม {bulkPreview.added} คน
+                  </Button>
+                )}
+              </div>
+              {bulkPreview && (
+                <div className="grid gap-1 text-sm max-h-56 overflow-y-auto rounded border p-2">
+                  {bulkPreview.rows.map((r) => {
+                    const cls = r.status === "added" ? "text-green-600" : r.status === "not_found" ? "text-destructive" : "text-muted-foreground";
+                    const label = r.status === "added" ? "✓ จะเพิ่ม" : r.status === "already_member" ? "○ เป็นสมาชิกอยู่แล้ว" : r.status === "not_found" ? "✗ ไม่พบผู้ใช้" : "⚠ ซ้ำในรายการ";
+                    return (
+                      <div key={r.email} className={cls}>{label} — {r.email}</div>
+                    );
+                  })}
+                  {bulkPreview.added === 0 && <p className="text-muted-foreground text-xs mt-1">ไม่มีรายการที่จะเพิ่ม</p>}
                 </div>
               )}
             </div>
