@@ -74,3 +74,27 @@ export function gradeAttempt(
   const scorePercentage = total === 0 ? 0 : Math.round((correct / total) * 10000) / 100;
   return { correct, total, scorePercentage };
 }
+
+/**
+ * Re-grade an attempt after an answer-key correction on one question.
+ * Matches the new correct option by **text** (option text is preserved across remappings).
+ * Returns null if the question is not in this snapshot or the new text is not found.
+ */
+export function gradeWithKeyOverride(
+  snapshot: readonly AttemptSnapshotItem[],
+  answers: Readonly<Record<string, string>>,
+  questionId: string,
+  newCorrectOptionText: string,
+): { scorePercentage: number } | null {
+  const item = snapshot.find((s) => s.questionId === questionId);
+  if (!item) return null;
+  const newRemappedId = item.options.find((o) => o.text === newCorrectOptionText)?.id;
+  if (!newRemappedId) return null;
+  const total = snapshot.length;
+  const correct = snapshot.filter((s) =>
+    s.questionId === questionId
+      ? answers[s.questionId] === newRemappedId
+      : answers[s.questionId] === s.correctOptionId,
+  ).length;
+  return { scorePercentage: total === 0 ? 0 : Math.round((correct / total) * 10000) / 100 };
+}

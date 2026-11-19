@@ -240,6 +240,7 @@ export interface Courses {
   navigation_mode: Generated<string>;
   passing_quiz_score: Generated<number>;
   published_at: Timestamp | null;
+  quiz_draw_count: number | null;
   quiz_time_limit_sec: Generated<number>;
   slug: string;
   thumbnail_url: string | null;
@@ -529,6 +530,23 @@ export interface QuizQuestions {
   lesson_id: string | null;
   options: Json;
   question_text: string;
+  tags: Generated<string[]>;
+}
+
+export interface QuizScoreCorrections {
+  applied_at: Timestamp | null;
+  applied_by: string | null;
+  attempt_id: string;
+  course_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  new_correct_text: string;
+  new_is_passed: boolean;
+  new_score_percentage: Numeric;
+  old_correct_text: string;
+  old_is_passed: boolean;
+  old_score_percentage: Numeric;
+  question_id: string;
 }
 
 export interface SystemSettings {
@@ -672,6 +690,7 @@ export interface DB {
   quiz_attempts: QuizAttempts;
   quiz_lockout_resets: QuizLockoutResets;
   quiz_questions: QuizQuestions;
+  quiz_score_corrections: QuizScoreCorrections;
   system_settings: SystemSettings;
   user_api_tokens: UserApiTokens;
   user_emails: UserEmails;

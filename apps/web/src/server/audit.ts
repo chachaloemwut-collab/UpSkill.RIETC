@@ -29,6 +29,7 @@ export type AuditAction =
   | "course.suspended"
   | "course.completion_overridden"
   | "course.quiz_attempts_reset"
+  | "quiz.corrections_applied"
   | "course.assigned"
   | "course.assignment_cancelled"
   | "course.instructor_changed"
