@@ -151,6 +151,58 @@ describe("free_complete navigation", () => {
   });
 });
 
+describe("H02 — FIRST_PING / UNANCHORED regression", () => {
+  // Clip: 60 s, linear, 90 % threshold.
+  // Pings at t=10,20,30,40,50,60 s, position matches; then a duplicate at t=62.1 s, pos 60.
+  const linearRules: LessonRules = { durationSec: 60, minWatchPercentage: 90 };
+  const freeRules: LessonRules = { durationSec: 60, minWatchPercentage: 90, navigationMode: "free_complete" };
+
+  function simPings(r: LessonRules, withAnchor: boolean) {
+    const pings: Array<[number, number]> = withAnchor ? [[0, 0]] : [];
+    for (let s = 10; s <= 60; s += 10) pings.push([s, s]);
+    pings.push([62.1, 60]);
+    let state = fresh;
+    let seq = 0;
+    const outcomes = [];
+    for (const [t, pos] of pings) {
+      const o = evaluateHeartbeat(state, seq, { seq: seq + 1, positionSec: pos }, r, t * 1000);
+      outcomes.push(o);
+      if (o.kind === "accepted") { state = o.state; seq += 1; }
+    }
+    return { state, outcomes };
+  }
+
+  it("linear without anchor ping — FIRST_PING then UNANCHORED, 0 credit, never completes", () => {
+    const { state, outcomes } = simPings(linearRules, false);
+    expect(outcomes[0]).toMatchObject({ resyncReason: "FIRST_PING" });
+    expect(outcomes.some((o) => o.kind === "accepted" && o.resyncReason === "UNANCHORED")).toBe(true);
+    expect(state.accumulatedValidSec).toBe(0);
+    expect(state.watchedChunks.size).toBe(0);
+    expect(state.isCompleted).toBe(false);
+  });
+
+  it("linear with anchor ping at position 0 — all 60 s credited, 6 chunks, completes", () => {
+    const { state } = simPings(linearRules, true);
+    expect(state.accumulatedValidSec).toBe(60);
+    expect(state.watchedChunks.size).toBe(6);
+    expect(state.isCompleted).toBe(true);
+  });
+
+  it("free_complete without anchor — 50 s credited, 5 chunks, does NOT complete (chunk 0 missing)", () => {
+    const { state } = simPings(freeRules, false);
+    expect(state.accumulatedValidSec).toBe(50);
+    expect(state.watchedChunks.size).toBe(5);
+    expect(state.isCompleted).toBe(false);
+  });
+
+  it("free_complete with anchor at 0 — 60 s, 6 chunks, completes", () => {
+    const { state } = simPings(freeRules, true);
+    expect(state.accumulatedValidSec).toBe(60);
+    expect(state.watchedChunks.size).toBe(6);
+    expect(state.isCompleted).toBe(true);
+  });
+});
+
 describe("coverage helpers", () => {
   it("lists unwatched ranges merged and clipped to the duration", () => {
     expect(unwatchedRanges([0, 1, 4], 55)).toEqual([{ fromSec: 20, toSec: 40 }, { fromSec: 50, toSec: 55 }]);
