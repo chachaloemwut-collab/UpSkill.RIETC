@@ -815,6 +815,20 @@ export function LessonPlayer({
 
       <StatusBar status={status} confirming={confirming} free={free} watchedCount={watchedCount} totalChunks={totalChunks} watchedPercent={watchedPercent} minPercent={minWatchPercentage} onTakeOver={takeOver} />
 
+      {/* H07: primary action bar — single most important next step, always above the fold */}
+      <PrimaryActionBar
+        completed={completed}
+        confirming={confirming}
+        watchedEnough={watchedEnough}
+        checkpointPending={checkpointPending}
+        checkpointPassed={checkpointPassed}
+        checkpoint={checkpoint}
+        lessonTest={lessonTest}
+        nextAction={nextAction}
+        onGoToCheckpoint={() => checkpoint && seek(Math.max(0, checkpoint.atSec - 5), true)}
+        onJump={jumpToUnwatched}
+      />
+
       <LessonChecklist
         free={free}
         completed={completed}
@@ -912,6 +926,52 @@ function StatusBar({
       )}
     </div>
   );
+}
+
+function PrimaryActionBar({
+  completed, confirming, watchedEnough, checkpointPending, checkpointPassed, checkpoint, lessonTest, nextAction, onGoToCheckpoint, onJump,
+}: {
+  completed: boolean; confirming: boolean; watchedEnough: boolean; checkpointPending: boolean; checkpointPassed: boolean;
+  checkpoint: { atSec: number } | null; lessonTest: Props["lessonTest"]; nextAction: PlayerAction | null;
+  onGoToCheckpoint: () => void; onJump: () => void;
+}) {
+  if (confirming) return null;
+  if (completed) {
+    if (lessonTest && !lessonTest.done && lessonTest.available)
+      return (
+        <div className="border-b bg-primary/5 px-4 py-3 lg:border-b-0 lg:border-t">
+          <Link href={lessonTest.href} className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+            <CheckCircle2 className="h-4 w-4" /> ทำแบบทดสอบท้ายคลิป
+          </Link>
+        </div>
+      );
+    if (nextAction)
+      return (
+        <div className="border-b bg-primary/5 px-4 py-3 lg:border-b-0 lg:border-t">
+          <Link href={nextAction.href} className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+            {nextAction.label} <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      );
+    return null;
+  }
+  if (checkpointPending && watchedEnough && !checkpointPassed && checkpoint)
+    return (
+      <div className="border-b bg-warning/5 px-4 py-3 lg:border-b-0 lg:border-t">
+        <button type="button" onClick={onGoToCheckpoint} className="inline-flex h-9 items-center gap-2 rounded-md bg-warning px-4 text-sm font-semibold text-warning-foreground hover:bg-warning/90">
+          <CircleHelp className="h-4 w-4" /> ตอบคำถามระหว่างคลิป ({clock(checkpoint.atSec)})
+        </button>
+      </div>
+    );
+  if (!watchedEnough)
+    return (
+      <div className="border-b bg-muted/40 px-4 py-3 lg:border-b-0 lg:border-t">
+        <button type="button" onClick={onJump} className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-muted">
+          <FastForward className="h-4 w-4" /> ดูช่วงที่ยังขาดอยู่
+        </button>
+      </div>
+    );
+  return null;
 }
 
 function LessonChecklist({
