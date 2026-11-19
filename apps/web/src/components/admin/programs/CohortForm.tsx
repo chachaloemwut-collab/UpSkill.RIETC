@@ -10,7 +10,7 @@ type FormField = {
   key: string; label: string; type: "text" | "textarea" | "select" | "date" | "number"; required: boolean;
   options?: string[]; showIf?: { field: string; value: string };
 };
-export type Rules = { emailDomains: string[]; groupIds: string[]; requireLegalName: boolean; prerequisiteCourseIds: string[]; applicationForm: FormField[] };
+export type Rules = { emailDomains: string[]; groupIds: string[]; groupMode: "any" | "all"; requireLegalName: boolean; prerequisiteCourseIds: string[]; prerequisiteMode: "any" | "all"; applicationForm: FormField[] };
 export type CohortDefaults = {
   title: string;
   registration_opens_at: Date | string | null;
@@ -36,7 +36,7 @@ const EMPTY: CohortDefaults = {
   waitlist_enabled: false,
   waitlist_acceptance_hours: null,
   requires_approval: false,
-  rules: { emailDomains: [], groupIds: [], requireLegalName: false, prerequisiteCourseIds: [], applicationForm: [] },
+  rules: { emailDomains: [], groupIds: [], groupMode: "any", requireLegalName: false, prerequisiteCourseIds: [], prerequisiteMode: "all", applicationForm: [] },
 };
 
 function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submitLabel }: {
@@ -70,7 +70,7 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
       waitlistEnabled,
       waitlistAcceptanceHours: waitlistEnabled && wlh ? Number(wlh) : null,
       requiresApproval: f.get("requiresApproval") === "on",
-      eligibility: { ...rules, applicationForm: fields.map((x, i) => ({ ...x, key: x.key || `q${i + 1}`, label: x.label.trim() })) },
+      eligibility: { ...rules, groupMode: rules.groupMode ?? "any", prerequisiteMode: rules.prerequisiteMode ?? "all", applicationForm: fields.map((x, i) => ({ ...x, key: x.key || `q${i + 1}`, label: x.label.trim() })) },
       ...(defaults.updated_at ? { clientUpdatedAt: new Date(defaults.updated_at).toISOString() } : {}),
     });
   }
@@ -104,12 +104,40 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
         <Field label="โดเมนอีเมลที่อนุญาต" hint="เว้นว่าง = ทุกอีเมล · เช่น rietc.ac.th (รวมโดเมนย่อย)">
           <TagInput value={rules.emailDomains} onValueChange={(v) => setRules((r) => ({ ...r, emailDomains: v.map((d) => d.trim().toLowerCase().replace(/^@/, "")) }))} placeholder="พิมพ์โดเมนแล้วกด Enter" />
         </Field>
-        <Field label="ต้องเป็นสมาชิกกลุ่มผู้เรียน" hint="อย่างน้อยหนึ่งกลุ่ม · จัดการกลุ่มได้ที่หน้ามอบหมายหลักสูตร">
-          <MultiSelect value={rules.groupIds} onValueChange={(v) => setRules((r) => ({ ...r, groupIds: v }))} placeholder="ไม่จำกัดกลุ่ม" options={groups.map((g) => ({ value: g.id, label: g.name }))} />
-        </Field>
-        <Field label="ต้องเรียนจบรายวิชาก่อน">
-          <MultiSelect value={rules.prerequisiteCourseIds} onValueChange={(v) => setRules((r) => ({ ...r, prerequisiteCourseIds: v }))} placeholder="ไม่มีรายวิชาพื้นฐาน" options={courses.map((c) => ({ value: c.id, label: c.name }))} />
-        </Field>
+        <div className="grid gap-2">
+          <Field label="ต้องเป็นสมาชิกกลุ่มผู้เรียน" hint="จัดการกลุ่มได้ที่หน้ามอบหมายหลักสูตร">
+            <MultiSelect value={rules.groupIds} onValueChange={(v) => setRules((r) => ({ ...r, groupIds: v }))} placeholder="ไม่จำกัดกลุ่ม" options={groups.map((g) => ({ value: g.id, label: g.name }))} />
+          </Field>
+          {rules.groupIds.length > 1 && (
+            <div className="flex gap-3 text-sm">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="groupMode" value="any" checked={(rules.groupMode ?? "any") === "any"} onChange={() => setRules((r) => ({ ...r, groupMode: "any" }))} className="h-3.5 w-3.5" />
+                อย่างน้อยหนึ่งกลุ่ม
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="groupMode" value="all" checked={rules.groupMode === "all"} onChange={() => setRules((r) => ({ ...r, groupMode: "all" }))} className="h-3.5 w-3.5" />
+                ครบทุกกลุ่ม
+              </label>
+            </div>
+          )}
+        </div>
+        <div className="grid gap-2">
+          <Field label="ต้องเรียนจบรายวิชาก่อน">
+            <MultiSelect value={rules.prerequisiteCourseIds} onValueChange={(v) => setRules((r) => ({ ...r, prerequisiteCourseIds: v }))} placeholder="ไม่มีรายวิชาพื้นฐาน" options={courses.map((c) => ({ value: c.id, label: c.name }))} />
+          </Field>
+          {rules.prerequisiteCourseIds.length > 1 && (
+            <div className="flex gap-3 text-sm">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="prereqMode" value="all" checked={(rules.prerequisiteMode ?? "all") === "all"} onChange={() => setRules((r) => ({ ...r, prerequisiteMode: "all" }))} className="h-3.5 w-3.5" />
+                ครบทุกวิชา
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="prereqMode" value="any" checked={rules.prerequisiteMode === "any"} onChange={() => setRules((r) => ({ ...r, prerequisiteMode: "any" }))} className="h-3.5 w-3.5" />
+                อย่างน้อยหนึ่งวิชา
+              </label>
+            </div>
+          )}
+        </div>
         <Checkbox checked={rules.requireLegalName} onChange={(e) => setRules((r) => ({ ...r, requireLegalName: e.currentTarget.checked }))} label="ต้องกรอกชื่อ-นามสกุลจริงในบัญชีก่อนสมัคร" />
       </fieldset>
 

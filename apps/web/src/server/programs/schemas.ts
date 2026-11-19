@@ -17,8 +17,10 @@ const ruleField = z.strictObject({
 export const EligibilityBody = z.strictObject({
   emailDomains: z.array(z.string().max(253)).max(20).default([]),
   groupIds: z.array(z.uuid()).max(20).default([]),
+  groupMode: z.enum(["any", "all"]).default("any"),
   requireLegalName: z.boolean().default(false),
   prerequisiteCourseIds: z.array(z.uuid()).max(20).default([]),
+  prerequisiteMode: z.enum(["any", "all"]).default("all"),
   applicationForm: z.array(ruleField).max(10).default([]),
 });
 

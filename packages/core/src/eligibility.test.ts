@@ -7,7 +7,7 @@ const applicant: Applicant = { email: "teacher@rietc.ac.th", hasLegalName: true,
 
 describe("parseEligibilityRules", () => {
   it("returns empty rules for garbage", () => {
-    expect(parseEligibilityRules(null)).toEqual({ emailDomains: [], groupIds: [], requireLegalName: false, prerequisiteCourseIds: [], applicationForm: [] });
+    expect(parseEligibilityRules(null)).toEqual({ emailDomains: [], groupIds: [], groupMode: "any", requireLegalName: false, prerequisiteCourseIds: [], prerequisiteMode: "all", applicationForm: [] });
     expect(parseEligibilityRules([1, 2])).toMatchObject({ emailDomains: [] });
   });
   it("normalizes domains and drops invalid ids and fields", () => {
