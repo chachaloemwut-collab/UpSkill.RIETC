@@ -22,6 +22,7 @@ import { loadYouTubeIframeApi, YT_STATE, type YTPlayer } from "./youtube-iframe-
 type Status =
   | { kind: "idle" }
   | { kind: "recording" }
+  | { kind: "buffering" }
   | { kind: "paused" }
   | { kind: "focus-paused" }
   | { kind: "superseded" }
@@ -266,6 +267,8 @@ export function LessonPlayer({
                 }
               }
               setStatus((s) => (s.kind === "completed" ? s : { kind: "recording" }));
+            } else if (e.data === YT_STATE.BUFFERING) {
+              setStatus((s) => (s.kind === "completed" || s.kind === "superseded" ? s : { kind: "buffering" }));
             } else if (e.data === YT_STATE.PAUSED) {
               setStatus((s) => (s.kind === "completed" || s.kind === "superseded" ? s : { kind: focusPauseRef.current ? "focus-paused" : "paused" }));
               void sendHeartbeat();
@@ -810,7 +813,7 @@ export function LessonPlayer({
         </div>
       </div>
 
-      <StatusBar status={status} free={free} watchedCount={watchedCount} totalChunks={totalChunks} watchedPercent={watchedPercent} minPercent={minWatchPercentage} onTakeOver={takeOver} />
+      <StatusBar status={status} confirming={confirming} free={free} watchedCount={watchedCount} totalChunks={totalChunks} watchedPercent={watchedPercent} minPercent={minWatchPercentage} onTakeOver={takeOver} />
 
       <LessonChecklist
         free={free}
@@ -866,6 +869,7 @@ export function LessonPlayer({
 
 const STATUS_TONE = {
   idle: "bg-muted-foreground/50",
+  buffering: "bg-blue-400 animate-pulse",
   recording: "bg-success",
   paused: "bg-warning",
   "focus-paused": "bg-warning",
@@ -876,20 +880,21 @@ const STATUS_TONE = {
 } as const;
 
 function StatusBar({
-  status, free, watchedCount, totalChunks, watchedPercent, minPercent, onTakeOver,
+  status, confirming, free, watchedCount, totalChunks, watchedPercent, minPercent, onTakeOver,
 }: {
-  status: Status; free: boolean; watchedCount: number; totalChunks: number; watchedPercent: number; minPercent: number; onTakeOver: () => void;
+  status: Status; confirming: boolean; free: boolean; watchedCount: number; totalChunks: number; watchedPercent: number; minPercent: number; onTakeOver: () => void;
 }) {
   const progress = free ? `ดูแล้ว ${watchedCount}/${totalChunks} ช่วง` : `ดูแล้ว ${watchedPercent}% (เกณฑ์ ${minPercent}%)`;
   const text: Record<Status["kind"], string> = {
     idle: "กดเล่นเพื่อเริ่มนับเวลาเรียน",
+    buffering: `กำลังโหลดวิดีโอ · ${progress}`,
     recording: `กำลังนับเวลาเรียน · ${progress}`,
     paused: `หยุดชั่วคราว · ${progress}`,
     "focus-paused": "หยุดให้อัตโนมัติเพราะสลับไปหน้าอื่น — กดเล่นเพื่อเรียนต่อ",
     superseded: "มีการเปิดบทเรียนในหน้าต่างอื่น หน้านี้จึงหยุดนับเวลา",
     offline: "การเชื่อมต่อขาดหาย — ระบบจะนับต่อให้เมื่อกลับมาออนไลน์",
     broken: "วิดีโอนี้ไม่พร้อมใช้งาน ระบบแจ้งผู้สอนแล้ว",
-    completed: "ดูคลิปนี้ครบตามเกณฑ์แล้ว",
+    completed: confirming ? "กำลังยืนยันผลการดู…" : "ดูคลิปนี้ครบตามเกณฑ์แล้ว",
   };
   return (
     <div aria-live="polite" className="flex items-center justify-between gap-3 border-b bg-card px-4 py-2.5 text-xs text-foreground lg:border-b-0 lg:border-t">
