@@ -140,6 +140,7 @@ export interface CohortRegistrations {
   id: Generated<string>;
   status: Generated<string>;
   user_id: string;
+  waitlist_offer_sent_at: Timestamp | null;
 }
 
 export interface CohortWatches {
@@ -466,6 +467,7 @@ export interface ProgramCohorts {
   status: Generated<string>;
   title: string;
   updated_at: Generated<Timestamp>;
+  waitlist_acceptance_hours: number | null;
   waitlist_enabled: Generated<boolean>;
 }
 

@@ -38,6 +38,7 @@ export interface CohortInput {
   requiresApproval: boolean;
   eligibility: unknown;
   clientUpdatedAt?: Date;
+  waitlistAcceptanceHours?: number | null;
 }
 
 /** Approved and pending registrations both hold a seat until an admin decides */
@@ -163,6 +164,7 @@ export async function updateCohort(user: CurrentUser, cohortId: string, input: C
           waitlist_enabled: input.waitlistEnabled,
           requires_approval: input.requiresApproval,
           eligibility: JSON.stringify(rules),
+          ...(input.waitlistAcceptanceHours !== undefined ? { waitlist_acceptance_hours: input.waitlistAcceptanceHours } : {}),
         })
         .where("id", "=", cohortId)
         .execute();
@@ -298,7 +300,7 @@ async function promoteWaitlist(trx: Tx, cohortId: string) {
       .executeTakeFirst();
     if (!next) return;
     if (c.requires_approval) {
-      await trx.updateTable("cohort_registrations").set({ status: "pending" }).where("id", "=", next.id).execute();
+      await trx.updateTable("cohort_registrations").set({ status: "pending", waitlist_offer_sent_at: new Date() }).where("id", "=", next.id).execute();
     } else {
       await trx.updateTable("cohort_registrations").set({ status: "approved", decided_at: new Date(), decided_by: null }).where("id", "=", next.id).execute();
       await enrollFromCohort(trx, next.user_id, cohortId, c.program_id);
@@ -573,4 +575,42 @@ export async function exportRegistrationsCsv(
   await audit(ctx().db, { action: "cohort.registrations_exported", userId: user.id, entityType: "cohort", entityId: cohortId, ip: meta.ip, details: { rows: rows.length, cols: header.length } });
   const csv = "﻿" + [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
   return { filename: `registrations-${cohortId.slice(0, 8)}.csv`, csv };
+}
+
+/** Worker: expire pending seats offered from the waitlist that passed their acceptance deadline */
+export async function expireWaitlistOffers() {
+  const { db } = ctx();
+  const expired = await db
+    .selectFrom("cohort_registrations as r")
+    .innerJoin("program_cohorts as c", "c.id", "r.cohort_id")
+    .select(["r.id", "r.cohort_id"])
+    .where("r.status", "=", "pending")
+    .where("r.waitlist_offer_sent_at", "is not", null)
+    .whereRef(
+      sql<Date>`r.waitlist_offer_sent_at + (c.waitlist_acceptance_hours * interval '1 hour')`,
+      "<",
+      sql<Date>`now()`,
+    )
+    .execute();
+  for (const row of expired) {
+    await db.transaction().execute(async (trx) => {
+      const updated = await trx.updateTable("cohort_registrations")
+        .set({ status: "waitlisted", waitlist_offer_sent_at: null })
+        .where("id", "=", row.id)
+        .where("status", "=", "pending")
+        .executeTakeFirst();
+      if (Number(updated.numUpdatedRows) > 0) await promoteWaitlist(trx, row.cohort_id);
+    });
+  }
+  return { expired: expired.length };
+}
+
+/** Admin: manually promote the next waitlisted applicant for a cohort */
+export async function promoteNextWaitlisted(user: CurrentUser, cohortId: string) {
+  const { db } = ctx();
+  await db.transaction().execute(async (trx) => {
+    await loadCohort(trx, cohortId, true);
+    await promoteWaitlist(trx, cohortId);
+  });
+  return { ok: true };
 }

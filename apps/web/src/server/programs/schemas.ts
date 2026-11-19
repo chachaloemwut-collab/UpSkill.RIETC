@@ -31,6 +31,7 @@ export const CohortBody = z.strictObject({
   requiresApproval: z.boolean(),
   eligibility: EligibilityBody,
   clientUpdatedAt: isoDate.optional(),
+  waitlistAcceptanceHours: z.number().int().min(1).max(720).nullable().optional(),
 });
 
 export const AnnouncementBody = z.strictObject({

@@ -16,6 +16,7 @@ import {
 import { enqueueCohortOpenEmails, enqueueCohortStartingEmails } from "./jobs/cohort-notifications.ts";
 import { checkAnticheatAnomaly } from "./jobs/anticheat-anomaly.ts";
 import { processScheduledBroadcasts } from "./jobs/process-scheduled-broadcasts.ts";
+import { expireWaitlistOffers } from "./jobs/expire-waitlist-offers.ts";
 import { ensureSystemOwner } from "./system-owner.ts";
 import { ensureDeveloperTestCertificate } from "./developer-test.ts";
 import { configuredEmailSender } from "./email-transport.ts";
@@ -38,6 +39,7 @@ const schedulerQueues = [
   new Queue("cohort-notifications", schedulerQueueOptions), // [4]
   new Queue("ops-health", schedulerQueueOptions),           // [5]
   new Queue("scheduled-broadcasts", schedulerQueueOptions), // [6]
+  new Queue("waitlist-expire", schedulerQueueOptions),      // [7]
 ];
 
 const workers = [
@@ -77,6 +79,7 @@ const workers = [
   }, { connection, concurrency: 1 }),
   new Worker("ops-health", () => checkAnticheatAnomaly(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
   new Worker("scheduled-broadcasts", () => processScheduledBroadcasts(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
+  new Worker("waitlist-expire", () => expireWaitlistOffers(db), { connection, concurrency: 1 }),
 ];
 
 // Daily cron: re-check every lesson's video (catches broken videos before learners hit them)
@@ -87,6 +90,7 @@ await schedulerQueues[2]!.upsertJobScheduler("weekly", { pattern: "0 8 * * 1", t
 await schedulerQueues[4]!.upsertJobScheduler("cohort-starting", { pattern: "*/15 * * * *", tz: "Asia/Bangkok" }, { name: "starting" });
 await schedulerQueues[5]!.upsertJobScheduler("anticheat-anomaly", { pattern: "*/15 * * * *", tz: "Asia/Bangkok" }, { name: "check" });
 await schedulerQueues[6]!.upsertJobScheduler("scheduled-broadcasts", { every: 60_000 }, { name: "check" });
+await schedulerQueues[7]!.upsertJobScheduler("waitlist-expire", { every: 300_000 }, { name: "expire" }); // every 5 min
 
 for (const w of workers) {
   // Log only the job id/template: job data can hold email addresses and links with tokens

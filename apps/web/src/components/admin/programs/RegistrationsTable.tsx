@@ -1,7 +1,7 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Check, Download, X } from "lucide-react";
+import { ArrowUpFromLine, Check, Download, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { REGISTRATION_STATUS, formatDateTimeTh } from "@/lib/format";
 import { Badge, Button, Checkbox, Dialog, EmptyState, Field, SegmentedControl, Table, Textarea, useToast } from "@/components/ui";
@@ -99,6 +99,17 @@ export function RegistrationsTable({ cohortId, registrations, form, cancelled }:
             { value: "all", label: `ทั้งหมด (${counts.all})` },
           ]}
         />
+        {filter === "waitlisted" && (counts.waitlisted ?? 0) > 0 && !cancelled && (
+          <Button variant="outline" size="sm" loading={busy} className="gap-1.5" onClick={async () => {
+            setBusy(true);
+            const r = await api(`/api/admin/cohorts/${cohortId}/waitlist`, { method: "POST" });
+            setBusy(false);
+            if (r.ok) { toast({ title: "เลื่อนรายชื่อสำรองขึ้นแล้ว" }); router.refresh(); }
+            else toast({ title: "ไม่สำเร็จ", description: (r as { message?: string }).message, variant: "destructive" });
+          }}>
+            <ArrowUpFromLine className="h-4 w-4" /> เลื่อนคนถัดไปขึ้น
+          </Button>
+        )}
         <Button variant="outline" size="sm" className="ml-auto gap-2" onClick={() => setExportOpen(true)}>
           <Download className="h-4 w-4" /> ส่งออก CSV
         </Button>
