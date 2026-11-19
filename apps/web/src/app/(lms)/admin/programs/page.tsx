@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "หลักสูตรอบรม
 
 export default async function AdminProgramsPage() {
   const user = await requireAdminPage();
-  const [programs, categories] = await Promise.all([listProgramsAdmin(user), listProgramCategories(user)]);
+  const [programs, categories] = await Promise.all([listProgramsAdmin(user), listProgramCategories()]);
   return (
     <>
       <PageHeader
