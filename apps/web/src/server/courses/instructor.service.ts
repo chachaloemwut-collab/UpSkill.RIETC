@@ -37,6 +37,23 @@ export async function loadOwnedCourse(user: CurrentUser, courseId: string) {
 }
 
 /** Instructors see their own courses; admins see every course (with its instructor) so they can manage all of them */
+export async function getCertPresets(user: CurrentUser, excludeCourseId?: string) {
+  return ctx()
+    .db.selectFrom("courses")
+    .select([
+      "id", "title",
+      "credential_enabled", "credential_type", "credential_name_th", "credential_name_en",
+      "credential_template_key", "credential_text_align", "credential_validity_days",
+      "credential_signer_name", "credential_signer_title",
+      "credential_achievement_th", "credential_achievement_en",
+      "credential_background_url",
+    ])
+    .$if(user.role !== "admin", (q) => q.where("instructor_id", "=", user.id))
+    .$if(!!excludeCourseId, (q) => q.where("id", "!=", excludeCourseId!))
+    .orderBy("title")
+    .execute();
+}
+
 export async function listMyCourses(user: CurrentUser) {
   return ctx()
     .db.selectFrom("courses as c")

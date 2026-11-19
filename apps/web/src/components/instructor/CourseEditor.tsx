@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Award,
   Check,
+  Copy,
   CheckCircle2,
   Circle,
   CircleHelp,
@@ -368,17 +369,55 @@ function PublishSection({
   );
 }
 
+type CertPreset = { id: string; title: string; credential_name_th: string; credential_name_en: string | null; credential_type: string; credential_template_key: string; credential_text_align: string; credential_validity_days: number | null; credential_signer_name: string | null; credential_signer_title: string | null; credential_achievement_th: string; credential_achievement_en: string | null; credential_background_url: string | null };
+
 function SettingsSection({ base, course }: { base: string; course: EditorData["course"] }) {
   const a = useAction();
+  const toast = useToast();
 
   // Form states for live certificate preview
   const [certEnabled, setCertEnabled] = useState(course.credential_enabled);
   const [certTitleTh, setCertTitleTh] = useState(course.credential_name_th);
+  const [certNameEn, setCertNameEn] = useState(course.credential_name_en ?? "");
+  const [certType, setCertType] = useState(course.credential_type);
   const [certSigner, setCertSigner] = useState(course.credential_signer_name ?? "");
   const [certSignerTitle, setCertSignerTitle] = useState(course.credential_signer_title ?? "");
   const [certTemplate, setCertTemplate] = useState(course.credential_template_key);
   const [certAlign, setCertAlign] = useState(course.credential_text_align);
+  const [certValidityDays, setCertValidityDays] = useState(course.credential_validity_days ?? "");
   const [certAchievement, setCertAchievement] = useState(course.credential_achievement_th);
+  const [certAchievementEn, setCertAchievementEn] = useState(course.credential_achievement_en ?? "");
+  const [certBgUrl, setCertBgUrl] = useState(course.credential_background_url ?? "");
+
+  // Preset loading
+  const [presets, setPresets] = useState<CertPreset[] | null>(null);
+  const [loadingPresets, setLoadingPresets] = useState(false);
+
+  async function fetchPresets() {
+    if (presets) return;
+    setLoadingPresets(true);
+    const r = await api<CertPreset[]>(`/api/instructor/courses/cert-presets?exclude=${course.id}`);
+    setLoadingPresets(false);
+    if (r.ok) setPresets(r.data);
+    else toast({ title: "โหลดรายวิชาไม่สำเร็จ", variant: "destructive" });
+  }
+
+  function applyPreset(id: string) {
+    const p = presets?.find((x) => x.id === id);
+    if (!p) return;
+    setCertTitleTh(p.credential_name_th);
+    setCertNameEn(p.credential_name_en ?? "");
+    setCertType(p.credential_type);
+    setCertTemplate(p.credential_template_key);
+    setCertAlign(p.credential_text_align);
+    setCertValidityDays(p.credential_validity_days ?? "");
+    setCertSigner(p.credential_signer_name ?? "");
+    setCertSignerTitle(p.credential_signer_title ?? "");
+    setCertAchievement(p.credential_achievement_th);
+    setCertAchievementEn(p.credential_achievement_en ?? "");
+    setCertBgUrl(p.credential_background_url ?? "");
+    toast({ title: "โหลดค่าเทมเพลตแล้ว", description: `จากวิชา "${p.title}" — ตรวจสอบและบันทึกอีกครั้ง` });
+  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -523,6 +562,19 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
             <p className="mt-1 text-xs text-muted-foreground">
               กำหนดรูปแบบและการจัดวางสำหรับใบประกาศนียบัตรที่ออกให้ผู้เรียนเมื่อผ่านเกณฑ์
             </p>
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-dashed bg-muted/40 p-3">
+              <Copy className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">สำเนาค่าจากวิชาอื่น:</span>
+              <Select
+                className="h-7 max-w-xs flex-1 text-xs"
+                defaultValue=""
+                onFocus={() => void fetchPresets()}
+                onChange={(e) => { if (e.target.value) applyPreset(e.target.value); e.target.value = ""; }}
+              >
+                <option value="" disabled>{loadingPresets ? "กำลังโหลด…" : presets ? "— เลือกวิชา —" : "— คลิกเพื่อดูรายการ —"}</option>
+                {(presets ?? []).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+              </Select>
+            </div>
           </div>
 
           <Checkbox
@@ -546,7 +598,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
               <Input
                 name="credential_name_en"
                 maxLength={120}
-                defaultValue={course.credential_name_en ?? ""}
+                value={certNameEn}
+                onChange={(e) => setCertNameEn(e.target.value)}
               />
             </Field>
             <Field label="รหัสประเภทเอกสาร">
@@ -555,7 +608,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
                 required
                 pattern="[a-z0-9_]+"
                 maxLength={40}
-                defaultValue={course.credential_type}
+                value={certType}
+                onChange={(e) => setCertType(e.target.value)}
               />
             </Field>
             <Field label="รูปแบบเทมเพลต">
@@ -586,7 +640,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
                 type="number"
                 min={1}
                 max={36500}
-                defaultValue={course.credential_validity_days ?? ""}
+                value={certValidityDays}
+                onChange={(e) => setCertValidityDays(e.target.value)}
               />
             </Field>
             <Field label="ชื่อผู้ลงนาม" hint="เว้นว่างเพื่อใช้ชื่อผู้สอน">
@@ -619,7 +674,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
               <Input
                 name="credential_achievement_en"
                 maxLength={255}
-                defaultValue={course.credential_achievement_en ?? ""}
+                value={certAchievementEn}
+                onChange={(e) => setCertAchievementEn(e.target.value)}
               />
             </Field>
             <div className="sm:col-span-2">
@@ -629,7 +685,8 @@ function SettingsSection({ base, course }: { base: string; course: EditorData["c
                   type="url"
                   placeholder="https://..."
                   maxLength={500}
-                  defaultValue={course.credential_background_url ?? ""}
+                  value={certBgUrl}
+                  onChange={(e) => setCertBgUrl(e.target.value)}
                 />
               </Field>
             </div>
