@@ -654,6 +654,7 @@ export interface Users {
   legal_full_name_en: string | null;
   legal_full_name_th: string | null;
   legal_name_locked_at: Timestamp | null;
+  must_change_password: Generated<boolean>;
   password_hash: string | null;
   password_updated_at: Timestamp | null;
   role: Generated<string>;
