@@ -76,6 +76,11 @@ jobs:
       - run: PGPASSWORD=dev_owner_password psql -h localhost -p 55432 -U upskill_owner -d upskill -v ON_ERROR_STOP=1 -f infra/postgres/init/00-roles.sql
       - run: pnpm db:migrate
       - run: pnpm db:codegen && git diff --exit-code packages/db/src/generated.ts
+      # Production hosting has a single DB role and migrates with role grants stripped: that path must parse too
+      - name: Migrations apply in single-role mode (MIGRATION_SKIP_ROLE_GRANTS=1)
+        run: |
+          PGPASSWORD=dev_owner_password psql -h localhost -p 55432 -U upskill_owner -d upskill -v ON_ERROR_STOP=1 -c "CREATE DATABASE upskill_single_role"
+          DATABASE_MIGRATION_URL=postgres://upskill_owner:dev_owner_password@localhost:55432/upskill_single_role MIGRATION_SKIP_ROLE_GRANTS=1 pnpm db:migrate
 
       - run: pnpm typecheck
       - run: pnpm lint

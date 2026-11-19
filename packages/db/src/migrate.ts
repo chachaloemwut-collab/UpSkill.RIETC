@@ -17,7 +17,8 @@ if (!url) throw new Error("DATABASE_MIGRATION_URL is required");
  * original file, so the same migrations stay valid for both setups.
  */
 const skipRoleGrants = process.env.MIGRATION_SKIP_ROLE_GRANTS === "1";
-const ROLE_GRANT = /^[ \t]*(?:GRANT|REVOKE)\b[^;]*?\b(?:upskill_app|upskill_readonly)\b[^;]*;/gim;
+// The optional ALTER DEFAULT PRIVILEGES prefix must be swallowed with its GRANT, or the dangling prefix is a syntax error
+const ROLE_GRANT = /^[ \t]*(?:ALTER\s+DEFAULT\s+PRIVILEGES\b[^;]*?)?\b(?:GRANT|REVOKE)\b[^;]*?\b(?:upskill_app|upskill_readonly)\b[^;]*;/gim;
 function forThisDatabase(sql: string): { sql: string; skipped: number } {
   if (!skipRoleGrants) return { sql, skipped: 0 };
   let skipped = 0;
