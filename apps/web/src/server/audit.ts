@@ -51,7 +51,9 @@ export type AuditAction =
   | "learning.cheat_flag"
   | "system.email_settings_updated"
   | "system.email_settings_tested"
-  | "system.google_oauth_settings_updated";
+  | "system.google_oauth_settings_updated"
+  | "programs.category_renamed"
+  | "programs.category_deleted";
 
 /** The app role can INSERT only (UPDATE/DELETE are blocked by both grant and trigger) */
 export async function audit(
