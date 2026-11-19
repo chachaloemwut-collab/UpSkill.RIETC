@@ -16,6 +16,7 @@ export type CohortDefaults = {
   ends_at: Date | string | null;
   capacity: number | null;
   waitlist_enabled: boolean;
+  waitlist_acceptance_hours: number | null;
   requires_approval: boolean;
   rules: Rules;
   updated_at?: Date | string;
@@ -30,6 +31,7 @@ const EMPTY: CohortDefaults = {
   ends_at: null,
   capacity: null,
   waitlist_enabled: false,
+  waitlist_acceptance_hours: null,
   requires_approval: false,
   rules: { emailDomains: [], groupIds: [], requireLegalName: false, prerequisiteCourseIds: [], applicationForm: [] },
 };
@@ -44,6 +46,7 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
   submitLabel: string;
 }) {
   const [rules, setRules] = useState<Rules>(defaults.rules);
+  const [waitlistEnabled, setWaitlistEnabled] = useState(defaults.waitlist_enabled);
   const [localError, setLocalError] = useState<string | null>(null);
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -51,6 +54,7 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
     const dates = ["registrationOpensAt", "registrationClosesAt", "startsAt", "endsAt"].map((k) => fromBangkokInput(f.get(k)));
     if (dates.some((d) => !d)) return setLocalError("กรุณากรอกวันที่ให้ครบ");
     const cap = String(f.get("capacity") ?? "").trim();
+    const wlh = String(f.get("waitlistAcceptanceHours") ?? "").trim();
     const fields = rules.applicationForm.filter((x) => x.label.trim());
     setLocalError(null);
     onSubmit({
@@ -60,7 +64,8 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
       startsAt: dates[2],
       endsAt: dates[3],
       capacity: cap ? Number(cap) : null,
-      waitlistEnabled: f.get("waitlistEnabled") === "on",
+      waitlistEnabled,
+      waitlistAcceptanceHours: waitlistEnabled && wlh ? Number(wlh) : null,
       requiresApproval: f.get("requiresApproval") === "on",
       eligibility: { ...rules, applicationForm: fields.map((x, i) => ({ ...x, key: x.key || `q${i + 1}`, label: x.label.trim() })) },
       ...(defaults.updated_at ? { clientUpdatedAt: new Date(defaults.updated_at).toISOString() } : {}),
@@ -80,10 +85,16 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="จำนวนที่นั่ง" hint="เว้นว่าง = ไม่จำกัด"><Input type="number" name="capacity" min={1} max={100000} defaultValue={defaults.capacity ?? ""} /></Field>
         <div className="grid content-end gap-2 pb-1">
-          <Checkbox name="waitlistEnabled" defaultChecked={defaults.waitlist_enabled} label="รับรายชื่อสำรองเมื่อที่นั่งเต็ม" />
+          <Checkbox checked={waitlistEnabled} onChange={(e) => setWaitlistEnabled(e.currentTarget.checked)} label="รับรายชื่อสำรองเมื่อที่นั่งเต็ม" />
           <Checkbox name="requiresApproval" defaultChecked={defaults.requires_approval} label="ผู้ดูแลต้องอนุมัติใบสมัคร" />
         </div>
       </div>
+
+      {waitlistEnabled && (
+        <Field label="กำหนดเวลายืนยันสิทธิ์สำรอง (ชั่วโมง)" hint="เว้นว่าง = ไม่มีกำหนด · 1–720 ชั่วโมง">
+          <Input type="number" name="waitlistAcceptanceHours" min={1} max={720} defaultValue={defaults.waitlist_acceptance_hours ?? ""} placeholder="เช่น 48" />
+        </Field>
+      )}
 
       <fieldset className="grid gap-4 rounded-lg border p-4">
         <legend className="px-1 text-sm font-semibold">เงื่อนไขผู้สมัคร</legend>

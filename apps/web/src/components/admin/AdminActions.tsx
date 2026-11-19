@@ -330,3 +330,75 @@ export function RemoveSuppressionButton({ email }: { email: string }) {
     else toast({ title: "ทำรายการไม่สำเร็จ", description: result.message, variant: "destructive" });
   }}><RotateCcw className="h-4 w-4" /> ยกเลิกการระงับ</Button>;
 }
+
+export type CourseDefaultsData = {
+  min_watch_percentage: number;
+  passing_quiz_score: number;
+  max_quiz_attempts_per_day: number;
+  quiz_time_limit_min: number;
+  is_sequential_locked: boolean;
+  navigation_mode: string;
+  completion_rule: string;
+};
+
+export function CourseDefaultsForm({ defaults }: { defaults: CourseDefaultsData }) {
+  const toast = useToast();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setBusy(true); setError(null);
+    const result = await api("/api/admin/settings/course-defaults", {
+      method: "PATCH",
+      body: {
+        min_watch_percentage: Number(f.get("min_watch_percentage")),
+        passing_quiz_score: Number(f.get("passing_quiz_score")),
+        max_quiz_attempts_per_day: Number(f.get("max_quiz_attempts_per_day")),
+        quiz_time_limit_min: Number(f.get("quiz_time_limit_min")),
+        is_sequential_locked: f.get("is_sequential_locked") === "on",
+        navigation_mode: f.get("navigation_mode"),
+        completion_rule: f.get("completion_rule"),
+      },
+    });
+    setBusy(false);
+    if (result.ok) { toast({ title: "บันทึกค่าเริ่มต้นแล้ว", variant: "success" }); router.refresh(); }
+    else setError(result.message);
+  }
+  return (
+    <form onSubmit={submit} className="grid gap-4 p-5">
+      {error && <Alert variant="destructive" title={error} />}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="เปอร์เซ็นต์ชมขั้นต่ำ (%)" hint="50–100">
+          <Input type="number" name="min_watch_percentage" min={50} max={100} defaultValue={defaults.min_watch_percentage} required />
+        </Field>
+        <Field label="คะแนนผ่านควิซขั้นต่ำ (%)" hint="0–100">
+          <Input type="number" name="passing_quiz_score" min={0} max={100} defaultValue={defaults.passing_quiz_score} required />
+        </Field>
+        <Field label="จำนวนครั้งทำควิซต่อวัน" hint="1–20">
+          <Input type="number" name="max_quiz_attempts_per_day" min={1} max={20} defaultValue={defaults.max_quiz_attempts_per_day} required />
+        </Field>
+        <Field label="เวลาทำควิซ (นาที)" hint="1–240">
+          <Input type="number" name="quiz_time_limit_min" min={1} max={240} defaultValue={defaults.quiz_time_limit_min} required />
+        </Field>
+        <Field label="โหมดนำทาง">
+          <Select name="navigation_mode" defaultValue={defaults.navigation_mode}>
+            <option value="free_complete">ดูได้อิสระ นับเฉพาะที่ผ่านเกณฑ์</option>
+            <option value="linear">ต้องเรียนตามลำดับ</option>
+          </Select>
+        </Field>
+        <Field label="เงื่อนไขจบหลักสูตร">
+          <Select name="completion_rule" defaultValue={defaults.completion_rule}>
+            <option value="post_test">ต้องทำแบบทดสอบท้ายหลักสูตร</option>
+            <option value="lesson_tests_average">เฉลี่ยคะแนนแบบทดสอบในบท</option>
+          </Select>
+        </Field>
+      </div>
+      <div className="flex items-center justify-between">
+        <Checkbox name="is_sequential_locked" defaultChecked={defaults.is_sequential_locked} label="ล็อกบทเรียนตามลำดับโดยค่าเริ่มต้น" />
+        <Button type="submit" loading={busy}><Save className="h-4 w-4" /> บันทึก</Button>
+      </div>
+    </form>
+  );
+}
