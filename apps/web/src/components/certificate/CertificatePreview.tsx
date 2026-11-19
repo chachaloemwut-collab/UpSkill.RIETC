@@ -36,6 +36,7 @@ export function CertificatePreview({
   signerName,
   signerTitle,
   display = CERTIFICATE_DISPLAY_DEFAULTS,
+  signatureUrl,
   record,
   className,
 }: {
@@ -48,6 +49,8 @@ export function CertificatePreview({
   signerName?: string | null;
   signerTitle?: string | null;
   display?: CertificateDisplay;
+  /** Signature image URL; without it no signer name is shown (same rule as the PDF) */
+  signatureUrl?: string | null;
   record?: CertificatePreviewRecord;
   className?: string;
 }) {
@@ -55,7 +58,7 @@ export function CertificatePreview({
   const left = align === "left";
   const isTest = documentType === "development_test";
   const issuer = display.issuer_name.trim();
-  const showSigner = display.show_signer && !!signerName?.trim();
+  const showSigner = !!signatureUrl && !!signerName?.trim();
   const r: CertificatePreviewRecord = record ?? {
     recipientName: "นายสมชาย พัฒนาวิชาชีพ",
     studyText: "2 ชั่วโมง 15 นาที",
@@ -142,8 +145,10 @@ export function CertificatePreview({
           </svg>
           {showSigner ? (
             <div className="absolute bottom-0 right-0 text-center" style={{ width: "24cqw" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- private, auth-checked image */}
+              <img src={signatureUrl!} alt="" className="mx-auto block object-contain" style={{ height: "5cqw", maxWidth: "20cqw", marginBottom: "-0.3cqw" }} />
               <div style={{ height: "0.1cqw", background: p.ink, opacity: 0.55, marginBottom: "0.7cqw" }} />
-              <p className="font-semibold" style={{ fontSize: "1.65cqw", fontFamily: prompt }}>{signerName}</p>
+              <p className="font-semibold" style={{ fontSize: "1.65cqw", fontFamily: prompt }}>({signerName})</p>
               <p style={{ fontSize: "1.25cqw", color: p.muted }}>{signerTitle || "ผู้ลงนาม"}</p>
             </div>
           ) : (

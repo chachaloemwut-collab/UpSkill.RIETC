@@ -11,7 +11,7 @@ import QRCode from "qrcode";
 import type { Database } from "@upskill/db";
 import type { Env } from "@upskill/infra/env";
 import { logger } from "@upskill/infra/logger";
-import { createCertificateStorage } from "@upskill/infra/storage";
+import { createCertificateStorage, createSignatureStorage } from "@upskill/infra/storage";
 import { addWorkerEmail } from "./process-email-outbox.ts";
 import { buildCertificateHtml } from "./certificate-template.ts";
 import { parseCertificateDisplay } from "@upskill/core/certificate-patterns";
@@ -32,7 +32,7 @@ async function fontFace(family: string, file: string, weight: number): Promise<s
 export async function renderCertificatePdf(db: Database, env: Env, code: string) {
   const c = await db.selectFrom("certificates").selectAll().where("certificate_code", "=", code).executeTakeFirstOrThrow();
 
-  // Site-wide layout options (signature block on/off, issuing body); a missing row means the defaults
+  // Site-wide layout options (issuing body); a missing row means the defaults
   const displayRow = await db.selectFrom("system_settings").select("value").where("key", "=", "certificate_display").executeTakeFirst();
   const display = parseCertificateDisplay(displayRow?.value);
 
@@ -53,6 +53,14 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
       logger.warn("college emblem missing (assets/brand/rietc-emblem.png); rendering the drawn medallion");
       return "";
     });
+
+  // Signature chosen at issue time (NULL = no signer block). If the file is gone, print no signer rather than fail.
+  let signatureDataUrl = "";
+  if (c.signature_key_snapshot) {
+    const img = await createSignatureStorage(env).read(c.signature_key_snapshot).catch(() => null);
+    if (img) signatureDataUrl = `data:image/${c.signature_key_snapshot.endsWith(".png") ? "png" : "jpeg"};base64,${img.toString("base64")}`;
+    else logger.warn({ code }, "certificate signature image missing; rendering without the signer block");
+  }
 
   // Optional background image: fetched once here (https only, configured by instructors/admins)
   // and embedded as a data URL, so the Playwright context can stay fully network-blocked.
@@ -89,7 +97,7 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
       visualDigest: c.visual_digest,
       display,
     },
-    { fontCss, qrDataUrl: qr, verifyUrl, backgroundDataUrl, emblemDataUrl },
+    { fontCss, qrDataUrl: qr, verifyUrl, backgroundDataUrl, emblemDataUrl, signatureDataUrl },
   );
 
   const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });

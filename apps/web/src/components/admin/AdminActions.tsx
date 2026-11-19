@@ -403,7 +403,7 @@ export function CourseDefaultsForm({ defaults }: { defaults: CourseDefaultsData 
   );
 }
 
-export function CertificateDisplayForm({ defaults }: { defaults: { show_signer: boolean; issuer_name: string } }) {
+export function CertificateDisplayForm({ defaults }: { defaults: { issuer_name: string } }) {
   const toast = useToast();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -414,7 +414,7 @@ export function CertificateDisplayForm({ defaults }: { defaults: { show_signer: 
     setBusy(true); setError(null);
     const result = await api("/api/admin/settings/certificate-display", {
       method: "PATCH",
-      body: { show_signer: f.get("show_signer") === "on", issuer_name: String(f.get("issuer_name") ?? "") },
+      body: { issuer_name: String(f.get("issuer_name") ?? "") },
     });
     setBusy(false);
     if (result.ok) { toast({ title: "บันทึกรูปแบบวุฒิบัตรแล้ว", description: "มีผลกับเอกสารที่ออกหลังจากนี้", variant: "success" }); router.refresh(); }
@@ -426,13 +426,8 @@ export function CertificateDisplayForm({ defaults }: { defaults: { show_signer: 
       <Field label="ชื่อหน่วยงานผู้ออกเอกสาร" hint="พิมพ์ใต้ตราวิทยาลัย เว้นว่างเพื่อใช้ชื่อวิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง">
         <Input name="issuer_name" maxLength={160} defaultValue={defaults.issuer_name} />
       </Field>
-      <Checkbox
-        name="show_signer"
-        defaultChecked={defaults.show_signer}
-        label="แสดงชื่อและตำแหน่งผู้ลงนามบนเอกสาร"
-      />
       <p className="-mt-2 text-xs text-muted-foreground">
-        เมื่อปิด เอกสารจะไม่มีช่องลงนามของบุคคล และแสดงว่ารับรองด้วยลายมือชื่อดิจิทัลของระบบแทน (ใช้กับเอกสารที่ออกหลังบันทึก ฉบับที่ออกไปแล้วไม่เปลี่ยน)
+        ลายเซ็นและชื่อผู้ลงนามตั้งแยกรายหลักสูตร (หน้าแก้ไขหลักสูตร ส่วนใบรับรอง) ใช้กับเอกสารที่ออกหลังบันทึก ฉบับที่ออกไปแล้วไม่เปลี่ยน
       </p>
       <Button type="submit" loading={busy} className="justify-self-end"><Save className="h-4 w-4" /> บันทึก</Button>
     </form>

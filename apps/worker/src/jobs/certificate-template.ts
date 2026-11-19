@@ -50,6 +50,11 @@ export interface CertificateAssets {
   backgroundDataUrl: string;
   /** Issuing college's emblem as a data: URL ("" falls back to a drawn medallion) */
   emblemDataUrl?: string;
+  /**
+   * The signer's signature image as a data: URL. The signer block (signature, name, title) is printed only
+   * when this is present: no signature, no name (the course must also have its admin switch on at issue time).
+   */
+  signatureDataUrl?: string;
 }
 
 const BRAND = "UpskillReskill.RIETC";
@@ -172,7 +177,7 @@ export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): 
   const p = certificatePattern(c.template);
   const isTest = c.documentType === "development_test";
   const left = c.textAlign === "left";
-  const showSigner = c.display.show_signer && !!c.signerName.trim();
+  const showSigner = !!a.signatureDataUrl && !!c.signerName.trim();
   const issuer = c.display.issuer_name.trim();
   const coursePrefix = c.documentType === "program" ? "หลักสูตรอบรม" : "หลักสูตร";
   const achievement = c.achievement ?? "ได้ผ่านการอบรมออนไลน์";
@@ -225,6 +230,7 @@ export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): 
     .code { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 9pt; color: ${p.ink}; letter-spacing: .04em; }
     .seal { position: absolute; left: 50%; bottom: -4mm; width: 40mm; height: 40mm; transform: translateX(-50%); }
     .sign { position: absolute; right: 0; bottom: 0; width: 72mm; text-align: center; }
+    .sign .sig { display: block; height: 15mm; max-width: 60mm; margin: 0 auto -1mm; object-fit: contain; }
     .sign .line { height: .3mm; background: ${p.ink}; opacity: .55; margin-bottom: 2mm; }
     .sign .n { font-family: "Prompt", sans-serif; font-weight: 600; font-size: 12pt; color: ${p.ink}; }
     .sign .r { font-size: 9pt; color: ${p.muted}; margin-top: .5mm; line-height: 1.35; }
@@ -256,7 +262,7 @@ export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): 
       <div class="qr"><img src="${a.qrDataUrl}" alt=""><div class="t"><b>สแกนเพื่อตรวจสอบ</b>รหัสเอกสาร<br><span class="code">${esc(c.code)}</span></div></div>
       ${seal(p, thaiDigits(year), isTest)}
       ${showSigner
-        ? `<div class="sign"><div class="line"></div><div class="n">${esc(c.signerName)}</div><div class="r">${c.signerTitle ? esc(c.signerTitle) : "ผู้ลงนาม"}</div></div>`
+        ? `<div class="sign"><img class="sig" src="${a.signatureDataUrl}" alt=""><div class="line"></div><div class="n">(${esc(c.signerName)})</div><div class="r">${c.signerTitle ? esc(c.signerTitle) : "ผู้ลงนาม"}</div></div>`
         : `<div class="attest"><b>รับรองด้วยลายมือชื่อดิจิทัล</b>เอกสารฉบับนี้ออกผ่านระบบ ${esc(BRAND)}<br>ลงนามอิเล็กทรอนิกส์ด้วย Ed25519<br>ตรวจสอบความถูกต้องได้ด้วย QR Code</div>`}
     </div>
     <div class="foot">${isTest ? `<b style="color:#b91c1c">[TEST / DEVELOPMENT]</b> · ` : ""}เอกสารต้นฉบับดิจิทัล ลงนามด้วย Ed25519 · ตรวจสอบที่ ${esc(a.verifyUrl.replace(/^https?:\/\//, ""))} · ลายนิ้วมือภาพ <span class="digest">${esc(c.visualDigest || "-")}</span></div>

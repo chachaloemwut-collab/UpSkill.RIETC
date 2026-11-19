@@ -49,6 +49,7 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
     publishRules: PUBLISH_RULES,
     courseDefaults,
     certificateDisplay,
+    isAdmin: user.role === "admin",
   };
 
   const vis = VISIBILITY[data.course.visibility];

@@ -64,6 +64,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ sl
             signerName: snap.instructor_name_snapshot,
             signerTitle: snap.signer_title_snapshot,
             display,
+            signatureUrl: snap.signature_key_snapshot ? `/api/certificates/${encodeURIComponent(snap.certificate_code)}/signature` : null,
             record: {
               recipientName: snap.recipient_name_snapshot,
               studyText: formatStudyDurationTh(snap.total_actual_study_sec),

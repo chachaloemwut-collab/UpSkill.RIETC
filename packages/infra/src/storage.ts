@@ -170,3 +170,76 @@ export function createApplicationFileStorage(env: Env): ApplicationFileStorage {
   }
   return localApplicationFileStorage(env.CERT_STORAGE_DIR);
 }
+
+// ---------------------------------------------------------------------------
+// Certificate signature images: same backend, under "signatures/". Content-addressed
+// ("<sha256>.png|jpg") so an issued certificate's snapshot key always points at the exact
+// image it was issued with; files are never overwritten or deleted.
+// ---------------------------------------------------------------------------
+export interface SignatureStorage {
+  save(key: string, bytes: Uint8Array, contentType: string): Promise<void>;
+  read(key: string): Promise<Buffer | null>;
+}
+
+export const SIGNATURE_KEY_RE = /^[0-9a-f]{64}\.(png|jpg)$/;
+
+function assertSignatureKey(key: string): void {
+  if (!SIGNATURE_KEY_RE.test(key)) throw new Error("invalid signature key");
+}
+
+export function localSignatureStorage(rootDir: string): SignatureStorage {
+  const base = path.join(path.resolve(rootDir), "signatures");
+  const fileFor = (key: string) => {
+    assertSignatureKey(key);
+    return path.join(base, key);
+  };
+  return {
+    async save(key, bytes) {
+      await mkdir(base, { recursive: true });
+      await writeFile(fileFor(key), bytes, { mode: 0o600 });
+    },
+    async read(key) {
+      try {
+        return await readFile(fileFor(key));
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw err;
+      }
+    },
+  };
+}
+
+export function s3SignatureStorage(cfg: { bucket: string; region: string; endpoint?: string; client?: S3Client }): SignatureStorage {
+  const client = cfg.client ?? getS3Client(cfg.bucket, cfg.region, cfg.endpoint);
+  const keyFor = (key: string) => {
+    assertSignatureKey(key);
+    return `signatures/${key}`;
+  };
+  return {
+    async save(key, bytes, contentType) {
+      await client.send(new PutObjectCommand({ Bucket: cfg.bucket, Key: keyFor(key), Body: Buffer.from(bytes), ContentType: contentType }));
+    },
+    async read(key) {
+      try {
+        const out = await client.send(new GetObjectCommand({ Bucket: cfg.bucket, Key: keyFor(key) }));
+        const bytes = await out.Body?.transformToByteArray();
+        return bytes ? Buffer.from(bytes) : null;
+      } catch (err) {
+        const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+        if (e.name === "NoSuchKey" || e.name === "NotFound" || e.$metadata?.httpStatusCode === 404) return null;
+        throw err;
+      }
+    },
+  };
+}
+
+export function createSignatureStorage(env: Env): SignatureStorage {
+  if (env.CERT_STORAGE_DRIVER === "s3") {
+    return s3SignatureStorage({
+      bucket: env.CERT_S3_BUCKET!,
+      region: env.CERT_S3_REGION!,
+      ...(env.CERT_S3_ENDPOINT ? { endpoint: env.CERT_S3_ENDPOINT } : {}),
+    });
+  }
+  return localSignatureStorage(env.CERT_STORAGE_DIR);
+}

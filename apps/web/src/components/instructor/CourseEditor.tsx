@@ -62,6 +62,7 @@ import { CourseLearnersRoster } from "./CourseLearnersRoster";
 import { LessonDetailsForm, UnitBadge, UnitsManager, type EditorUnit } from "./UnitsManager";
 import { ApplicationsManager, type EditorApplication } from "./ApplicationsManager";
 import { CertificatePreview } from "@/components/certificate/CertificatePreview";
+import { SignatureAdminCard } from "@/components/admin/SignatureAdminCard";
 import type { CertificateDisplay } from "@upskill/core/certificate-patterns";
 import { COURSE_TYPES, COURSE_TYPE_INFO } from "@upskill/core/application";
 
@@ -91,6 +92,8 @@ export interface EditorData {
     credential_achievement_en: string | null;
     credential_background_url: string | null;
     credential_text_align: string;
+    credential_show_signer: boolean;
+    credential_signature_key: string | null;
     navigation_mode: string;
     completion_rule: string;
     course_type: string;
@@ -134,6 +137,8 @@ export interface EditorData {
     completion_rule: string;
   };
   certificateDisplay?: CertificateDisplay;
+  /** Admins manage the course's signature (SignatureAdminCard) */
+  isAdmin?: boolean;
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -250,7 +255,7 @@ export function CourseEditor({ data }: { data: EditorData }) {
         </TabsContent>
 
         <TabsContent value="settings" className="mt-4">
-          <SettingsSection base={base} course={course} courseDefaults={data.courseDefaults} certificateDisplay={data.certificateDisplay} />
+          <SettingsSection base={base} course={course} courseDefaults={data.courseDefaults} certificateDisplay={data.certificateDisplay} isAdmin={data.isAdmin ?? false} />
         </TabsContent>
       </Tabs>
 
@@ -382,7 +387,7 @@ function PublishSection({
 
 type CertPreset = { id: string; title: string; credential_name_th: string; credential_name_en: string | null; credential_type: string; credential_template_key: string; credential_text_align: string; credential_validity_days: number | null; credential_signer_name: string | null; credential_signer_title: string | null; credential_achievement_th: string; credential_achievement_en: string | null; credential_background_url: string | null };
 
-function SettingsSection({ base, course, courseDefaults, certificateDisplay }: { base: string; course: EditorData["course"]; courseDefaults?: EditorData["courseDefaults"]; certificateDisplay?: CertificateDisplay }) {
+function SettingsSection({ base, course, courseDefaults, certificateDisplay, isAdmin }: { base: string; course: EditorData["course"]; courseDefaults?: EditorData["courseDefaults"]; certificateDisplay?: CertificateDisplay; isAdmin: boolean }) {
   const a = useAction();
   const toast = useToast();
 
@@ -467,6 +472,9 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay }: {
       "บันทึกการตั้งค่าแล้ว",
     );
   }
+
+  // Printed only when the admin switch is on AND a signature exists AND a signer name is set (issue.service.ts)
+  const signerPrinted = course.credential_show_signer && !!course.credential_signature_key && !!certSigner.trim();
 
   return (
     <div className="grid gap-6">
@@ -729,13 +737,19 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay }: {
           signerName={certSigner}
           signerTitle={certSignerTitle}
           display={certificateDisplay}
+          signatureUrl={signerPrinted && isAdmin ? `/api/admin/courses/${course.id}/signature?v=${course.credential_signature_key!.slice(0, 12)}` : null}
           className="max-w-3xl"
         />
         <p className="text-xs text-muted-foreground">
-          ภาพจำลองใช้สีและการจัดวางเดียวกับไฟล์ PDF จริง (ชื่อผู้เรียน คะแนน และ QR Code เป็นข้อมูลตัวอย่าง)
-          {!certificateDisplay?.show_signer && " · ตอนนี้ปิดการแสดงผู้ลงนามทั้งระบบ ชื่อผู้ลงนามด้านบนจึงยังไม่พิมพ์บนเอกสาร"}
+          ภาพจำลองใช้สีและการจัดวางเดียวกับไฟล์ PDF จริง (ชื่อผู้เรียนและ QR Code เป็นข้อมูลตัวอย่าง)
+          {signerPrinted
+            ? " · พิมพ์ลายเซ็นและชื่อผู้ลงนามบนเอกสาร"
+            : " · ยังไม่พิมพ์ชื่อผู้ลงนาม (ต้องมีลายเซ็นและผู้ดูแลระบบเปิดการแสดงผู้ลงนามของหลักสูตรนี้)"}
         </p>
       </Card>
+      {isAdmin && (
+        <SignatureAdminCard courseId={course.id} signatureKey={course.credential_signature_key} showSigner={course.credential_show_signer} signerName={course.credential_signer_name} />
+      )}
     </div>
   );
 }

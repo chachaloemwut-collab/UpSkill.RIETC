@@ -231,7 +231,7 @@ export default async function AdminPage() {
               <Award className="h-5 w-5" />
               <div>
                 <h3 className="font-semibold">รูปแบบวุฒิบัตร</h3>
-                <p className="text-xs text-muted-foreground">หน่วยงานผู้ออกเอกสาร และการแสดงผู้ลงนาม ใช้กับทุกหลักสูตร</p>
+                <p className="text-xs text-muted-foreground">หน่วยงานผู้ออกเอกสาร ใช้กับทุกหลักสูตร</p>
               </div>
             </div>
             <CertificateDisplayForm defaults={certificateDisplay} />

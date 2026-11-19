@@ -18,15 +18,15 @@ const view: CertificateView = {
   template: "standard",
   textAlign: "center",
   visualDigest: "abcd-1234",
-  display: { show_signer: false, issuer_name: "วิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง" },
+  display: { issuer_name: "วิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง" },
 };
 const assets = { fontCss: "", qrDataUrl: "data:image/png;base64,AA==", verifyUrl: "https://example.test/verify/UR-2026-AAAA-BBBB", backgroundDataUrl: "" };
 
 describe("certificate artwork", () => {
   it("escapes every snapshot field", () => {
     const html = buildCertificateHtml(
-      { ...view, recipientName: `<img src=x onerror="x()">`, courseTitle: "a & b", signerTitle: "<b>t</b>", achievement: `"q'`, display: { show_signer: true, issuer_name: "<i>" } },
-      assets,
+      { ...view, recipientName: `<img src=x onerror="x()">`, courseTitle: "a & b", signerTitle: "<b>t</b>", achievement: `"q'`, display: { issuer_name: "<i>" } },
+      { ...assets, signatureDataUrl: "data:image/png;base64,SIG" },
     );
     assert.ok(!html.includes("<img src=x"));
     assert.ok(html.includes("&lt;img src=x onerror=&quot;x()&quot;&gt;"));
@@ -53,12 +53,13 @@ describe("certificate artwork", () => {
     assert.ok(html.includes(`<img class="emblem" src="data:image/png;base64,EMBLEM"`));
   });
 
-  it("hides the signer unless the site setting turns it on", () => {
+  it("prints no signer name at all without a signature image", () => {
     const off = buildCertificateHtml(view, assets);
     assert.ok(!off.includes("ดร.ผู้ลงนาม"));
     assert.ok(off.includes("รับรองด้วยลายมือชื่อดิจิทัล"));
-    const on = buildCertificateHtml({ ...view, display: { show_signer: true, issuer_name: "สถาบันทดสอบ" } }, assets);
-    assert.ok(on.includes("ดร.ผู้ลงนาม"));
+    const on = buildCertificateHtml({ ...view, display: { issuer_name: "สถาบันทดสอบ" } }, { ...assets, signatureDataUrl: "data:image/png;base64,SIG" });
+    assert.ok(on.includes("(ดร.ผู้ลงนาม)"));
+    assert.ok(on.includes(`<img class="sig" src="data:image/png;base64,SIG"`));
     assert.ok(on.includes("สถาบันทดสอบ"));
     assert.ok(!on.includes("รับรองด้วยลายมือชื่อดิจิทัล"));
   });
