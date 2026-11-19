@@ -158,7 +158,8 @@ export function CourseEditor({ data }: { data: EditorData }) {
   const lessonQuestions = questions.filter((question) => question.assessment_type === "lesson");
   const averageRule = course.completion_rule === "lesson_tests_average";
   const base = `/api/instructor/courses/${course.id}`;
-  const checks = [
+  const brokenLessons = lessons.filter((l) => l.video_status !== "active");
+  const checks: Array<{ ok: boolean; label: string; brokenLessons?: typeof brokenLessons }> = [
     { ok: lessons.length > 0, label: "มีบทเรียนอย่างน้อย 1 บท" },
     {
       ok: course.total_duration_sec >= publishRules.minTotalDurationSec,
@@ -174,8 +175,9 @@ export function CourseEditor({ data }: { data: EditorData }) {
           label: `Post-test ≥ ${publishRules.minQuestions} ข้อ (ตอนนี้ ${postQuestions.length})`,
         },
     {
-      ok: lessons.length > 0 && lessons.every((l) => l.video_status === "active"),
+      ok: brokenLessons.length === 0,
       label: "วิดีโอทุกบทใช้งานได้",
+      brokenLessons: brokenLessons.length > 0 ? brokenLessons : undefined,
     },
   ];
 
@@ -254,7 +256,7 @@ function PublishSection({
 }: {
   base: string;
   course: EditorData["course"];
-  checks: Array<{ ok: boolean; label: string }>;
+  checks: Array<{ ok: boolean; label: string; brokenLessons?: Array<{ id: string; title: string }> }>;
 }) {
   const a = useAction();
   const set = (visibility: string) =>
@@ -288,7 +290,22 @@ function PublishSection({
             ) : (
               <Circle className="mt-0.5 h-4 w-4 shrink-0" />
             )}
-            {c.label}
+            <span>
+              {c.label}
+              {!c.ok && c.brokenLessons && c.brokenLessons.length > 0 && (
+                <span className="mt-1 flex flex-col gap-0.5">
+                  {c.brokenLessons.map((l) => (
+                    <a
+                      key={l.id}
+                      href={`#lesson-${l.id}`}
+                      className="text-xs text-destructive underline underline-offset-2 hover:text-destructive/80"
+                    >
+                      {l.title}
+                    </a>
+                  ))}
+                </span>
+              )}
+            </span>
           </li>
         ))}
       </ul>
@@ -782,7 +799,7 @@ function LessonsSection({
               const hasCheckpoint = !!l.checkpoint_question;
 
               return (
-                <li key={l.id} className="grid gap-3 px-4 py-3.5 hover:bg-muted/10 transition-colors">
+                <li key={l.id} id={`lesson-${l.id}`} className="grid gap-3 px-4 py-3.5 hover:bg-muted/10 transition-colors">
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold tabular-nums text-foreground">
                       {l.sequence_order}

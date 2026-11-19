@@ -669,6 +669,52 @@ export async function setVisibility(user: CurrentUser, courseId: string, visibil
 
 
 // ---------------------------------------------------------------------------
+// I-03: Pre-publish readiness check — structured result with broken-item IDs
+// so the UI can render links instead of a plain error string.
+// ---------------------------------------------------------------------------
+
+export async function getPublishReadiness(user: CurrentUser, courseId: string) {
+  await loadOwnedCourse(user, courseId);
+  const { db } = ctx();
+  const stats = await db
+    .selectFrom("courses as c")
+    .select([
+      "c.total_duration_sec",
+      "c.completion_rule",
+      sql<number>`(select count(*)::int from lessons l where l.course_id = c.id)`.as("lessons"),
+      sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.assessment_type = 'post' and q.is_active)`.as("questions"),
+      sql<number>`(select count(*)::int from quiz_questions q where q.course_id = c.id and q.assessment_type = 'lesson' and q.is_active)`.as("lesson_questions"),
+    ])
+    .where("c.id", "=", courseId)
+    .executeTakeFirstOrThrow();
+  const brokenLessons = await db
+    .selectFrom("lessons")
+    .select(["id", "title", "sequence_order"])
+    .where("course_id", "=", courseId)
+    .where("video_status", "<>", "active")
+    .orderBy("sequence_order")
+    .execute();
+
+  type Check = { id: string; label: string; ok: boolean; detail?: string };
+  const checks: Check[] = [
+    { id: "has_lessons", label: "มีบทเรียนอย่างน้อย 1 บท", ok: stats.lessons > 0 },
+    { id: "min_duration", label: "ความยาวรวมอย่างน้อย 10 นาที", ok: stats.total_duration_sec >= PUBLISH_RULES.minTotalDurationSec },
+    {
+      id: "has_questions",
+      label: stats.completion_rule === "lesson_tests_average" ? "มีข้อสอบท้ายคลิปรวมอย่างน้อย 3 ข้อ" : "มีข้อสอบอย่างน้อย 3 ข้อ",
+      ok: stats.completion_rule === "lesson_tests_average" ? stats.lesson_questions >= PUBLISH_RULES.minQuestions : stats.questions >= PUBLISH_RULES.minQuestions,
+    },
+    {
+      id: "no_broken_lessons",
+      label: "ไม่มีวิดีโอที่ใช้งานไม่ได้",
+      ok: brokenLessons.length === 0,
+      detail: brokenLessons.length > 0 ? `บทที่มีปัญหา: ${brokenLessons.map((l) => `"${l.title}"`).join(", ")}` : undefined,
+    },
+  ];
+  return { ready: checks.every((c) => c.ok), checks, brokenLessonIds: brokenLessons.map((l) => l.id) };
+}
+
+// ---------------------------------------------------------------------------
 // Learning units (หน่วยการเรียนรู้): a title + summary article grouping lessons.
 // Lessons keep their own global order; a unit is a label on a run of lessons.
 // ---------------------------------------------------------------------------

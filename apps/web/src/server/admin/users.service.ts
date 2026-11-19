@@ -16,6 +16,41 @@ import { revokeAllSessions } from "../auth/session";
 const PAGE_SIZE = 50;
 const STATUS_LABELS = { active: "ใช้งาน", suspended: "ระงับชั่วคราว", banned: "ระงับถาวร" } as const;
 
+/**
+ * I-07: Lightweight user picker — search by name, primary email, secondary verified email,
+ * or username. Used in assignment, group-member, cert-issuance and invitation pickers.
+ * Returns at most 20 results; query must be at least 2 characters.
+ */
+export async function searchUsersForPicker(query: string) {
+  const { db } = ctx();
+  const q = query.trim();
+  if (q.length < 2) return { users: [] };
+  const users = await db
+    .selectFrom("users as u")
+    .select(["u.id", "u.email", "u.username", "u.legal_full_name_th", "u.legal_full_name_en", "u.role"])
+    .where("u.status", "=", "active")
+    .where("u.deleted_at", "is", null)
+    .where((eb) =>
+      eb.or([
+        eb("u.email", "ilike", `%${q}%`),
+        eb("u.username", "ilike", `%${q}%`),
+        eb("u.legal_full_name_th", "ilike", `%${q}%`),
+        eb("u.legal_full_name_en", "ilike", `%${q}%`),
+        eb.exists(
+          eb.selectFrom("user_emails as ue")
+            .select("ue.id")
+            .whereRef("ue.user_id", "=", "u.id")
+            .where("ue.verified_at", "is not", null)
+            .where("ue.email", "ilike", `%${q}%`),
+        ),
+      ]),
+    )
+    .orderBy("u.legal_full_name_th", "asc")
+    .limit(20)
+    .execute();
+  return { users };
+}
+
 export async function listUsersAdmin(input: { query?: string; role?: string; status?: string; page: number }) {
   const { db } = ctx();
   const q = (input.query ?? "").trim();
