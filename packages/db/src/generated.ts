@@ -158,9 +158,11 @@ export interface CourseApplicationFiles {
   doc_key: string;
   id: Generated<string>;
   original_name: string;
+  page_no: Generated<number>;
   sha256: Buffer;
   size_bytes: number;
   storage_key: string;
+  superseded_at: Timestamp | null;
   user_id: string;
 }
 

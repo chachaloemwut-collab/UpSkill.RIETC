@@ -10,12 +10,14 @@ const DocKey = z.string().regex(/^[a-z][a-z0-9_]{0,39}$/);
 
 /**
  * Upload one document file for the application form: raw bytes in the body (PDF/JPG/PNG, max 5 MB),
- * ?doc=<document key>, the original name in X-File-Name (URI-encoded). The type is sniffed from the bytes.
+ * ?doc=<document key>&page=<1-based page number (default 1)>, name in X-File-Name (URI-encoded).
+ * Also accepts re-upload after the applicant's application is submitted if admin requested it.
  */
 export const POST = route<never, { id: string }>({ auth: "required" }, async ({ req, params, user }) => {
   const courseId = uuidParam(params.id);
   const doc = DocKey.safeParse(req.nextUrl.searchParams.get("doc"));
   if (!doc.success) throw new HttpError(400, "UNKNOWN_DOCUMENT");
+  const pageNo = Math.max(1, Math.min(10, Number(req.nextUrl.searchParams.get("page") ?? "1") || 1));
   const r = await hitRateLimit(ctx().redis, RATE_LIMITS.applicationUploadPerUser, user!.id);
   if (!r.allowed) throw new HttpError(429, "RATE_LIMITED", undefined, { "Retry-After": String(r.retryAfterSec) });
   // Refuse oversized uploads before reading them
@@ -28,5 +30,5 @@ export const POST = route<never, { id: string }>({ auth: "required" }, async ({ 
   } catch {
     name = "";
   }
-  return uploadApplicationFile(user!, courseId, doc.data, bytes, name);
+  return uploadApplicationFile(user!, courseId, doc.data, bytes, name, pageNo);
 });
