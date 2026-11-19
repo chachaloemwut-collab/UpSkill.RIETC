@@ -1,5 +1,5 @@
 "use client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Check, Download, X } from "lucide-react";
 import { api } from "@/lib/api";
@@ -21,8 +21,9 @@ type FormField = { key: string; label: string };
 
 export function RegistrationsTable({ cohortId, registrations, form, cancelled }: { cohortId: string; registrations: Registration[]; form: FormField[]; cancelled: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
-  const [filter, setFilter] = useState("pending");
+  const [filter, setFilter] = useState(() => searchParams.get("regStatus") ?? "pending");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
@@ -66,7 +67,13 @@ export function RegistrationsTable({ cohortId, registrations, form, cancelled }:
       <div className="flex flex-wrap items-center gap-3">
         <SegmentedControl
           value={filter}
-          onValueChange={(v) => { setFilter(v); setSelected(new Set()); }}
+          onValueChange={(v) => {
+            setFilter(v);
+            setSelected(new Set());
+            const p = new URLSearchParams(searchParams.toString());
+            if (v === "pending") p.delete("regStatus"); else p.set("regStatus", v);
+            router.replace(`?${p.toString()}`, { scroll: false });
+          }}
           options={[
             { value: "pending", label: `รอพิจารณา (${counts.pending ?? 0})` },
             { value: "approved", label: `อนุมัติ (${counts.approved ?? 0})` },
