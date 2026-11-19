@@ -163,3 +163,28 @@ export async function saveMyProfile(userId: string, input: ProfileInput & { pdpa
     }
   });
 }
+
+export const ContactPatch = z.strictObject({
+  phone: z.string().max(20).optional(),
+  addressLine: z.string().max(255).optional(),
+  subdistrict: z.string().max(100).optional(),
+  district: z.string().max(100).optional(),
+  province: z.string().max(100).optional(),
+  postalCode: z.string().max(10).optional(),
+});
+
+/** Patch only contact/address fields; never touches identity or name. */
+export async function updateContactInfo(userId: string, patch: z.infer<typeof ContactPatch>) {
+  const { db } = ctx();
+  const exists = await db.selectFrom("user_profiles").select("user_id").where("user_id", "=", userId).executeTakeFirst();
+  if (!exists) throw new HttpError(404, "PROFILE_NOT_FOUND", "กรุณากรอกข้อมูลส่วนตัวก่อน");
+  const set: Record<string, string> = {};
+  if (patch.phone !== undefined) set.phone = patch.phone;
+  if (patch.addressLine !== undefined) set.address_line = patch.addressLine;
+  if (patch.subdistrict !== undefined) set.subdistrict = patch.subdistrict;
+  if (patch.district !== undefined) set.district = patch.district;
+  if (patch.province !== undefined) set.province = patch.province;
+  if (patch.postalCode !== undefined) set.postal_code = patch.postalCode;
+  if (Object.keys(set).length === 0) return;
+  await db.updateTable("user_profiles").set(set).where("user_id", "=", userId).execute();
+}

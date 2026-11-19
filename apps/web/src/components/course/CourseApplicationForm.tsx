@@ -106,10 +106,12 @@ export function CourseApplicationForm({
   pendingFiles?: ApplicationFile[];
 }) {
   const router = useRouter();
-  const [contact, setContact] = useState<ApplicationInput["contact"]>({
+  const profileContact = {
     phone: profile.phone, email: profile.email, addressLine: profile.address_line, subdistrict: profile.subdistrict,
     district: profile.district, province: profile.province, postalCode: profile.postal_code,
-  });
+  };
+  const [contact, setContact] = useState<ApplicationInput["contact"]>(profileContact);
+  const [updateProfileContact, setUpdateProfileContact] = useState(false);
   const [education, setEducation] = useState({ level: "", institution: "", qualification: "" });
   const [occupation, setOccupation] = useState({ occupation: "", organization: "" });
   const [guardian, setGuardian] = useState({ name: profile.guardian_name ?? "", relation: "", phone: profile.guardian_phone ?? "", consent: false });
@@ -195,6 +197,12 @@ export function CourseApplicationForm({
     setBusy(true);
     setError(null);
     const r = await api<{ applicationNo: string; status: "approved" | "submitted" }>(`/api/courses/${courseId}/application`, { body: input });
+    if (r.ok && updateProfileContact) {
+      await api("/api/user/profile", {
+        method: "PATCH",
+        body: { phone: contact.phone, addressLine: contact.addressLine, subdistrict: contact.subdistrict, district: contact.district, province: contact.province, postalCode: contact.postalCode },
+      });
+    }
     setBusy(false);
     if (r.ok) {
       setDone(r.data);
@@ -269,6 +277,16 @@ export function CourseApplicationForm({
           </Field>
           <Field label="รหัสไปรษณีย์" error={err("contact.postalCode")}><Input inputMode="numeric" maxLength={5} {...c("postalCode")} /></Field>
         </div>
+        {/* I-08: offer to sync changed contact back to profile */}
+        {(contact.phone !== profileContact.phone || contact.addressLine !== profileContact.addressLine || contact.subdistrict !== profileContact.subdistrict || contact.district !== profileContact.district || contact.province !== profileContact.province || contact.postalCode !== profileContact.postalCode) && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+            <Checkbox
+              checked={updateProfileContact}
+              onChange={(e) => setUpdateProfileContact(e.target.checked)}
+              label="อัปเดตข้อมูลติดต่อในบัญชีของฉันด้วย (เปลี่ยนถาวร ไม่ใช่แค่ใบนี้)"
+            />
+          </div>
+        )}
       </Section>
 
       {settings.education !== "off" && (
