@@ -403,6 +403,42 @@ export function CourseDefaultsForm({ defaults }: { defaults: CourseDefaultsData 
   );
 }
 
+export function CertificateDisplayForm({ defaults }: { defaults: { show_signer: boolean; issuer_name: string } }) {
+  const toast = useToast();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setBusy(true); setError(null);
+    const result = await api("/api/admin/settings/certificate-display", {
+      method: "PATCH",
+      body: { show_signer: f.get("show_signer") === "on", issuer_name: String(f.get("issuer_name") ?? "") },
+    });
+    setBusy(false);
+    if (result.ok) { toast({ title: "บันทึกรูปแบบวุฒิบัตรแล้ว", description: "มีผลกับเอกสารที่ออกหลังจากนี้", variant: "success" }); router.refresh(); }
+    else setError(result.message);
+  }
+  return (
+    <form onSubmit={submit} className="grid gap-4 p-5">
+      {error && <Alert variant="destructive" title={error} />}
+      <Field label="ชื่อหน่วยงานผู้ออกเอกสาร" hint="พิมพ์เหนือชื่อเอกสาร เว้นว่างเพื่อใช้ชื่อระบบ">
+        <Input name="issuer_name" maxLength={160} defaultValue={defaults.issuer_name} placeholder="เช่น ชื่อสถาบันหรือหน่วยงาน" />
+      </Field>
+      <Checkbox
+        name="show_signer"
+        defaultChecked={defaults.show_signer}
+        label="แสดงชื่อและตำแหน่งผู้ลงนามบนเอกสาร"
+      />
+      <p className="-mt-2 text-xs text-muted-foreground">
+        เมื่อปิด เอกสารจะไม่มีช่องลงนามของบุคคล และแสดงว่ารับรองด้วยลายมือชื่อดิจิทัลของระบบแทน (ใช้กับเอกสารที่ออกหลังบันทึก ฉบับที่ออกไปแล้วไม่เปลี่ยน)
+      </p>
+      <Button type="submit" loading={busy} className="justify-self-end"><Save className="h-4 w-4" /> บันทึก</Button>
+    </form>
+  );
+}
+
 type AutomationName = "assignment_reminders" | "cohort_notifications" | "waitlist_promotion";
 
 const AUTOMATION_LABELS: Record<AutomationName, { title: string; description: string }> = {

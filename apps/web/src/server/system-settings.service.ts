@@ -3,6 +3,7 @@ import type { JsonValue } from "@upskill/db";
 import { ctx } from "./context";
 import { audit } from "./audit";
 import type { CurrentUser } from "./auth/session";
+import { parseCertificateDisplay, type CertificateDisplay } from "@upskill/core/certificate-patterns";
 
 export interface CourseDefaults {
   min_watch_percentage: number;
@@ -41,5 +42,23 @@ export async function updateCourseDefaults(user: CurrentUser, patch: Partial<Cou
     .onConflict((oc) => oc.column("key").doUpdateSet({ value: next as unknown as JsonValue, updated_at: new Date(), updated_by: user.id }))
     .execute();
   await audit(db, { action: "system.course_defaults_updated", userId: user.id, entityType: "system", entityId: "course_defaults", ip: "internal", details: patch });
+  return next;
+}
+
+/** Site-wide certificate layout (signature block, issuing body). Read by the worker when it renders a PDF. */
+export async function getCertificateDisplay(): Promise<CertificateDisplay> {
+  const row = await ctx().db.selectFrom("system_settings").select("value").where("key", "=", "certificate_display").executeTakeFirst();
+  return parseCertificateDisplay(row?.value);
+}
+
+export async function updateCertificateDisplay(user: CurrentUser, patch: Partial<CertificateDisplay>) {
+  const { db } = ctx();
+  const next = parseCertificateDisplay({ ...(await getCertificateDisplay()), ...patch });
+  await db
+    .insertInto("system_settings")
+    .values({ key: "certificate_display", value: next as unknown as JsonValue, updated_by: user.id })
+    .onConflict((oc) => oc.column("key").doUpdateSet({ value: next as unknown as JsonValue, updated_at: new Date(), updated_by: user.id }))
+    .execute();
+  await audit(db, { action: "system.certificate_display_updated", userId: user.id, entityType: "system", entityId: "certificate_display", ip: "internal", details: patch });
   return next;
 }

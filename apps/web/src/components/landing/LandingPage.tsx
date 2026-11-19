@@ -18,28 +18,30 @@ import { BRAND_NAME, BrandLogo } from "@/components/brand/BrandLogo";
 import { CertificatePreview } from "@/components/certificate/CertificatePreview";
 import { VerifyCodeForm } from "@/components/certificate/VerifyCodeForm";
 import { listPublishedCourses, publicStats } from "@/server/courses/courses.service";
+import { getCertificateDisplay } from "@/server/system-settings.service";
 import { listUpcomingCohorts } from "@/server/programs/programs.service";
 import { listPublicAnnouncements } from "@/server/programs/announcements.service";
 import { AnnouncementCard } from "@/components/programs/AnnouncementCard";
 import { UpcomingCohortCard } from "@/components/programs/UpcomingCohortCard";
 import { LandingNav } from "./LandingNav";
+import type { CertificateDisplay } from "@upskill/core/certificate-patterns";
 import { COURSE_TYPES, COURSE_TYPE_INFO } from "@upskill/core/application";
 
 const STEPS = [
   { icon: UserPlus, title: "สมัครและลงทะเบียน", text: "สร้างบัญชี เลือกหลักสูตร และกรอกใบสมัครเมื่อหลักสูตรกำหนด" },
   { icon: PlayCircle, title: "เรียนจากวิดีโอ", text: "ระบบบันทึกเวลาเรียนจริงของแต่ละบทจากฝั่งเซิร์ฟเวอร์" },
   { icon: ClipboardCheck, title: "ทำแบบทดสอบ", text: "ทำแบบทดสอบตามเกณฑ์ที่เจ้าของหลักสูตรกำหนด" },
-  { icon: Award, title: "รับเกียรติบัตร", text: "ไฟล์ PDF ลงนามดิจิทัล ตรวจสอบสถานะได้ด้วย QR Code" },
+  { icon: Award, title: "รับวุฒิบัตร", text: "ไฟล์ PDF ลงนามดิจิทัล ตรวจสอบสถานะได้ด้วย QR Code" },
 ];
 
 const FAQ = [
   {
-    q: "ตรวจสอบเกียรติบัตรหรือใบรับรองได้อย่างไร",
+    q: "ตรวจสอบวุฒิบัตรหรือใบรับรองได้อย่างไร",
     a: "สแกน QR Code บนเอกสาร หรือกรอกรหัสเอกสารในหน้าตรวจสอบ ระบบจะแสดงชื่อผู้ได้รับ หลักสูตร วันที่ออก และสถานะว่ายังใช้ได้หรือถูกเพิกถอนแล้ว",
   },
   {
     q: "ทำไมกรอวิดีโอข้ามหรือเร่งความเร็วแล้วเวลาเรียนไม่เพิ่ม",
-    a: "ระบบนับเฉพาะช่วงที่ดูจริงจากฝั่งเซิร์ฟเวอร์ ช่วงที่กรอข้าม เร่งความเร็ว หรือเปิดเรียนซ้ำหลายแท็บจะไม่ถูกนับ เพื่อให้เวลาเรียนบนเกียรติบัตรเชื่อถือได้",
+    a: "ระบบนับเฉพาะช่วงที่ดูจริงจากฝั่งเซิร์ฟเวอร์ ช่วงที่กรอข้าม เร่งความเร็ว หรือเปิดเรียนซ้ำหลายแท็บจะไม่ถูกนับ เพื่อให้เวลาเรียนบนวุฒิบัตรเชื่อถือได้",
   },
   {
     q: "ต้องได้คะแนนเท่าไรจึงจะผ่าน",
@@ -53,7 +55,7 @@ const FAQ = [
 
 /** Public landing page for visitors who are not signed in. */
 export async function LandingPage() {
-  const [courses, stats, upcoming, announcements] = await Promise.all([listPublishedCourses(), publicStats(), listUpcomingCohorts(3), listPublicAnnouncements({ limit: 3 })]);
+  const [courses, stats, upcoming, announcements, certificateDisplay] = await Promise.all([listPublishedCourses(), publicStats(), listUpcomingCohorts(3), listPublicAnnouncements({ limit: 3 }), getCertificateDisplay()]);
   // The landing page promotes no single course: it presents the kinds of training on offer
   const typeCounts = { certified_training: stats.certifiedTraining, short_course: stats.shortCourses } as const;
   const longContent = stats.durationSec >= 10 * 3600;
@@ -87,7 +89,7 @@ export async function LandingPage() {
               Reskill.
             </h1>
             <p className="mt-5 animate-slide-up text-xl font-medium text-foreground/85 [animation-delay:160ms] [animation-fill-mode:both] sm:text-2xl">
-              เรียนจากวิดีโอ ทำแบบทดสอบ แล้วรับเกียรติบัตรที่ใครก็ตรวจสอบได้
+              เรียนจากวิดีโอ ทำแบบทดสอบ แล้วรับวุฒิบัตรที่ใครก็ตรวจสอบได้
             </p>
             <p className="mx-auto mt-3 max-w-xl animate-slide-up font-reading text-muted-foreground [animation-delay:240ms] [animation-fill-mode:both] lg:mx-0">
               ระบบบันทึกเวลาเรียนจริงของทุกบท และออกเอกสาร PDF ลงนามดิจิทัลพร้อม QR Code สำหรับตรวจสอบสถานะออนไลน์
@@ -112,14 +114,14 @@ export async function LandingPage() {
             </dl>
           </div>
 
-          <HeroVisual />
+          <HeroVisual display={certificateDisplay} />
         </div>
       </section>
 
       {/* ---------- How it works ---------- */}
       <section id="how" className="scroll-mt-20 border-y bg-muted/30">
         <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <SectionHeading eyebrow="ขั้นตอน" title="จากบทเรียนแรก ถึงเกียรติบัตร" description="ทุกหลักสูตรใช้ลำดับเดียวกัน ตั้งแต่ลงทะเบียนจนถึงรับเอกสาร" />
+          <SectionHeading eyebrow="ขั้นตอน" title="จากบทเรียนแรก ถึงวุฒิบัตร" description="ทุกหลักสูตรใช้ลำดับเดียวกัน ตั้งแต่ลงทะเบียนจนถึงรับเอกสาร" />
           <ol className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((s, i) => (
               <Reveal key={s.title} delay={i * 90} className="h-full">
@@ -158,11 +160,11 @@ export async function LandingPage() {
                     template="royal"
                     align="center"
                     documentType="completion"
-                    documentName="เกียรติบัตร"
-                    achievement="ได้ผ่านการอบรมและการประเมินตามเกณฑ์"
-                    courseTitle="ตัวอย่างหลักสูตร"
+                    documentName="วุฒิบัตร"
+                                        courseTitle="ตัวอย่างหลักสูตร"
                     signerName="ผู้อำนวยการสถาบัน"
                     signerTitle="ผู้ลงนาม"
+                    display={certificateDisplay}
                   />
                 </div>
               </div>
@@ -419,7 +421,7 @@ function FooterColumn({ title, links }: { title: string; links: [string, string]
 }
 
 /** Product composition: the actual certificate artwork behind a lesson-progress card. */
-function HeroVisual() {
+function HeroVisual({ display }: { display: CertificateDisplay }) {
   return (
     <div className="relative mx-auto w-full max-w-xl animate-slide-up pb-10 [animation-delay:200ms] [animation-fill-mode:both] lg:max-w-none">
       <div aria-hidden className="absolute -inset-6 rounded-[2rem] bg-gradient-to-br from-primary/15 via-transparent to-streak/10 blur-2xl" />
@@ -428,11 +430,11 @@ function HeroVisual() {
           template="standard"
           align="center"
           documentType="completion"
-          documentName="เกียรติบัตร"
-          achievement="ได้ผ่านการอบรมและการประเมินตามเกณฑ์"
-          courseTitle="การประยุกต์ใช้ AI เพื่อการเรียนการสอน"
+          documentName="วุฒิบัตร"
+                    courseTitle="การประยุกต์ใช้ AI เพื่อการเรียนการสอน"
           signerName="ผู้อำนวยการสถาบัน"
           signerTitle="ผู้ลงนาม"
+          display={display}
         />
       </div>
 

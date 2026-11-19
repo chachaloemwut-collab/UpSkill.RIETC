@@ -38,3 +38,37 @@ const KICKERS: Record<string, string> = {
 
 /** Small caps line above the document name, from the credential type code. */
 export const certificateKicker = (type: string) => KICKERS[type] ?? `Certificate · ${type.replace(/_/g, " ")}`;
+
+/**
+ * Site-wide certificate layout options (system_settings key "certificate_display").
+ * show_signer: print a named person's signature block. Off by default: the document is issued and
+ *   digitally signed by the system, not by a person, until the institution decides otherwise.
+ * issuer_name: issuing body printed above the document name ("" = the platform brand).
+ */
+export interface CertificateDisplay {
+  show_signer: boolean;
+  issuer_name: string;
+}
+
+export const CERTIFICATE_DISPLAY_DEFAULTS: CertificateDisplay = { show_signer: false, issuer_name: "" };
+
+/** Tolerant parser for the stored JSON value (missing row or fields fall back to the defaults). */
+export function parseCertificateDisplay(value: unknown): CertificateDisplay {
+  const v = (value && typeof value === "object" ? value : {}) as Partial<Record<keyof CertificateDisplay, unknown>>;
+  return {
+    show_signer: typeof v.show_signer === "boolean" ? v.show_signer : CERTIFICATE_DISPLAY_DEFAULTS.show_signer,
+    issuer_name: typeof v.issuer_name === "string" ? v.issuer_name.trim().slice(0, 160) : CERTIFICATE_DISPLAY_DEFAULTS.issuer_name,
+  };
+}
+
+const THAI_DIGITS = "๐๑๒๓๔๕๖๗๘๙";
+/** Arabic → Thai digits, the convention on formal Thai certificates. */
+export const thaiDigits = (s: string) => s.replace(/[0-9]/g, (d) => THAI_DIGITS[Number(d)]!);
+
+/** "๑๙ พฤศจิกายน พ.ศ. ๒๕๖๙" — the formal "ให้ไว้ ณ วันที่" date, Bangkok time. */
+export function formalThaiDate(d: Date): string {
+  const parts = new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const year = get("year").replace(/[^0-9]/g, "");
+  return thaiDigits(`${get("day")} ${get("month")} พ.ศ. ${year}`);
+}

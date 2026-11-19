@@ -58,6 +58,7 @@ export type AuditAction =
   | "programs.category_renamed"
   | "programs.category_deleted"
   | "system.course_defaults_updated"
+  | "system.certificate_display_updated"
   | "system.automation_toggled";
 
 /** The app role can INSERT only (UPDATE/DELETE are blocked by both grant and trigger) */

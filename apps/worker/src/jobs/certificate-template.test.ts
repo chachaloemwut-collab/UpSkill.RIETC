@@ -18,13 +18,14 @@ const view: CertificateView = {
   template: "standard",
   textAlign: "center",
   visualDigest: "abcd-1234",
+  display: { show_signer: false, issuer_name: "" },
 };
 const assets = { fontCss: "", qrDataUrl: "data:image/png;base64,AA==", verifyUrl: "https://example.test/verify/UR-2026-AAAA-BBBB", backgroundDataUrl: "" };
 
 describe("certificate artwork", () => {
   it("escapes every snapshot field", () => {
     const html = buildCertificateHtml(
-      { ...view, recipientName: `<img src=x onerror="x()">`, courseTitle: "a & b", signerTitle: "<b>t</b>", achievement: `"q'` },
+      { ...view, recipientName: `<img src=x onerror="x()">`, courseTitle: "a & b", signerTitle: "<b>t</b>", achievement: `"q'`, display: { show_signer: true, issuer_name: "<i>" } },
       assets,
     );
     assert.ok(!html.includes("<img src=x"));
@@ -32,14 +33,27 @@ describe("certificate artwork", () => {
     assert.ok(html.includes("a &amp; b"));
     assert.ok(html.includes("&lt;b&gt;t&lt;/b&gt;"));
     assert.ok(html.includes("&quot;q&#39;"));
+    assert.ok(html.includes("&lt;i&gt;"));
   });
 
-  it("shows the real study time, score and Buddhist-era year", () => {
+  it("uses formal Thai wording with Thai digits", () => {
     const html = buildCertificateHtml(view, assets);
-    assert.ok(html.includes("2 ชั่วโมง 15 นาที"));
-    assert.ok(html.includes("92.50%"));
-    assert.ok(html.includes(">2569<"));
+    assert.ok(html.includes("ให้ไว้เพื่อแสดงว่า"));
+    assert.ok(html.includes("รวมเวลาเรียน ๒ ชั่วโมง ๑๕ นาที"));
+    assert.ok(html.includes("ผลการประเมินร้อยละ ๙๒.๕๐"));
+    assert.ok(html.includes("ให้ไว้ ณ วันที่ ๑๙ พฤศจิกายน พ.ศ. ๒๕๖๙"));
+    assert.ok(html.includes(">๒๕๖๙<"));
     assert.ok(!html.includes("TEST / DEVELOPMENT"));
+  });
+
+  it("hides the signer unless the site setting turns it on", () => {
+    const off = buildCertificateHtml(view, assets);
+    assert.ok(!off.includes("ดร.ผู้ลงนาม"));
+    assert.ok(off.includes("รับรองด้วยลายมือชื่อดิจิทัล"));
+    const on = buildCertificateHtml({ ...view, display: { show_signer: true, issuer_name: "สถาบันทดสอบ" } }, assets);
+    assert.ok(on.includes("ดร.ผู้ลงนาม"));
+    assert.ok(on.includes("สถาบันทดสอบ"));
+    assert.ok(!on.includes("รับรองด้วยลายมือชื่อดิจิทัล"));
   });
 
   it("marks development test documents unmistakably", () => {
@@ -47,14 +61,14 @@ describe("certificate artwork", () => {
     assert.ok(html.includes("TEST / DEVELOPMENT"));
     assert.ok(html.includes("มิใช่การสำเร็จการศึกษาจริง"));
     assert.ok(html.includes("NOT A REAL CREDENTIAL"));
-    assert.ok(!html.includes("92.50%"));
+    assert.ok(!html.includes("ร้อยละ"));
   });
 
   it("falls back to the standard pattern and shrinks long names", () => {
     const short = buildCertificateHtml(view, assets);
     const long = buildCertificateHtml({ ...view, template: "unknown", recipientName: "ก".repeat(60) }, assets);
-    assert.ok(short.includes("font-size: 38pt"));
-    assert.ok(long.includes("font-size: 23pt"));
+    assert.ok(short.includes("font-size: 36pt"));
+    assert.ok(long.includes("font-size: 22pt"));
     assert.ok(long.includes("#4a2a9c"));
   });
 });

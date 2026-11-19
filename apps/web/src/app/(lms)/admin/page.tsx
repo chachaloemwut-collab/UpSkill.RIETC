@@ -8,13 +8,13 @@ import { AdminInvitations } from "@/components/admin/AdminInvitations";
 import { listInstructors } from "@/server/courses/instructor.service";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
-import { AutomationPanel, CourseAdminControls, CourseDefaultsForm, EmailSettingsForm, GoogleOAuthSettingsForm, RemoveSuppressionButton, RetryEmailButton, RevokeCertificateForm, TestEmailSettingsForm, UserAdminForm } from "@/components/admin/AdminActions";
+import { AutomationPanel, CertificateDisplayForm, CourseAdminControls, CourseDefaultsForm, EmailSettingsForm, GoogleOAuthSettingsForm, RemoveSuppressionButton, RetryEmailButton, RevokeCertificateForm, TestEmailSettingsForm, UserAdminForm } from "@/components/admin/AdminActions";
 import { VISIBILITY, formatDateTimeTh } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { adminOverview } from "@/server/admin/admin.service";
 import { getEmailSettingsView } from "@/server/admin/email-settings.service";
 import { getGoogleOAuthSettingsView } from "@/server/settings/google-oauth.service";
-import { getCourseDefaults } from "@/server/system-settings.service";
+import { getCertificateDisplay, getCourseDefaults } from "@/server/system-settings.service";
 import { getAutomationFlags, getAutomationBacklog } from "@/server/automation.service";
 
 export const metadata: Metadata = { title: "ผู้ดูแลระบบ", robots: { index: false } };
@@ -24,7 +24,7 @@ const REASONS: Record<string, string> = { POSITION_JUMP: "กรอข้าม 
 export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") redirect("/");
-  const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings, googleSettings, instructors, courseDefaults, automationFlags, automationBacklog] = await Promise.all([adminOverview(), getEmailSettingsView(), getGoogleOAuthSettingsView(), listInstructors(), getCourseDefaults(), getAutomationFlags(), getAutomationBacklog()]);
+  const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings, googleSettings, instructors, courseDefaults, automationFlags, automationBacklog, certificateDisplay] = await Promise.all([adminOverview(), getEmailSettingsView(), getGoogleOAuthSettingsView(), listInstructors(), getCourseDefaults(), getAutomationFlags(), getAutomationBacklog(), getCertificateDisplay()]);
 
   return (
     <>
@@ -225,6 +225,16 @@ export default async function AdminPage() {
               </div>
             </div>
             <CourseDefaultsForm defaults={courseDefaults} />
+          </Card>
+          <Card className="max-w-2xl">
+            <div className="flex items-center gap-3 border-b px-5 py-4">
+              <Award className="h-5 w-5" />
+              <div>
+                <h3 className="font-semibold">รูปแบบวุฒิบัตร</h3>
+                <p className="text-xs text-muted-foreground">หน่วยงานผู้ออกเอกสาร และการแสดงผู้ลงนาม ใช้กับทุกหลักสูตร</p>
+              </div>
+            </div>
+            <CertificateDisplayForm defaults={certificateDisplay} />
           </Card>
           <Card className="max-w-2xl">
             <div className="flex items-center gap-3 border-b px-5 py-4">

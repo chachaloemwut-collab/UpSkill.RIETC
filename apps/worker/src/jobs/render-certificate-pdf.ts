@@ -14,6 +14,7 @@ import { logger } from "@upskill/infra/logger";
 import { createCertificateStorage } from "@upskill/infra/storage";
 import { addWorkerEmail } from "./process-email-outbox.ts";
 import { buildCertificateHtml } from "./certificate-template.ts";
+import { parseCertificateDisplay } from "@upskill/core/certificate-patterns";
 
 const FONT_DIR = new URL("../../assets/fonts/", import.meta.url);
 
@@ -29,6 +30,10 @@ async function fontFace(family: string, file: string, weight: number): Promise<s
 
 export async function renderCertificatePdf(db: Database, env: Env, code: string) {
   const c = await db.selectFrom("certificates").selectAll().where("certificate_code", "=", code).executeTakeFirstOrThrow();
+
+  // Site-wide layout options (signature block on/off, issuing body); a missing row means the defaults
+  const displayRow = await db.selectFrom("system_settings").select("value").where("key", "=", "certificate_display").executeTakeFirst();
+  const display = parseCertificateDisplay(displayRow?.value);
 
   const verifyUrl = `${env.APP_ORIGIN}/verify/${encodeURIComponent(c.certificate_code)}`;
   const qr = await QRCode.toDataURL(verifyUrl, { errorCorrectionLevel: "M", margin: 1, width: 360 });
@@ -74,6 +79,7 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
       template: c.template_snapshot,
       textAlign: c.text_align_snapshot,
       visualDigest: c.visual_digest,
+      display,
     },
     { fontCss, qrDataUrl: qr, verifyUrl, backgroundDataUrl },
   );

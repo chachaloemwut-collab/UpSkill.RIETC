@@ -62,6 +62,7 @@ import { CourseLearnersRoster } from "./CourseLearnersRoster";
 import { LessonDetailsForm, UnitBadge, UnitsManager, type EditorUnit } from "./UnitsManager";
 import { ApplicationsManager, type EditorApplication } from "./ApplicationsManager";
 import { CertificatePreview } from "@/components/certificate/CertificatePreview";
+import type { CertificateDisplay } from "@upskill/core/certificate-patterns";
 import { COURSE_TYPES, COURSE_TYPE_INFO } from "@upskill/core/application";
 
 export interface EditorData {
@@ -132,6 +133,7 @@ export interface EditorData {
     navigation_mode: string;
     completion_rule: string;
   };
+  certificateDisplay?: CertificateDisplay;
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -248,7 +250,7 @@ export function CourseEditor({ data }: { data: EditorData }) {
         </TabsContent>
 
         <TabsContent value="settings" className="mt-4">
-          <SettingsSection base={base} course={course} courseDefaults={data.courseDefaults} />
+          <SettingsSection base={base} course={course} courseDefaults={data.courseDefaults} certificateDisplay={data.certificateDisplay} />
         </TabsContent>
       </Tabs>
 
@@ -380,7 +382,7 @@ function PublishSection({
 
 type CertPreset = { id: string; title: string; credential_name_th: string; credential_name_en: string | null; credential_type: string; credential_template_key: string; credential_text_align: string; credential_validity_days: number | null; credential_signer_name: string | null; credential_signer_title: string | null; credential_achievement_th: string; credential_achievement_en: string | null; credential_background_url: string | null };
 
-function SettingsSection({ base, course, courseDefaults }: { base: string; course: EditorData["course"]; courseDefaults?: EditorData["courseDefaults"] }) {
+function SettingsSection({ base, course, courseDefaults, certificateDisplay }: { base: string; course: EditorData["course"]; courseDefaults?: EditorData["courseDefaults"]; certificateDisplay?: CertificateDisplay }) {
   const a = useAction();
   const toast = useToast();
 
@@ -726,8 +728,13 @@ function SettingsSection({ base, course, courseDefaults }: { base: string; cours
           courseTitle={course.title}
           signerName={certSigner}
           signerTitle={certSignerTitle}
+          display={certificateDisplay}
+          className="max-w-3xl"
         />
-        <p className="text-xs text-muted-foreground">ภาพจำลองใช้สีและการจัดวางเดียวกับไฟล์ PDF จริง (ชื่อผู้เรียน คะแนน และ QR Code เป็นข้อมูลตัวอย่าง)</p>
+        <p className="text-xs text-muted-foreground">
+          ภาพจำลองใช้สีและการจัดวางเดียวกับไฟล์ PDF จริง (ชื่อผู้เรียน คะแนน และ QR Code เป็นข้อมูลตัวอย่าง)
+          {!certificateDisplay?.show_signer && " · ตอนนี้ปิดการแสดงผู้ลงนามทั้งระบบ ชื่อผู้ลงนามด้านบนจึงยังไม่พิมพ์บนเอกสาร"}
+        </p>
       </Card>
     </div>
   );

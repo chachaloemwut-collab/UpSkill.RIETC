@@ -2,12 +2,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Award, Check, Copy, ExternalLink, Lock, Maximize2, Printer, ShieldCheck, Sparkles } from "lucide-react";
+import { Award, Check, Copy, ExternalLink, Lock, Maximize2, Printer, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDialog, Badge, Button, Card, Checkbox, Dialog, DownloadIcon, Field, Input, usePlay, useToast } from "@/components/ui";
-import { formatDateTh } from "@/lib/format";
-import { BRAND_NAME } from "@/components/brand/BrandLogo";
+import { CertificatePreview } from "@/components/certificate/CertificatePreview";
 
 export function LockLegalNameForm({ className, defaultTh, defaultEn }: { className?: string; defaultTh?: string | null; defaultEn?: string | null }) {
   const router = useRouter();
@@ -172,17 +171,16 @@ export function DownloadCertificateButton({ code, variant = "default", size = "m
 export function CertificateViewerCard({
   code,
   courseTitle,
-  recipientName,
-  issuedAt,
   revokedAt,
   credentialName,
+  preview,
 }: {
   code: string;
   courseTitle: string;
-  recipientName: string;
-  issuedAt?: string;
   revokedAt?: string | null;
   credentialName?: string;
+  /** The issued document's snapshot, rendered with the same artwork as the PDF */
+  preview: React.ComponentProps<typeof CertificatePreview>;
 }) {
   const toast = useToast();
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -216,7 +214,7 @@ export function CertificateViewerCard({
             <Badge variant="success" className="gap-1 font-semibold text-xs">
               <Sparkles className="h-3 w-3" /> เอกสารผ่านการรับรองดิจิทัล
             </Badge>
-            <h3 className="text-xl font-bold tracking-tight text-foreground">{credentialName || "ใบประกาศนียบัตรสำเร็จการศึกษา"}</h3>
+            <h3 className="text-xl font-bold tracking-tight text-foreground">{credentialName || "วุฒิบัตร"}</h3>
             <p className="text-sm text-muted-foreground">{courseTitle}</p>
           </div>
           <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-4 py-1.5 backdrop-blur-xs">
@@ -262,56 +260,11 @@ export function CertificateViewerCard({
       <Dialog
         open={zoomOpen}
         onOpenChange={setZoomOpen}
-        title="ตัวอย่างใบรับรอง (Certificate Preview)"
+        title={credentialName || "วุฒิบัตร"}
         className="max-w-4xl"
       >
         <div className="p-2 sm:p-4">
-          <div className="relative aspect-[1.414/1] w-full rounded-xl border-8 border-amber-600/20 bg-background p-6 sm:p-10 shadow-inner flex flex-col justify-between text-center select-none overflow-hidden">
-            {/* Corner Filigree Ornaments */}
-            <div className="absolute top-2 left-2 w-8 h-8 border-t-2 border-l-2 border-amber-600/40" />
-            <div className="absolute top-2 right-2 w-8 h-8 border-t-2 border-r-2 border-amber-600/40" />
-            <div className="absolute bottom-2 left-2 w-8 h-8 border-b-2 border-l-2 border-amber-600/40" />
-            <div className="absolute bottom-2 right-2 w-8 h-8 border-b-2 border-r-2 border-amber-600/40" />
-
-            <div>
-              <p className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
-                Regional Institute of Vocational Education North Eastern Region 1
-              </p>
-              <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-foreground mt-2">
-                {credentialName || "ใบประกาศนียบัตรรับรองสมรรถนะ"}
-              </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1">CERTIFICATE OF ACHIEVEMENT</p>
-            </div>
-
-            <div className="my-auto py-4">
-              <p className="text-xs text-muted-foreground">เอกสารฉบับนี้รับรองว่า</p>
-              <h3 className="text-lg sm:text-2xl font-bold text-primary mt-1 tracking-wide">
-                {recipientName}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-3">ได้ผ่านการอบรมและทดสอบตามเกณฑ์มาตรฐานในหลักสูตร</p>
-              <p className="text-sm sm:text-lg font-semibold text-foreground mt-1">
-                {courseTitle}
-              </p>
-            </div>
-
-            <div className="flex items-end justify-between border-t border-border/80 pt-4 text-left">
-              <div>
-                <p className="text-[10px] text-muted-foreground">ออกให้ ณ วันที่</p>
-                <p className="text-xs font-medium text-foreground">{issuedAt ? formatDateTh(issuedAt, "long") : "—"}</p>
-                <p className="mt-1 font-mono text-[10px] text-muted-foreground">รหัส: {code}</p>
-              </div>
-
-              <div className="flex flex-col items-center">
-                <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full border-2 border-emerald-500/80 bg-emerald-500/10 text-emerald-600">
-                  <ShieldCheck className="h-6 w-6" />
-                </div>
-                <span className="font-mono text-[8px] font-bold text-emerald-600 tracking-wider mt-1">
-                  ED25519 VERIFIED
-                </span>
-              </div>
-            </div>
-          </div>
-
+          <CertificatePreview {...preview} />
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
               <Printer className="h-3.5 w-3.5" /> พิมพ์ (A4 Landscape)
@@ -323,39 +276,9 @@ export function CertificateViewerCard({
         </div>
       </Dialog>
 
-      {/* Hidden Print Container formatted strictly for A4 Landscape */}
+      {/* Print: the same artwork at A4 landscape */}
       <div className="hidden print:block certificate-print-container">
-        <div className="relative h-full w-full border-[10px] border-black p-10 flex flex-col justify-between text-center">
-          <div>
-            <p className="text-xs tracking-widest uppercase font-semibold text-neutral-600">
-              สถาบันการอาชีวศึกษาภาคตะวันออกเฉียงเหนือ 1 ({BRAND_NAME})
-            </p>
-            <h1 className="text-3xl font-bold mt-4 tracking-tight">
-              {credentialName || "ใบประกาศนียบัตรรับรองสมรรถนะ"}
-            </h1>
-            <p className="text-sm text-neutral-500 uppercase tracking-widest mt-1">CERTIFICATE OF ACHIEVEMENT</p>
-          </div>
-
-          <div className="my-auto py-8">
-            <p className="text-sm text-neutral-600">เอกสารฉบับนี้รับรองว่า</p>
-            <h2 className="text-3xl font-bold mt-2">{recipientName}</h2>
-            <p className="text-sm text-neutral-600 mt-4">ได้สำเร็จการศึกษาตามเกณฑ์มาตรฐานในหลักสูตร</p>
-            <h3 className="text-xl font-semibold mt-1">{courseTitle}</h3>
-          </div>
-
-          <div className="flex items-end justify-between border-t-2 border-neutral-300 pt-6 text-left">
-            <div>
-              <p className="text-xs text-neutral-500">วันที่ออกเอกสาร</p>
-              <p className="text-sm font-semibold">{issuedAt ? formatDateTh(issuedAt, "long") : "—"}</p>
-              <p className="text-xs font-mono text-neutral-500 mt-1">รหัสเอกสาร: {code}</p>
-            </div>
-            <div className="text-center">
-              <div className="inline-block border-2 border-neutral-800 px-4 py-2 text-xs font-mono font-bold tracking-wider uppercase">
-                ED25519 SIGNED & VERIFIED
-              </div>
-            </div>
-          </div>
-        </div>
+        <CertificatePreview {...preview} />
       </div>
     </>
   );
