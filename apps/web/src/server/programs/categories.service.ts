@@ -4,7 +4,7 @@ import { audit } from "../audit";
 import { HttpError } from "../http";
 import type { CurrentUser } from "../auth/session";
 
-export async function listProgramCategories(user: CurrentUser) {
+export async function listProgramCategories() {
   const rows = await ctx()
     .db.selectFrom("programs")
     .select("category")

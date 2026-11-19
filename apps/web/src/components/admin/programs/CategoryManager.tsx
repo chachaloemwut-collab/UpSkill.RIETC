@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Pencil, Tag, Trash2, X } from "lucide-react";
 import { api } from "@/lib/api";
-import { Badge, Button, Dialog, Field, Input, useToast } from "@/components/ui";
+import { Badge, Button, Dialog, Input, useToast } from "@/components/ui";
 import { useRouter } from "next/navigation";
 
 export function CategoryManager({ initialCategories }: { initialCategories: string[] }) {

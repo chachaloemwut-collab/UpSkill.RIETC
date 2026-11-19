@@ -2,8 +2,8 @@ import { z } from "zod";
 import { route } from "@/server/http";
 import { listProgramCategories, renameProgramCategory, deleteProgramCategory } from "@/server/programs/categories.service";
 
-export const GET = route({ auth: "required", roles: ["admin"] }, async ({ user }) =>
-  listProgramCategories(user!),
+export const GET = route({ auth: "required", roles: ["admin"] }, async () =>
+  listProgramCategories(),
 );
 
 const RenameBody = z.strictObject({ from: z.string().trim().min(1).max(60), to: z.string().trim().min(1).max(60) });
