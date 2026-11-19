@@ -54,13 +54,13 @@ beforeAll(async () => {
 });
 
 describe("owner sets up a short course with an application form", () => {
-  it("creates a short course (ประกาศนียบัตร by default) and publishes it", async () => {
+  it("creates a short course (วุฒิบัตร by default) and publishes it", async () => {
     const c = await instructor.req("/api/instructor/courses", { body: { title: `E2E short course ${run}`, course_type: "short_course" } });
     expect(c.status).toBe(200);
     courseId = c.json.id;
     courseSlug = c.json.slug;
     const row = await withDb((db) => db.query("select course_type, credential_name_th from courses where id = $1", [courseId]));
-    expect(row.rows[0]).toEqual({ course_type: "short_course", credential_name_th: "ประกาศนียบัตร" });
+    expect(row.rows[0]).toEqual({ course_type: "short_course", credential_name_th: "วุฒิบัตร" });
     expect((await instructor.req(`/api/instructor/courses/${courseId}/lessons`, { body: { url: "https://youtu.be/aqz-KE-bpKQ", title: "Clip", dev_duration_sec: 620 } })).status).toBe(200);
     for (let i = 0; i < 3; i++) {
       expect((await instructor.req(`/api/instructor/courses/${courseId}/quiz`, { body: { question_text: `Q${i}?`, options: ["a", "b"], correct_index: 0 } })).status).toBe(200);
@@ -163,7 +163,7 @@ describe("PDPA erasure", () => {
 });
 
 describe("catalog", () => {
-  it("filters by course type and the course card says ประกาศนียบัตร", async () => {
+  it("filters by course type and the course card says วุฒิบัตร", async () => {
     const page = await new Client().req("/courses?type=short_course");
     expect(page.status).toBe(200);
     expect(page.text).toContain(`E2E short course ${run}`);
