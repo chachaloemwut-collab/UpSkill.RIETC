@@ -19,11 +19,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1164.0",
+    "@aws-sdk/client-s3": "^3.1168.0",
     "@node-rs/argon2": "2.2.2",
     "@upskill/core": "workspace:*",
     "ioredis": "6.0.0",
-    "nodemailer": "10.3.1",
+    "nodemailer": "10.5.0",
     "pino": "10.4.0",
     "zod": "4.6.7"
   },
