@@ -93,6 +93,8 @@ export interface EditorData {
     credential_background_url: string | null;
     credential_text_align: string;
     credential_show_signer: boolean;
+    /** For edit-conflict detection when several people edit the course at once */
+    updated_at?: Date | string;
     credential_signature_key: string | null;
     navigation_mode: string;
     completion_rule: string;
@@ -463,6 +465,7 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
           credential_achievement_en: String(f.get("credential_achievement_en") ?? "") || null,
           credential_background_url: String(f.get("credential_background_url") ?? "") || null,
           credential_text_align: f.get("credential_text_align"),
+          ...(course.updated_at ? { expected_updated_at: new Date(course.updated_at).toISOString() } : {}),
         },
       },
       "บันทึกการตั้งค่าแล้ว",

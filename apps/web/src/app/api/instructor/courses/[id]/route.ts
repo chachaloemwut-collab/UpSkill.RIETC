@@ -29,10 +29,14 @@ const Body = z.strictObject({
   course_type: z.enum(["certified_training", "short_course"]).optional(),
   // Shape is enforced by the core parser (unknown fields dropped); only size is limited here
   application_settings: z.record(z.string(), z.unknown()).optional(),
+  // Optimistic concurrency: the course's updated_at when the editor was opened; a newer save by someone
+  // else makes this one fail with EDIT_CONFLICT instead of silently overwriting their changes
+  expected_updated_at: z.iso.datetime({ offset: true }).optional(),
 });
 
 export const PATCH = route<typeof Body, { id: string }>({ auth: "required", roles: ["instructor", "admin"], body: Body }, async ({ params, body, user, ip }) => {
-  const patch = Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined));
-  await updateCourse(user!, uuidParam(params.id), patch, ip);
+  const { expected_updated_at, ...rest } = body;
+  const patch = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
+  await updateCourse(user!, uuidParam(params.id), patch, ip, expected_updated_at);
   return { ok: true };
 });

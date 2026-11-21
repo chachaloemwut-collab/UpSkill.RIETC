@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Copy, Send, Trash2 } from "lucide-react";
 import { Badge, Button, Card, Input, Textarea, useToast } from "@/components/ui";
 import { formatDateTimeTh } from "@/lib/format";
+import { useConfirm } from "@/components/common/ConfirmProvider";
+import { api } from "@/lib/api";
 
 interface Invitation {
   id: string;
@@ -33,6 +35,7 @@ export function AdminInvitations() {
   const [error, setError] = useState<string | null>(null);
   const [createdLink, setCreatedLink] = useState<string | null>(null);
   const toast = useToast();
+  const confirm = useConfirm();
 
   useEffect(() => {
     fetch("/api/admin/instructor-invitations")
@@ -71,8 +74,13 @@ export function AdminInvitations() {
   }
 
   async function revoke(id: string) {
-    if (!window.confirm("ยกเลิกคำเชิญนี้?")) return;
-    await fetch(`/api/admin/instructor-invitations/${id}/revoke`, { method: "POST" });
+    if (!(await confirm({ title: "ยกเลิกคำเชิญนี้?", destructive: true }))) return;
+    const r = await api(`/api/admin/instructor-invitations/${id}/revoke`, { body: {} });
+    if (!r.ok) {
+      toast({ title: "ยกเลิกคำเชิญไม่สำเร็จ", description: r.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "ยกเลิกคำเชิญแล้ว", variant: "success" });
     fetch("/api/admin/instructor-invitations")
       .then((r) => r.json())
       .then((d: { invitations: Invitation[] }) => setList(d.invitations ?? []))
@@ -121,38 +129,40 @@ export function AdminInvitations() {
         {list.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted-foreground">ยังไม่มีคำเชิญ</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
-                <th className="px-5 py-2">อีเมล</th>
-                <th className="px-5 py-2">เชิญโดย</th>
-                <th className="px-5 py-2">สถานะ</th>
-                <th className="px-5 py-2">หมดอายุ</th>
-                <th className="px-5 py-2 text-right">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((inv) => (
-                <tr key={inv.id} className="border-b last:border-0">
-                  <td className="px-5 py-2.5 font-medium">{inv.email}</td>
-                  <td className="px-5 py-2.5 text-muted-foreground">{inv.inviterName}</td>
-                  <td className="px-5 py-2.5">
-                    <Badge variant={STATUS_BADGE[inv.status].variant}>{STATUS_BADGE[inv.status].label}</Badge>
-                  </td>
-                  <td className="px-5 py-2.5 text-xs text-muted-foreground">{formatDateTimeTh(inv.expiresAt)}</td>
-                  <td className="px-5 py-2.5 text-right">
-                    {inv.status === "pending" ? (
-                      <Button variant="outline" size="sm" onClick={() => void revoke(inv.id)}>
-                        <Trash2 className="h-4 w-4" /> ยกเลิก
-                      </Button>
-                    ) : inv.link ? (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    ) : null}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="min-w-[640px] w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
+                  <th className="px-5 py-2">อีเมล</th>
+                  <th className="px-5 py-2">เชิญโดย</th>
+                  <th className="px-5 py-2">สถานะ</th>
+                  <th className="px-5 py-2">หมดอายุ</th>
+                  <th className="px-5 py-2 text-right">จัดการ</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {list.map((inv) => (
+                  <tr key={inv.id} className="border-b last:border-0">
+                    <td className="px-5 py-2.5 font-medium">{inv.email}</td>
+                    <td className="px-5 py-2.5 text-muted-foreground">{inv.inviterName}</td>
+                    <td className="px-5 py-2.5">
+                      <Badge variant={STATUS_BADGE[inv.status].variant}>{STATUS_BADGE[inv.status].label}</Badge>
+                    </td>
+                    <td className="px-5 py-2.5 text-xs text-muted-foreground">{formatDateTimeTh(inv.expiresAt)}</td>
+                    <td className="px-5 py-2.5 text-right">
+                      {inv.status === "pending" ? (
+                        <Button variant="outline" size="sm" onClick={() => void revoke(inv.id)}>
+                          <Trash2 className="h-4 w-4" /> ยกเลิก
+                        </Button>
+                      ) : inv.link ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
     </div>

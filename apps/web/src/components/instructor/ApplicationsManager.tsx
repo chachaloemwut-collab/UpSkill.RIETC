@@ -20,6 +20,7 @@ import {
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, Checkbox, EmptyState, Field, Input, Select, Textarea, useToast } from "@/components/ui";
+import { formatDateTh } from "@/lib/format";
 
 export interface EditorApplication {
   id: string;
@@ -221,7 +222,7 @@ function ApplicationsList({ base, applications }: { base: string; applications: 
                   <Badge variant={statusVariant(app.status)} className="text-[11px]">{APPLICATION_STATUS_LABEL[app.status as ApplicationStatus] ?? app.status}</Badge>
                   <Badge variant="outline" className="text-[11px]">{VERIFICATION_STATUS_LABEL[app.verification_status as keyof typeof VERIFICATION_STATUS_LABEL] ?? app.verification_status}</Badge>
                   <Badge variant="outline" className="text-[11px]">{PAYMENT_STATUS_LABEL[app.payment_status as keyof typeof PAYMENT_STATUS_LABEL] ?? app.payment_status}</Badge>
-                  <span className="text-xs text-muted-foreground">{new Date(app.created_at).toLocaleDateString("th-TH", { dateStyle: "medium" })}</span>
+                  <span className="text-xs text-muted-foreground">{formatDateTh(app.created_at)}</span>
                   <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
                 </button>
                 {isOpen && <ApplicationDetail base={base} app={app} />}

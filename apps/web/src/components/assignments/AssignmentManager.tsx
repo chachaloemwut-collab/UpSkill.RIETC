@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Ban, CalendarClock, Clipboard, Plus, UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
-import { toBangkokInput } from "@/lib/format";
+import { toBangkokInput, formatDateTimeTh } from "@/lib/format";
 import { Badge, Button, Card, Dialog, Field, Input, Select, Table, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, useToast } from "@/components/ui";
 
 type BulkRow = { email: string; status: "added" | "already_member" | "not_found" | "duplicate" };
@@ -218,7 +218,7 @@ export function AssignmentManager({ courses, groups, assignments }: Props) {
                   <td>{item.target_name}</td>
                   <td>{item.completed_count}/{item.recipient_count}</td>
                   <td className="whitespace-nowrap">
-                    {item.due_at ? new Date(item.due_at).toLocaleString("th-TH") : "—"}
+                    {item.due_at ? formatDateTimeTh(item.due_at) : "—"}
                   </td>
                   <td><Badge variant={item.status === "active" ? "success" : "secondary"}>{item.status === "active" ? "ใช้งาน" : "ยกเลิก"}</Badge></td>
                   <td className="text-right">

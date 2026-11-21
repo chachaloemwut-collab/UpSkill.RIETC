@@ -4,14 +4,16 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Download, Trash2 } from "lucide-react";
 import { Button, buttonClass } from "@/components/ui";
+import { useConfirm } from "@/components/common/ConfirmProvider";
 
 /** PDPA data-subject rights: export own data and request erasure. */
 export function DataRights() {
   const router = useRouter();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
 
   async function doDelete() {
-    if (!window.confirm("ยืนยันลบบัญชีของคุณถาวร?\nข้อมูลที่ระบุตัวตนจะถูกลบ แต่วุฒิบัตรและบันทึกการตรวจสอบจะยังคงอยู่")) return;
+    if (!(await confirm({ title: "ลบบัญชีของคุณถาวร?", description: "ข้อมูลที่ระบุตัวตนจะถูกลบ แต่วุฒิบัตรและบันทึกการตรวจสอบจะยังคงอยู่ การลบย้อนกลับไม่ได้", confirmLabel: "ลบบัญชี", destructive: true }))) return;
     setBusy(true);
     try {
       const r = await fetch("/api/user/me", { method: "DELETE" });

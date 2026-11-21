@@ -22,6 +22,7 @@ import { THAI_PROVINCES } from "@upskill/core/profile";
 import { api } from "@/lib/api";
 import { Alert, Button, Card, Checkbox, Field, Input, Select, buttonClass } from "@/components/ui";
 import { PdpaNotice } from "@/components/account/ProfileFields";
+import { formatDateTimeTh } from "@/lib/format";
 
 export interface ApplyProfile {
   email: string;
@@ -507,7 +508,7 @@ export function ApplicationSummary({
       )}
       <Section n={6} title="การรับรองข้อมูล">
         <Row label="ลงชื่อผู้สมัคร" value={application.declaration_name} />
-        <Row label="วันที่สมัคร" value={new Date(application.declared_at).toLocaleString("th-TH", { dateStyle: "long", timeStyle: "short" })} />
+        <Row label="วันที่สมัคร" value={formatDateTimeTh(application.declared_at)} />
       </Section>
     </div>
   );

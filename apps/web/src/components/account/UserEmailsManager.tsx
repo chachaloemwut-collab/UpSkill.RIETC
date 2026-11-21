@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock, Mail, Plus, Star, Trash2 } from "lucide-react";
 import { Alert, Badge, Button, Card, Field, Input, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
+import { useConfirm } from "@/components/common/ConfirmProvider";
 
 export interface UserEmailItem {
   id: string;
@@ -17,6 +18,7 @@ export interface UserEmailItem {
 export function UserEmailsManager({ initialEmails }: { initialEmails: UserEmailItem[] }) {
   const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
   const [emails, setEmails] = useState<UserEmailItem[]>(initialEmails);
   const [newEmail, setNewEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -104,7 +106,7 @@ export function UserEmailsManager({ initialEmails }: { initialEmails: UserEmailI
       });
       return;
     }
-    if (!window.confirm(`ยืนยันการลบอีเมล ${email} ออกจากบัญชีหรือไม่?`)) return;
+    if (!(await confirm({ title: `ยืนยันการลบอีเมล ${email} ออกจากบัญชีหรือไม่?`, destructive: true }))) return;
     setActionId(id);
     setError(null);
     try {

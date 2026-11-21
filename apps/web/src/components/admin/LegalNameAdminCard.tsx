@@ -6,6 +6,7 @@ import { Lock, LockOpen, Pencil, Save, X } from "lucide-react";
 import { Badge, Button, Card, Field, Input, useToast } from "@/components/ui";
 import { formatDateTimeTh } from "@/lib/format";
 import { api } from "@/lib/api";
+import { useConfirm } from "@/components/common/ConfirmProvider";
 
 export interface LegalNameAdminCardProps {
   userId: string;
@@ -22,6 +23,7 @@ export function LegalNameAdminCard({
 }: LegalNameAdminCardProps) {
   const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
 
   const [editing, setEditing] = useState(false);
   const [th, setTh] = useState(nameTh ?? "");
@@ -29,7 +31,7 @@ export function LegalNameAdminCard({
   const [busy, setBusy] = useState(false);
 
   const unlock = async () => {
-    if (!window.confirm("ยืนยันปลดล็อกชื่อ-นามสกุลทางการ? ผู้เรียนจะสามารถแก้ไขชื่อได้ด้วยตนเองในหน้าโปรไฟล์")) return;
+    if (!(await confirm({ title: "ยืนยันปลดล็อกชื่อ-นามสกุลทางการ? ผู้เรียนจะสามารถแก้ไขชื่อได้ด้วยตนเองในหน้าโปรไฟล์", destructive: true }))) return;
     setBusy(true);
     try {
       const res = await api(`/api/admin/users/${userId}/unlock-legal-name`, { method: "POST" });

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { formatDateTimeTh } from "@/lib/format";
 
 interface LearnerItem {
   enrollment_id: string;
@@ -84,18 +85,7 @@ function formatDuration(sec: number): string {
 }
 
 function formatDate(iso: string | null): string {
-  if (!iso) return "-";
-  try {
-    return new Date(iso).toLocaleDateString("th-TH", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+  return iso ? formatDateTimeTh(iso) : "-";
 }
 
 export function CourseLearnersRoster({

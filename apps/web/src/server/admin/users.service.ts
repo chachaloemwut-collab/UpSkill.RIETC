@@ -56,12 +56,15 @@ export async function listUsersAdmin(input: { query?: string; role?: string; sta
   const page = Math.max(1, Math.floor(input.page || 1));
   const role = input.role && ["member", "instructor", "admin"].includes(input.role) ? input.role : undefined;
   const status = input.status && ["active", "suspended", "banned"].includes(input.status) ? input.status : undefined;
+  // Deleted (anonymised) accounts are hidden unless asked for explicitly ("deleted")
+  const deleted = input.status === "deleted";
 
   const total = await db
     .selectFrom("users as u")
     .select(sql<number>`count(*)::int`.as("n"))
     .$if(Boolean(role), (x) => x.where("u.role", "=", role!))
     .$if(Boolean(status), (x) => x.where("u.status", "=", status!))
+    .where("u.deleted_at", deleted ? "is not" : "is", null)
     .$if(Boolean(q), (x) =>
       x.where((eb) =>
         eb.or([
@@ -85,6 +88,7 @@ export async function listUsersAdmin(input: { query?: string; role?: string; sta
     ])
     .$if(Boolean(role), (x) => x.where("u.role", "=", role!))
     .$if(Boolean(status), (x) => x.where("u.status", "=", status!))
+    .where("u.deleted_at", deleted ? "is not" : "is", null)
     .$if(Boolean(q), (x) =>
       x.where((eb) =>
         eb.or([

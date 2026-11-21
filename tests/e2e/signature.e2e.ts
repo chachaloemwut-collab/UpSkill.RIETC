@@ -82,4 +82,14 @@ describe("course signature", () => {
     const row = await withDb(async (db) => (await db.query("SELECT credential_signature_key AS k, credential_show_signer AS s FROM courses WHERE id = $1", [courseId])).rows[0]);
     expect(row).toEqual({ k: null, s: false });
   });
+
+  it("refuses a course settings save based on a stale copy (two editors at once)", async () => {
+    const stale = "2000-01-01T00:00:00.000Z";
+    const r = await admin.req(`/api/instructor/courses/${courseId}`, { method: "PATCH", body: { passing_quiz_score: 80, expected_updated_at: stale } });
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe("EDIT_CONFLICT");
+    const current = await withDb(async (db) => (await db.query("SELECT updated_at FROM courses WHERE id = $1", [courseId])).rows[0].updated_at as Date);
+    const ok = await admin.req(`/api/instructor/courses/${courseId}`, { method: "PATCH", body: { passing_quiz_score: 80, expected_updated_at: current.toISOString() } });
+    expect(ok.status).toBe(200);
+  });
 });
