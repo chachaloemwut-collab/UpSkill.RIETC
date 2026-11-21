@@ -175,3 +175,17 @@
   แถบเตือนขึ้นกับ UA iPadOS 15.7; หน้าแรกไม่มีคำว่า "ใบรับรอง" แล้ว
 - ยังไม่ได้ตรวจ: PDF ที่ re-render บน production (ต้องล็อกอินแอดมิน/เจ้าของเอกสาร), ล็อกอิน superadmin (ไม่มีรหัสในเซสชันนี้)
 - ⚠️ ยังค้าง: รหัสผ่านเจ้าของระบบเขียนตายตัวใน `login()` (ดูบันทึก release 056d953)
+
+## 2026-11-22T17:23:00+00:00 (00:23 Asia/Bangkok 23 พ.ย.) — Claude Code: release e73e424 (admin usability, multi-user safety, deps)
+
+- Released e73e424 (live เดิม 24df7b9) = PR #49 (deps + CI actions, รวม #41–#46) + PR #50 (admin/concurrency); ไม่มี migration
+- main CI 44928840986 ✅ (รวม branch-guard) → `released e73e424 ✓`
+- ใช้งานพร้อมกัน: rate limit ต่อ IP เดิม login 50/5 นาที, register 20/15 นาที — ทั้งห้องเรียนหลัง NAT โรงเรียนเกินได้ง่าย
+  → login 600/5 นาที, register 300/15 นาที, verify 300/นาที (ต่อบัญชียัง 20/5 นาที); แก้ตั้งค่าหลักสูตรพร้อมกัน → 409 `EDIT_CONFLICT`
+- แอดมิน: `ConfirmProvider/useConfirm` แทน window.confirm ทั้งหมด; ปุ่มบัญชีแจ้งผล/เหตุผลล้มเหลว; วันที่ไทยแบบ deterministic
+  (แก้ hydration error หน้ารายละเอียดสมาชิก); ซ่อนบัญชีที่ลบแล้วเป็นค่าเริ่มต้น; แถบกรอกโปรไฟล์เฉพาะผู้เรียน; ตารางเลื่อนแนวนอนบน iPad
+- PR housekeeping: ปิด #31/#32/#33 (อยู่ใน main แล้วผ่าน batch 5), ปิด #5 (TypeScript 7 major, CI ล้ม — ทำแยก);
+  #41–#46 ถูกรวมใน #49 (#45 แก้ analyze ให้ SHA ตรงกับ init) — ไม่มี PR เปิดค้าง
+- Live check (read-only): health ok, `/`, `/login` 200, หน้าแอดมิน 307 (ต้องล็อกอิน), เวลาตอบหน้าแรก ~0.1 วินาที
+- ยังไม่ได้ตรวจ: ล็อกอิน superadmin; หน้าแอดมินบน production (ต้องล็อกอิน)
+- ⚠️ ยังค้าง: รหัสผ่านเจ้าของระบบเขียนตายตัวใน `login()`; ไม่ทราบว่า reverse proxy (nginx) ส่ง X-Real-IP หรือไม่ (มีผลกับ rate limit ต่อ IP)
