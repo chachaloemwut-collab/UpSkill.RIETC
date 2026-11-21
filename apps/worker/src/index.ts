@@ -5,6 +5,7 @@ import { getEnv } from "@upskill/infra/env";
 import { logger } from "@upskill/infra/logger";
 import { createRedis } from "@upskill/infra/redis";
 import { renderCertificatePdf } from "./jobs/render-certificate-pdf.ts";
+import { scheduleCertificateRerender } from "./jobs/rerender-certificates.ts";
 import { recheckVideos } from "./jobs/recheck-videos.ts";
 import {
   addWorkerEmail,
@@ -47,10 +48,16 @@ const workers = [
     "certificate-pdf",
     async (job) => {
       const code = job.data.code as string;
+      const rerender = job.data.rerender === true;
       try {
-        await renderCertificatePdf(db, env, code);
+        await renderCertificatePdf(db, env, code, { notify: !rerender });
       } catch (error) {
         const message = error instanceof Error ? error.message.slice(0, 1000) : "certificate render failed";
+        // An artwork re-render that fails keeps serving the previous PDF: do not flag the document as failed
+        if (rerender) {
+          logger.warn({ code, message }, "certificate re-render failed; previous PDF kept");
+          throw error;
+        }
         await db.updateTable("certificates").set({ pdf_failed_at: new Date(), pdf_last_error: message }).where("certificate_code", "=", code).execute();
         if (job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
           await enqueueAdminAlert(db, "สร้างไฟล์เอกสารไม่สำเร็จ", `รหัส ${code}: ${message}`, `pdf-failed:${code}`, env.APP_ORIGIN);
@@ -119,4 +126,11 @@ const shutdown = async () => {
 };
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
+
+// Issued documents get the current certificate artwork once per artwork version (PDF only, no emails)
+const certificatePdfQueue = new Queue("certificate-pdf", { connection });
+await scheduleCertificateRerender(db, certificatePdfQueue).catch((err: unknown) =>
+  logger.error({ err: err instanceof Error ? err.message : String(err) }, "could not schedule certificate re-render"),
+);
+await certificatePdfQueue.close();
 logger.info("worker started");

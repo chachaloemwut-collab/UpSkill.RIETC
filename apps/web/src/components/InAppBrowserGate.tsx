@@ -26,7 +26,7 @@ export function InAppBrowserGate() {
           <ExternalLink className="h-5 w-5" />
         </span>
         <h2 className="mt-3 text-lg font-semibold">กรุณาเปิดในเบราว์เซอร์หลัก</h2>
-        <p className="mt-1 text-sm text-muted-foreground">แอปที่คุณใช้อยู่ไม่รองรับการเข้าสู่ระบบด้วย Google และการดาวน์โหลดใบรับรอง</p>
+        <p className="mt-1 text-sm text-muted-foreground">แอปที่คุณใช้อยู่ไม่รองรับการเข้าสู่ระบบด้วย Google และการดาวน์โหลดวุฒิบัตร</p>
         <div className="mt-5 grid gap-2">
           {external ? (
             <a href={external} className={buttonClass("default", "lg", "w-full")}>

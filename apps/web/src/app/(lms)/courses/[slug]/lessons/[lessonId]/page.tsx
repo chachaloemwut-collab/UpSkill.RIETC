@@ -39,7 +39,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
     lesson.completed && lesson.lessonTestRequired && !lesson.lessonTestDone
       ? { href: testHref, label: "ทำแบบทดสอบท้ายคลิป" }
       : courseCompleted
-        ? { href: `/courses/${slug}/certificate`, label: "เรียนจบแล้ว — รับใบรับรอง" }
+        ? { href: `/courses/${slug}/certificate`, label: "เรียนจบแล้ว — รับวุฒิบัตร" }
         : nextLessonOpen
           ? { href: `/courses/${slug}/lessons/${nextLesson.id}`, label: `คลิปถัดไป: ${nextLesson.title}` }
           : data.readyForPostTest

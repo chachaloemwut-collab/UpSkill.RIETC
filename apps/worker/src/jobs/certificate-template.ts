@@ -6,6 +6,9 @@
  */
 import { formatStudyDurationTh } from "@upskill/core";
 import {
+  CERTIFICATE_INTRO,
+  CERTIFICATE_TITLE,
+  certificateAchievement,
   certificateKicker,
   certificatePattern,
   formalThaiDate,
@@ -22,11 +25,13 @@ export const esc = (s: string) =>
 export interface CertificateView {
   code: string;
   documentType: string;
+  /** As signed at issue (may be an older name such as ใบรับรอง); the printed title is always CERTIFICATE_TITLE */
   documentName: string;
   recipientName: string;
   courseTitle: string;
   signerName: string;
   signerTitle: string | null;
+  /** As signed at issue; the printed sentence is the standard one (certificateAchievement) */
   achievement: string | null;
   studySec: number;
   /** Kept on the record (verification page); never printed — passing is what earns the document */
@@ -179,14 +184,12 @@ export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): 
   const left = c.textAlign === "left";
   const showSigner = !!a.signatureDataUrl && !!c.signerName.trim();
   const issuer = c.display.issuer_name.trim();
-  const coursePrefix = c.documentType === "program" ? "หลักสูตรอบรม" : "หลักสูตร";
-  const achievement = c.achievement ?? "ได้ผ่านการอบรมออนไลน์";
-  // "วุฒิบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า" (the wording of Thai online-training certificates); long custom names keep it short
-  const present = [...c.documentName].length <= 16 ? `${c.documentName}ฉบับนี้ให้ไว้เพื่อแสดงว่า` : "ให้ไว้เพื่อแสดงว่า";
+  // Fixed วุฒิบัตร wording for every document (old snapshots may say ใบรับรอง/ประกาศนียบัตร or a custom achievement line)
+  const achievement = certificateAchievement(c.documentType);
   const nameSize = fit(c.recipientName, [[26, 33], [34, 29], [44, 25]], 21);
-  const courseText = `${coursePrefix} ${c.courseTitle}`;
+  const courseText = `หลักสูตร ${c.courseTitle}`;
   const courseSize = fit(courseText, [[50, 18], [70, 15.5], [95, 13.5]], 12);
-  const titleSize = fit(c.documentName, [[12, 32], [36, 25], [56, 21]], 18);
+  const titleSize = 32;
   const year = String(Number(c.issuedAt.toLocaleDateString("en-US", { year: "numeric", timeZone: "Asia/Bangkok" })) + 543);
   const detail = isTest
     ? "เอกสารสำหรับทดสอบระบบ ไม่มีเวลาเรียนจริง"
@@ -247,9 +250,9 @@ export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): 
       ${a.emblemDataUrl ? `<img class="emblem" src="${a.emblemDataUrl}" alt="">` : emblem(p)}
       <div class="issuer">${esc(issuer)}</div>
       ${issuer === DEFAULT_ISSUER_TH ? `<div class="issuer-en">${DEFAULT_ISSUER_EN}</div>` : ""}
-      <h1>${esc(c.documentName)}</h1>
+      <h1>${CERTIFICATE_TITLE}</h1>
       <div class="kicker">${esc(certificateKicker(c.documentType))}</div>
-      <div class="present">${esc(present)}</div>
+      <div class="present">${CERTIFICATE_INTRO}</div>
       <div class="name">${esc(c.recipientName)}</div>
       ${divider(p, 140)}
       <div class="achieve">${esc(achievement)}</div>

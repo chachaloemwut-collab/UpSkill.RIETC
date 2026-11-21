@@ -2,6 +2,7 @@
  * POST /api/courses/:id/certificate/issue (spec 5.4)
  * Idempotent: calling it again returns the existing certificate (UNIQUE enrollment_id).
  */
+import { CERTIFICATE_TITLE, certificateAchievement } from "@upskill/core/certificate-patterns";
 import "server-only";
 import { sql } from "@upskill/db";
 import { computeVisualDigest, generateCertificateCode, normalizeName, signCertificate, type CertificatePayload } from "@upskill/core";
@@ -82,8 +83,9 @@ export async function issueCertificate(input: {
   // JS Date is millisecond precision -> the value stored in timestamptz (microseconds) round-trips exactly
   const issuedAt = new Date();
   const expiresAt = data.credential_validity_days ? new Date(issuedAt.getTime() + data.credential_validity_days * 86_400_000) : null;
-  const documentName = input.locale === "en" && data.credential_name_en ? data.credential_name_en : data.credential_name_th;
-  const achievementRaw = (input.locale === "en" && data.credential_achievement_en ? data.credential_achievement_en : data.credential_achievement_th) ?? null;
+  // Every document is a วุฒิบัตร with the standard wording (owner decision 2026-11-21); per-course names are not used
+  const documentName = input.locale === "en" && data.credential_name_en ? data.credential_name_en : CERTIFICATE_TITLE;
+  const achievementRaw = input.locale === "en" && data.credential_achievement_en ? data.credential_achievement_en : certificateAchievement(data.credential_type);
   const code = generateCertificateCode(issuedAt.getUTCFullYear());
   const recipientName = normalizeName(recipient);
   const courseTitle = normalizeName(data.title);
@@ -263,7 +265,7 @@ export async function issueProgramCertificate(input: { userId: string; programId
     }
   }
   if (courseScores.length === 0 || courseScores.length < required.length) {
-    throw new HttpError(409, "SCORE_UNAVAILABLE", "ยังไม่มีคะแนนครบทุกรายวิชาบังคับ จึงออกใบรับรองระดับหลักสูตรไม่ได้");
+    throw new HttpError(409, "SCORE_UNAVAILABLE", "ยังไม่มีคะแนนครบทุกรายวิชาบังคับ จึงออกวุฒิบัตรระดับหลักสูตรไม่ได้");
   }
   const programScore = courseScores.reduce((a, b) => a + b, 0) / courseScores.length;
 
@@ -288,11 +290,11 @@ export async function issueProgramCertificate(input: { userId: string; programId
     quizScore: programScore.toFixed(2),
     verifiedCourse: false,
     issuedAt: issuedAt.toISOString(),
-    documentName: "ใบประกาศนียบัตร",
+    documentName: CERTIFICATE_TITLE,
     documentType: "program",
     expiresAt: null,
     signerTitle: null,
-    achievement: "ผ่านการอบรมครบทุกวิชาบังคับของหลักสูตร",
+    achievement: certificateAchievement("program"),
     visualDigest,
   };
   const signed = signCertificate(payload, env.CERT_SIGNING_ACTIVE_KID, env.CERT_SIGNING_PRIVATE_KEY);

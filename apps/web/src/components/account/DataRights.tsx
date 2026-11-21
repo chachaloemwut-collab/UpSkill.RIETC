@@ -11,7 +11,7 @@ export function DataRights() {
   const [busy, setBusy] = useState(false);
 
   async function doDelete() {
-    if (!window.confirm("ยืนยันลบบัญชีของคุณถาวร?\nข้อมูลที่ระบุตัวตนจะถูกลบ แต่ใบรับรองและบันทึกการตรวจสอบจะยังคงอยู่")) return;
+    if (!window.confirm("ยืนยันลบบัญชีของคุณถาวร?\nข้อมูลที่ระบุตัวตนจะถูกลบ แต่วุฒิบัตรและบันทึกการตรวจสอบจะยังคงอยู่")) return;
     setBusy(true);
     try {
       const r = await fetch("/api/user/me", { method: "DELETE" });

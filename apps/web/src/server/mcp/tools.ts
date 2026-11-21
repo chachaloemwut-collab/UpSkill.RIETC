@@ -114,7 +114,7 @@ export const MCP_TOOLS: McpTool[] = [
   },
   {
     name: "my_certificates",
-    description: "ใบรับรองของฉัน (รหัส สถานะ วันออก)",
+    description: "วุฒิบัตรของฉัน (รหัส สถานะ วันออก)",
     inputSchema: { type: "object", properties: {} },
     minRole: "member",
     run: async (user) => ({
@@ -144,7 +144,7 @@ export const MCP_TOOLS: McpTool[] = [
   },
   {
     name: "verify_certificate",
-    description: "ตรวจสอบใบรับรองสาธารณะจากรหัส (valid/revoked/expired/tampered)",
+    description: "ตรวจสอบวุฒิบัตรสาธารณะจากรหัส (valid/revoked/expired/tampered)",
     inputSchema: { type: "object", properties: { code: { type: "string" } }, required: ["code"] },
     minRole: "member",
     run: async (_user, args) => verifyPublicCertificate(str(args.code)),
@@ -226,7 +226,7 @@ export const MCP_TOOLS: McpTool[] = [
   // ── admin ───────────────────────────────────────────────────────────────────────────
   {
     name: "admin_stats",
-    description: "ภาพรวมระบบ (ผู้ใช้ หลักสูตร การลงทะเบียน ใบรับรอง อีเมล แฟล็กกันโกง)",
+    description: "ภาพรวมระบบ (ผู้ใช้ หลักสูตร การลงทะเบียน วุฒิบัตร อีเมล แฟล็กกันโกง)",
     inputSchema: { type: "object", properties: {} },
     minRole: "admin",
     run: async () => {

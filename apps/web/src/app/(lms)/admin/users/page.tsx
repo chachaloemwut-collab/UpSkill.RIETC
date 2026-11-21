@@ -76,7 +76,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
               <th className="px-4 py-3">บทบาท</th>
               <th className="px-4 py-3">สถานะ</th>
               <th className="px-4 py-3 text-right">ลงทะเบียน</th>
-              <th className="px-4 py-3 text-right">ใบรับรอง</th>
+              <th className="px-4 py-3 text-right">วุฒิบัตร</th>
               <th className="px-4 py-3">สมัครเมื่อ</th>
               <th className="px-4 py-3 text-right">ใช้งานล่าสุด</th>
             </tr>
@@ -126,7 +126,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       </Card>
 
       <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-        <UserCog className="h-4 w-4" /> คลิกชื่อสมาชิกเพื่อดูรายละเอียดเต็ม: โปรไฟล์ การลงทะเบียน ใบรับรอง เซสชัน พฤติกรรม ประวัติอีเมล และ audit log
+        <UserCog className="h-4 w-4" /> คลิกชื่อสมาชิกเพื่อดูรายละเอียดเต็ม: โปรไฟล์ การลงทะเบียน วุฒิบัตร เซสชัน พฤติกรรม ประวัติอีเมล และ audit log
       </p>
     </div>
   );

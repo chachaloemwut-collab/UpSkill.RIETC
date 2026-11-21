@@ -36,7 +36,7 @@ export interface CourseCardData {
   course_type?: string;
 }
 
-/** What the course offers (chosen by its owner): ใบรับรอง or ประกาศนียบัตรหลักสูตรระยะสั้น */
+/** What the course offers (chosen by its owner): วุฒิบัตร or วุฒิบัตรหลักสูตรระยะสั้น */
 function CourseTypeBadge({ type }: { type?: string | undefined }) {
   if (!type) return null;
   const info = COURSE_TYPE_INFO[asCourseType(type)];
@@ -76,7 +76,7 @@ export function CourseCard({
           </span>
           <div className="absolute left-2.5 top-2.5 flex gap-1.5">
             {course.is_verified_course ? (
-              <Badge title="หลักสูตรที่ผ่านการรับรองมาตรฐาน มีระบบบันทึกเวลาเรียนจริงและออกใบรับรอง Ed25519" className="border-transparent bg-background/95 text-foreground shadow-xs backdrop-blur cursor-help">
+              <Badge title="หลักสูตรที่ผ่านการรับรองมาตรฐาน มีระบบบันทึกเวลาเรียนจริงและออกวุฒิบัตร Ed25519" className="border-transparent bg-background/95 text-foreground shadow-xs backdrop-blur cursor-help">
                 <BadgeCheck className="h-3.5 w-3.5 text-success" /> Verified
               </Badge>
             ) : (
@@ -122,7 +122,7 @@ export function CourseCard({
         </span>
         <div className="absolute left-3 top-3 flex gap-1.5">
           {course.is_verified_course ? (
-            <Badge title="หลักสูตรที่ผ่านการรับรองมาตรฐาน มีระบบบันทึกเวลาเรียนจริงและออกใบรับรอง Ed25519" className="border-transparent bg-background/95 text-foreground shadow-xs backdrop-blur cursor-help">
+            <Badge title="หลักสูตรที่ผ่านการรับรองมาตรฐาน มีระบบบันทึกเวลาเรียนจริงและออกวุฒิบัตร Ed25519" className="border-transparent bg-background/95 text-foreground shadow-xs backdrop-blur cursor-help">
               <BadgeCheck className="h-3.5 w-3.5 text-success" /> Verified
             </Badge>
           ) : (

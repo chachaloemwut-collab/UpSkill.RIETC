@@ -18,14 +18,14 @@ export function DeveloperTestCertificateButton() {
     setBusy(false);
     if (res.ok) {
       toast({
-        title: "ออกใบประกาศทดสอบสำเร็จ",
+        title: "ออกวุฒิบัตรทดสอบสำเร็จ",
         description: `รหัส: ${res.data?.code ?? ""}`,
         variant: "success",
       });
       router.refresh();
     } else {
       toast({
-        title: "ออกใบประกาศทดสอบไม่สำเร็จ",
+        title: "ออกวุฒิบัตรทดสอบไม่สำเร็จ",
         description: res.message,
         variant: "destructive",
       });
@@ -41,12 +41,12 @@ export function DeveloperTestCertificateButton() {
         <div>
           <h2 className="font-semibold text-foreground">บัญชีผู้พัฒนา (Developer Test Account)</h2>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            คุณสามารถกดออกใบประกาศนียบัตรสำหรับทดสอบระบบได้ โดยเอกสารจะระบุสถานะ TEST / DEVELOPMENT ชัดเจน
+            คุณสามารถกดออกวุฒิบัตรสำหรับทดสอบระบบได้ โดยเอกสารจะระบุสถานะ TEST / DEVELOPMENT ชัดเจน
           </p>
         </div>
       </div>
       <Button variant="outline" size="sm" loading={busy} onClick={handleIssue} className="border-amber-500/50 hover:bg-amber-500/20">
-        <FlaskConical className="h-4 w-4 text-amber-600" /> ออกใบประกาศทดสอบระบบ
+        <FlaskConical className="h-4 w-4 text-amber-600" /> ออกวุฒิบัตรทดสอบระบบ
       </Button>
     </Card>
   );

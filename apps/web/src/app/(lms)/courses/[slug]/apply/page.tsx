@@ -53,7 +53,7 @@ export default async function ApplyPage({ params }: { params: Promise<{ slug: st
         <Alert variant="success" title="คุณลงทะเบียนหลักสูตรนี้แล้ว" />
       ) : !context.profile ? (
         <div className="grid gap-4">
-          <Alert variant="warning" title="กรุณากรอกข้อมูลส่วนตัวให้ครบก่อนสมัคร">ข้อมูลชื่อ เลขประจำตัวประชาชน และที่อยู่ใช้ในใบสมัครและใบรับรอง</Alert>
+          <Alert variant="warning" title="กรุณากรอกข้อมูลส่วนตัวให้ครบก่อนสมัคร">ข้อมูลชื่อ เลขประจำตัวประชาชน และที่อยู่ใช้ในใบสมัครและวุฒิบัตร</Alert>
           <Link href="/me/profile" className={buttonClass("default", "md", "justify-self-start")}>ไปกรอกข้อมูลส่วนตัว</Link>
         </div>
       ) : (

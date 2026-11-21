@@ -179,7 +179,7 @@ export default async function CoursePage({ params }: Props) {
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2 shadow-xs">
               5
             </span>
-            <p className="font-semibold text-xs text-primary">รับใบรับรองดิจิทัล</p>
+            <p className="font-semibold text-xs text-primary">รับวุฒิบัตรดิจิทัล</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">ลงนาม Ed25519</p>
           </div>
         </div>
@@ -249,7 +249,7 @@ export default async function CoursePage({ params }: Props) {
               )}
               {!enrolled && course.visibility === "archived" ? (
                 <Alert variant="warning" title="หลักสูตรสิ้นสุดแล้ว (Archived)">
-                  หลักสูตรนี้ปิดการเรียนการสอนหรือสิ้นสุดโครงการแล้ว ผู้เรียนเดิมที่จบหลักสูตรยังคงดูและดาวน์โหลดใบรับรองได้ตลอดชีพ
+                  หลักสูตรนี้ปิดการเรียนการสอนหรือสิ้นสุดโครงการแล้ว ผู้เรียนเดิมที่จบหลักสูตรยังคงดูและดาวน์โหลดวุฒิบัตรได้ตลอดชีพ
                 </Alert>
               ) : !enrolled && data.programOnly ? (
                 <div className="grid gap-2">

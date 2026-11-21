@@ -6,7 +6,7 @@ import { ThemeToggle, buttonClass } from "@/components/ui";
 const POINTS = [
   { icon: PlayCircle, title: "เรียนจากวิดีโอคุณภาพ", text: "บทเรียนจาก YouTube จัดเป็นหลักสูตรอย่างเป็นระบบ" },
   { icon: ShieldCheck, title: "นับเวลาเรียนจริง", text: "ระบบกันโกงฝั่งเซิร์ฟเวอร์ ข้ามหรือเร่งวิดีโอไม่ได้" },
-  { icon: Award, title: "ใบรับรองที่ตรวจสอบได้", text: "ลงนามดิจิทัล Ed25519 พร้อม QR Code" },
+  { icon: Award, title: "วุฒิบัตรที่ตรวจสอบได้", text: "ลงนามดิจิทัล Ed25519 พร้อม QR Code" },
 ];
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -17,7 +17,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div aria-hidden className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-primary-foreground/5 blur-3xl" />
         <div className="relative my-auto max-w-md">
           <BrandLogo mode="unfold" tone="inverted" size="lg" className="mb-10" />
-          <h2 className="text-3xl font-semibold leading-tight tracking-tight">เรียนรู้ทักษะใหม่ ได้ใบรับรองที่เชื่อถือได้</h2>
+          <h2 className="text-3xl font-semibold leading-tight tracking-tight">เรียนรู้ทักษะใหม่ ได้วุฒิบัตรที่เชื่อถือได้</h2>
           <p className="mt-3 text-primary-foreground/70">Minimalist Features, Maximum Integrity</p>
           <ul className="mt-10 grid gap-6">
             {POINTS.map((p, i) => (

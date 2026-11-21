@@ -96,7 +96,7 @@ export async function issueDeveloperTestCertificate(meta: { ip: string }): Promi
     .executeTakeFirst();
 
   if (!course) {
-    throw new HttpError(404, "COURSE_NOT_FOUND", "ไม่พบหลักสูตรที่เปิดรับรองสำหรับออกใบประกาศทดสอบ");
+    throw new HttpError(404, "COURSE_NOT_FOUND", "ไม่พบหลักสูตรที่เปิดรับรองสำหรับออกวุฒิบัตรทดสอบ");
   }
 
   // 3. One developer TEST certificate ever, in any course (checking only the selected course issued new test
@@ -156,11 +156,11 @@ export async function issueDeveloperTestCertificate(meta: { ip: string }): Promi
     quizScore: "100.00",
     verifiedCourse: Boolean(course.is_verified_course),
     issuedAt: issuedAt.toISOString(),
-    documentName: "ใบประกาศนียบัตร (DEVELOPMENT TEST)",
+    documentName: "วุฒิบัตร (DEVELOPMENT TEST)",
     documentType: DEVELOPER_TEST_DOCUMENT_TYPE,
     expiresAt: null,
     signerTitle: course.credential_signer_title ?? "ผู้ดูแลระบบทดสอบ (Development / Integration Test)",
-    achievement: "เอกสารทดสอบระบบ (TEST / DEVELOPMENT) — สำหรับทดสอบการออกและตรวจสอบใบประกาศนียบัตรเท่านั้น มิใช่การสำเร็จการศึกษาจริง",
+    achievement: "เอกสารทดสอบระบบ (TEST / DEVELOPMENT) — สำหรับทดสอบการออกและตรวจสอบวุฒิบัตรเท่านั้น มิใช่การสำเร็จการศึกษาจริง",
     visualDigest,
   };
 

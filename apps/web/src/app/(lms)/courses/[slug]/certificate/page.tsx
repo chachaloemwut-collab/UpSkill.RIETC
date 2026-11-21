@@ -1,3 +1,4 @@
+import { CERTIFICATE_TITLE } from "@upskill/core/certificate-patterns";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -10,7 +11,7 @@ import { getCourseForViewer } from "@/server/courses/courses.service";
 import { getCertificateDisplay } from "@/server/system-settings.service";
 import { formatStudyDurationTh } from "@upskill/core";
 
-export const metadata: Metadata = { title: "ใบรับรอง" };
+export const metadata: Metadata = { title: "วุฒิบัตร" };
 
 export default async function CertificatePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -42,10 +43,10 @@ export default async function CertificatePage({ params }: { params: Promise<{ sl
             <Link href={`/courses/${slug}`} className="truncate transition-colors hover:text-foreground">
               {data.course.title}
             </Link>
-            <ChevronRight className="h-3.5 w-3.5" /> ใบรับรอง
+            <ChevronRight className="h-3.5 w-3.5" /> วุฒิบัตร
           </span>
         }
-        title={data.course.credential_name_th}
+        title={CERTIFICATE_TITLE}
         description={data.course.title}
       />
       {cert && snap && display ? (
@@ -53,7 +54,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ sl
           code={cert.certificate_code}
           courseTitle={data.course.title}
           revokedAt={cert.revoked_at ? String(cert.revoked_at) : null}
-          credentialName={snap.document_name_snapshot}
+          credentialName={CERTIFICATE_TITLE}
           preview={{
             template: snap.template_snapshot,
             align: snap.text_align_snapshot,

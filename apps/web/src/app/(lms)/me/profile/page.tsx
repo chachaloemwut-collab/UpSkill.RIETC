@@ -20,7 +20,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
       <PageHeader
         eyebrow={<span className="flex items-center gap-1.5"><Link href="/me" className="hover:text-foreground">ตั้งค่าบัญชี</Link><ChevronRight className="h-3.5 w-3.5" /> ข้อมูลผู้เรียน</span>}
         title="ข้อมูลผู้เรียน"
-        description="ชื่อ-นามสกุล ข้อมูลยืนยันตัวตน และที่อยู่ติดต่อ ใช้สำหรับลงทะเบียนเรียน สมัครรอบอบรม และออกใบรับรอง"
+        description="ชื่อ-นามสกุล ข้อมูลยืนยันตัวตน และที่อยู่ติดต่อ ใช้สำหรับลงทะเบียนเรียน สมัครรอบอบรม และออกวุฒิบัตร"
       />
       {!profile && (
         <div className="mb-4">

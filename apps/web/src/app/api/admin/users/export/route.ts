@@ -13,7 +13,7 @@ export const GET = route({ auth: "required", roles: ["admin"] }, async ({ user, 
   const rows = await exportUsersAdmin({ query: sp.get("q") ?? undefined, role: sp.get("role") ?? undefined, status: sp.get("status") ?? undefined });
   await audit(ctx().db, { action: "admin.users_exported", userId: user!.id, ip, details: { rows: rows.length } });
 
-  const header = ["อีเมล", "ชื่อ-นามสกุลไทย", "ชื่อภาษาอังกฤษ", "บทบาท", "สถานะ", "ยืนยันอีเมลแล้ว", "ลงทะเบียน (คอร์ส)", "ใบรับรอง", "สมัครเมื่อ", "ใช้งานล่าสุด", "ลบบัญชีแล้ว"];
+  const header = ["อีเมล", "ชื่อ-นามสกุลไทย", "ชื่อภาษาอังกฤษ", "บทบาท", "สถานะ", "ยืนยันอีเมลแล้ว", "ลงทะเบียน (คอร์ส)", "วุฒิบัตร", "สมัครเมื่อ", "ใช้งานล่าสุด", "ลบบัญชีแล้ว"];
   const body = rows.map((r) => [
     r.email,
     r.legal_full_name_th ?? "",

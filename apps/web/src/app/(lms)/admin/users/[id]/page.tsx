@@ -189,9 +189,9 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="p-6">
-            <h2 className="mb-3 flex items-center gap-2 font-semibold"><Award className="h-5 w-5" /> ใบรับรอง ({d.certificates.length})</h2>
+            <h2 className="mb-3 flex items-center gap-2 font-semibold"><Award className="h-5 w-5" /> วุฒิบัตร ({d.certificates.length})</h2>
             {d.certificates.length === 0 ? (
-              <p className="text-sm text-muted-foreground">ยังไม่มีใบรับรอง</p>
+              <p className="text-sm text-muted-foreground">ยังไม่มีวุฒิบัตร</p>
             ) : (
               <ul className="divide-y text-sm">
                 {d.certificates.map((c) => (

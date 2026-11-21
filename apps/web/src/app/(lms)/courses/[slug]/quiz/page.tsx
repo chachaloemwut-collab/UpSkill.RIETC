@@ -30,13 +30,13 @@ export default async function QuizPage({ params }: { params: Promise<{ slug: str
           </span>
         }
         title="แบบทดสอบท้ายหลักสูตร"
-        description="ตอบคำถามให้ได้คะแนนตามเกณฑ์เพื่อรับใบรับรอง"
+        description="ตอบคำถามให้ได้คะแนนตามเกณฑ์เพื่อรับวุฒิบัตร"
       />
       {data.enrollment.status === "completed" ? (
         <div className="grid gap-4">
           <Alert variant="success" title="คุณสอบผ่านหลักสูตรนี้แล้ว" />
           <Link href={`/courses/${slug}/certificate`} className={buttonClass("default", "lg", "justify-self-start")}>
-            ไปหน้าใบรับรอง
+            ไปหน้าวุฒิบัตร
           </Link>
         </div>
       ) : data.completionRule === "lesson_tests_average" ? (

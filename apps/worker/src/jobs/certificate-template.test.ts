@@ -32,7 +32,6 @@ describe("certificate artwork", () => {
     assert.ok(html.includes("&lt;img src=x onerror=&quot;x()&quot;&gt;"));
     assert.ok(html.includes("a &amp; b"));
     assert.ok(html.includes("&lt;b&gt;t&lt;/b&gt;"));
-    assert.ok(html.includes("&quot;q&#39;"));
     assert.ok(html.includes("&lt;i&gt;"));
   });
 
@@ -40,12 +39,21 @@ describe("certificate artwork", () => {
     const html = buildCertificateHtml(view, assets);
     assert.ok(html.includes("วิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง"));
     assert.ok(html.includes("Rayong Industrial Estate Technical College"));
-    assert.ok(html.includes("วุฒิบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า"));
+    assert.ok(html.includes("<h1>วุฒิบัตร</h1>"));
+    assert.ok(html.includes("ฉบับนี้ให้ไว้เพื่อแสดงว่า"));
     assert.ok(html.includes("ได้ผ่านการอบรมออนไลน์"));
     assert.ok(html.includes("จำนวนชั่วโมงการอบรม ๒ ชั่วโมง ๑๕ นาที"));
     assert.ok(html.includes("ให้ไว้ ณ วันที่ ๑๙ พฤศจิกายน พ.ศ. ๒๕๖๙"));
     assert.ok(!html.includes("ร้อยละ") && !html.includes("คะแนน") && !html.includes("ผลการประเมิน") && !html.includes("๙๒"));
     assert.ok(!html.includes("TEST / DEVELOPMENT"));
+  });
+
+  it("prints the standard wording even for documents issued under older names", () => {
+    const html = buildCertificateHtml({ ...view, documentName: "ใบประกาศนียบัตรสำเร็จการศึกษา", achievement: "ได้สำเร็จการศึกษาตามเกณฑ์มาตรฐาน" }, assets);
+    assert.ok(html.includes("<h1>วุฒิบัตร</h1>"));
+    assert.ok(!html.includes("ใบประกาศนียบัตร") && !html.includes("สำเร็จการศึกษาตามเกณฑ์"));
+    const program = buildCertificateHtml({ ...view, documentType: "program" }, assets);
+    assert.ok(program.includes(">ได้ผ่านการอบรม<"));
   });
 
   it("prints the college emblem when provided", () => {

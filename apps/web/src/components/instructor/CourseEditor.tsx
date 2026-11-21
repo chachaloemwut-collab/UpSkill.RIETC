@@ -63,7 +63,7 @@ import { LessonDetailsForm, UnitBadge, UnitsManager, type EditorUnit } from "./U
 import { ApplicationsManager, type EditorApplication } from "./ApplicationsManager";
 import { CertificatePreview } from "@/components/certificate/CertificatePreview";
 import { SignatureAdminCard } from "@/components/admin/SignatureAdminCard";
-import type { CertificateDisplay } from "@upskill/core/certificate-patterns";
+import { CERTIFICATE_TITLE, certificateAchievement, type CertificateDisplay } from "@upskill/core/certificate-patterns";
 import { COURSE_TYPES, COURSE_TYPE_INFO } from "@upskill/core/application";
 
 export interface EditorData {
@@ -229,7 +229,7 @@ export function CourseEditor({ data }: { data: EditorData }) {
           <TabsTrigger value="settings">
             <span className="inline-flex items-center gap-1.5">
               <Settings className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">ตั้งค่า & ใบประกาศ</span>
+              <span className="hidden sm:inline">ตั้งค่า & วุฒิบัตร</span>
             </span>
           </TabsTrigger>
         </TabsList>
@@ -330,7 +330,7 @@ function PublishSection({
         <Alert variant="destructive" title="หลักสูตรถูกระงับโดยผู้ดูแลระบบ" />
       ) : course.visibility === "enrollment_closed" ? (
         <div className="grid gap-2">
-          <Alert title="ปิดรับสมัครใหม่แล้ว">ผู้เรียนที่ลงทะเบียนไว้แล้วยังเข้าเรียนและรับใบรับรองได้ตามปกติ</Alert>
+          <Alert title="ปิดรับสมัครใหม่แล้ว">ผู้เรียนที่ลงทะเบียนไว้แล้วยังเข้าเรียนและรับวุฒิบัตรได้ตามปกติ</Alert>
           <Button loading={a.busy} onClick={() => set("published")}>
             <Rocket className="h-4 w-4" /> เปิดรับสมัครอีกครั้ง
           </Button>
@@ -393,7 +393,6 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
 
   // Form states for live certificate preview
   const [certEnabled, setCertEnabled] = useState(course.credential_enabled);
-  const [certTitleTh, setCertTitleTh] = useState(course.credential_name_th);
   const [certNameEn, setCertNameEn] = useState(course.credential_name_en ?? "");
   const [certType, setCertType] = useState(course.credential_type);
   const [certSigner, setCertSigner] = useState(course.credential_signer_name ?? "");
@@ -401,7 +400,6 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
   const [certTemplate, setCertTemplate] = useState(course.credential_template_key);
   const [certAlign, setCertAlign] = useState(course.credential_text_align);
   const [certValidityDays, setCertValidityDays] = useState(course.credential_validity_days ?? "");
-  const [certAchievement, setCertAchievement] = useState(course.credential_achievement_th);
   const [certAchievementEn, setCertAchievementEn] = useState(course.credential_achievement_en ?? "");
   const [certBgUrl, setCertBgUrl] = useState(course.credential_background_url ?? "");
 
@@ -421,7 +419,6 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
   function applyPreset(id: string) {
     const p = presets?.find((x) => x.id === id);
     if (!p) return;
-    setCertTitleTh(p.credential_name_th);
     setCertNameEn(p.credential_name_en ?? "");
     setCertType(p.credential_type);
     setCertTemplate(p.credential_template_key);
@@ -429,7 +426,6 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
     setCertValidityDays(p.credential_validity_days ?? "");
     setCertSigner(p.credential_signer_name ?? "");
     setCertSignerTitle(p.credential_signer_title ?? "");
-    setCertAchievement(p.credential_achievement_th);
     setCertAchievementEn(p.credential_achievement_en ?? "");
     setCertBgUrl(p.credential_background_url ?? "");
     toast({ title: "โหลดค่าเทมเพลตแล้ว", description: `จากวิชา "${p.title}" — ตรวจสอบและบันทึกอีกครั้ง` });
@@ -575,7 +571,7 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
               <h3 className="font-semibold text-foreground">เอกสารรับรองดิจิทัล (Digital Certificate)</h3>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              กำหนดรูปแบบและการจัดวางสำหรับใบประกาศนียบัตรที่ออกให้ผู้เรียนเมื่อผ่านเกณฑ์
+              กำหนดรูปแบบและการจัดวางสำหรับวุฒิบัตรที่ออกให้ผู้เรียนเมื่อผ่านเกณฑ์
             </p>
             <div className="mt-3 flex items-center gap-2 rounded-lg border border-dashed bg-muted/40 p-3">
               <Copy className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -596,19 +592,18 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
             name="credential_enabled"
             checked={certEnabled}
             onChange={(e) => setCertEnabled(e.target.checked)}
-            label="เปิดใช้งานการออกใบรับรองเมื่อผู้เรียนผ่านเกณฑ์"
+            label="เปิดใช้งานการออกวุฒิบัตรเมื่อผู้เรียนผ่านเกณฑ์"
           />
 
           <div className="grid items-start gap-4 sm:grid-cols-2">
-            <Field label="ชื่อเอกสารภาษาไทย">
-              <Input
-                name="credential_name_th"
-                required
-                maxLength={120}
-                value={certTitleTh}
-                onChange={(e) => setCertTitleTh(e.target.value)}
-              />
-            </Field>
+            <div className="sm:col-span-2 rounded-lg border bg-muted/40 p-3 text-sm">
+              <p className="font-medium">ชื่อเอกสาร: วุฒิบัตร (ใช้ถ้อยคำมาตรฐานทุกหลักสูตร)</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                “วุฒิบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า … ได้ผ่านการอบรมออนไลน์ หลักสูตร … จำนวนชั่วโมงการอบรม … ให้ไว้ ณ วันที่ …” ตามรูปแบบวุฒิบัตรอบรมออนไลน์ของหน่วยงานราชการ ไม่แสดงคะแนน
+              </p>
+              <input type="hidden" name="credential_name_th" value={CERTIFICATE_TITLE} />
+              <input type="hidden" name="credential_achievement_th" value={certificateAchievement(certType)} />
+            </div>
             <Field label="ชื่อเอกสารภาษาอังกฤษ" hint="ไม่บังคับ">
               <Input
                 name="credential_name_en"
@@ -677,14 +672,6 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
                 placeholder="เช่น ผู้อำนวยการสถาบันฯ"
               />
             </Field>
-            <Field label="ข้อความผลสัมฤทธิ์ (ไทย)" hint="แสดงใต้ชื่อผู้รับ">
-              <Input
-                name="credential_achievement_th"
-                maxLength={255}
-                value={certAchievement}
-                onChange={(e) => setCertAchievement(e.target.value)}
-              />
-            </Field>
             <Field label="ข้อความผลสัมฤทธิ์ (อังกฤษ)" hint="ไม่บังคับ">
               <Input
                 name="credential_achievement_en"
@@ -731,8 +718,6 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
           template={certTemplate}
           align={certAlign}
           documentType={certType}
-          documentName={certTitleTh}
-          achievement={certAchievement}
           courseTitle={course.title}
           signerName={certSigner}
           signerTitle={certSignerTitle}

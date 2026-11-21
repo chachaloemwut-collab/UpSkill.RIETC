@@ -184,7 +184,7 @@ export function QuizRunner({
         <div className="flex flex-wrap justify-center gap-2">
           {result.courseCompleted ? (
             <Link href={`/courses/${slug}/certificate`} className={buttonClass("default", "lg")}>
-              <Award className="h-4 w-4" /> รับใบรับรอง
+              <Award className="h-4 w-4" /> รับวุฒิบัตร
             </Link>
           ) : (
             <Link href={continueHref ?? `/courses/${slug}`} className={buttonClass("default", "lg")}>
@@ -228,7 +228,7 @@ export function QuizRunner({
           <Link href={continueHref ?? `/courses/${slug}`} className={buttonClass("default", "lg")}>เรียนต่อ</Link>
         ) : result.passed ? (
           <Link href={`/courses/${slug}/certificate`} className={buttonClass("default", "lg")}>
-            <Award className="h-4 w-4" /> รับใบรับรอง
+            <Award className="h-4 w-4" /> รับวุฒิบัตร
           </Link>
         ) : (
           <div className="flex flex-wrap justify-center gap-2">
