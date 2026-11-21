@@ -5,14 +5,14 @@ import { listCertificatesAdmin, listEligibleCoursesForAdmin, type AdminCertifica
 import { CertificatesManager } from "@/components/admin/CertificatesManager";
 
 export const metadata: Metadata = {
-  title: "จัดการใบประกาศนียบัตร",
+  title: "จัดการวุฒิบัตร",
   robots: { index: false },
 };
 
 export default async function AdminCertificatesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string; course?: string }>;
 }) {
   await requireAdminPage();
   const sp = await searchParams;
@@ -21,6 +21,7 @@ export default async function AdminCertificatesPage({
     listCertificatesAdmin({
       query: sp.q,
       status: sp.status as AdminCertificateStatus | undefined,
+      courseId: sp.course,
       page: Number(sp.page ?? 1),
     }),
     listEligibleCoursesForAdmin(),
@@ -29,8 +30,8 @@ export default async function AdminCertificatesPage({
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader
-        title="จัดการใบประกาศนียบัตร"
-        description={`ใบรับรองทั้งหมดในระบบ ${data.counts.total} ฉบับ · ค้นหา ตรวจสอบความถูกต้อง เพิกถอน หรือออกใบรับรองเป็นกรณีพิเศษ`}
+        title="จัดการวุฒิบัตร"
+        description={`วุฒิบัตรทั้งหมดในระบบ ${data.counts.total} ฉบับ · ค้นหา ตรวจสอบความถูกต้อง เพิกถอน หรือออกวุฒิบัตรเป็นกรณีพิเศษ`}
       />
 
       <CertificatesManager
@@ -38,6 +39,7 @@ export default async function AdminCertificatesPage({
         courses={courses}
         searchQuery={sp.q ?? ""}
         activeStatus={sp.status ?? ""}
+        activeCourse={sp.course ?? ""}
       />
     </div>
   );
