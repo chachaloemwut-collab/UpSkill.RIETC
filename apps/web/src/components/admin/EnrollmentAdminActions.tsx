@@ -54,7 +54,7 @@ export function EnrollmentAdminActions({
 
   const manualIssue = async () => {
     // The score printed on the certificate must be stated, never defaulted
-    const answer = window.prompt("ออกใบรับรองหลักสูตรนี้ให้ผู้เรียนทันที\nกรอกคะแนนที่จะพิมพ์บนใบรับรอง (0–100):");
+    const answer = window.prompt("ออกวุฒิบัตรหลักสูตรนี้ให้ผู้เรียนทันที\nกรอกคะแนนที่จะพิมพ์บนวุฒิบัตร (0–100):");
     if (answer === null) return;
     const score = answer.trim() === "" ? NaN : Number(answer);
     if (!Number.isFinite(score) || score < 0 || score > 100) {
@@ -69,14 +69,14 @@ export function EnrollmentAdminActions({
           userId,
           courseId,
           score,
-          reason: "อนุมัติจบหลักสูตรและออกใบรับรองจากหน้าจัดการสมาชิก",
+          reason: "อนุมัติจบหลักสูตรและออกวุฒิบัตรจากหน้าจัดการสมาชิก",
         },
       });
       if (!res.ok) {
         toast({ variant: "destructive", title: "ข้อผิดพลาด", description: res.message });
         return;
       }
-      toast({ title: "ออกใบรับรองสำเร็จ", description: `รหัสใบรับรอง: ${res.data.code}` });
+      toast({ title: "ออกวุฒิบัตรสำเร็จ", description: `รหัสวุฒิบัตร: ${res.data.code}` });
       router.refresh();
     } finally {
       setBusy(false);
@@ -105,9 +105,9 @@ export function EnrollmentAdminActions({
           loading={busy}
           onClick={manualIssue}
           className="h-8 px-2 text-xs bg-primary text-primary-foreground"
-          title="ออกใบรับรองทันที"
+          title="ออกวุฒิบัตรทันที"
         >
-          <Award className="h-3 w-3 mr-1" /> ออกใบรับรอง
+          <Award className="h-3 w-3 mr-1" /> ออกวุฒิบัตร
         </Button>
       )}
 

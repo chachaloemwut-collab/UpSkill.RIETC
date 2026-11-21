@@ -37,7 +37,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
   return (
     <div className="mx-auto max-w-4xl">
-      <PageHeader title="ตั้งค่าบัญชี" description="ข้อมูลส่วนตัว ชื่อบนใบรับรอง และความปลอดภัยของบัญชี" />
+      <PageHeader title="ตั้งค่าบัญชี" description="ข้อมูลส่วนตัว ชื่อบนวุฒิบัตร และความปลอดภัยของบัญชี" />
       {linked === "google" && (
         <div className="mb-6">
           <Alert variant="success" title="ผูกบัญชี Google เรียบร้อยแล้ว" />
@@ -85,7 +85,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </Card>
         </Section>
 
-        <Section icon={<UserRound className="h-4 w-4" />} title="ชื่อบนใบรับรอง" description="ชื่อจริงตามบัตรประชาชน ใช้พิมพ์บนใบรับรองทุกใบ">
+        <Section icon={<UserRound className="h-4 w-4" />} title="ชื่อบนวุฒิบัตร" description="ชื่อจริงตามบัตรประชาชน ใช้พิมพ์บนวุฒิบัตรทุกใบ">
           {me.legal_name_locked_at ? (
             <Card className="grid gap-3 p-5">
               <dl className="grid gap-3 sm:grid-cols-2">
@@ -145,7 +145,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           <Card className="p-6">
             <p className="mb-4 text-sm text-muted-foreground">
               คุณดาวน์โหลดข้อมูลส่วนบุคคลที่ระบบเก็บไว้ได้ และขอลบบัญชีได้ตลอด การลบบัญชีจะลบข้อมูลที่ระบุตัวตน
-              แต่คงใบรับรองและบันทึกการตรวจสอบที่จำเป็นต่อการยืนยันเอกสารไว้
+              แต่คงวุฒิบัตรและบันทึกการตรวจสอบที่จำเป็นต่อการยืนยันเอกสารไว้
             </p>
             <DataRights />
           </Card>

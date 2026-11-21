@@ -20,6 +20,7 @@ export async function listEligibleCoursesForAdmin() {
 export async function listCertificatesAdmin(input: {
   query?: string | undefined;
   status?: AdminCertificateStatus | undefined;
+  courseId?: string | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
 }) {
@@ -88,6 +89,8 @@ export async function listCertificatesAdmin(input: {
       .where("cert.revoked_at", "is", null)
       .where((eb) => eb.or([eb("cert.expires_at", "is", null), eb("cert.expires_at", ">", new Date())]));
   }
+
+  if (input.courseId && /^[0-9a-f-]{36}$/i.test(input.courseId)) query = query.where("cert.course_id", "=", input.courseId);
 
   // The page count must use the same search + status filters as the rows (the category totals above ignore the search)
   const filtered = await db
@@ -166,11 +169,11 @@ export async function adminManualIssueCertificate(
     .where("id", "=", input.courseId)
     .executeTakeFirst();
   if (!course) throw new HttpError(404, "COURSE_NOT_FOUND", "ไม่พบหลักสูตรนี้");
-  if (!course.credential_enabled) throw new HttpError(400, "CREDENTIAL_NOT_ENABLED", "หลักสูตรนี้ไม่ได้เปิดใช้งานใบรับรอง");
+  if (!course.credential_enabled) throw new HttpError(400, "CREDENTIAL_NOT_ENABLED", "หลักสูตรนี้ไม่ได้เปิดใช้งานวุฒิบัตร");
   // A04: validate before any writes so a draft course or missing name does not leave enrollment=completed with no cert
-  if (course.visibility === "draft") throw new HttpError(400, "COURSE_DRAFT", "หลักสูตรอยู่ในสถานะร่าง ออกใบรับรองไม่ได้");
+  if (course.visibility === "draft") throw new HttpError(400, "COURSE_DRAFT", "หลักสูตรอยู่ในสถานะร่าง ออกวุฒิบัตรไม่ได้");
   const userNameForCert = user.legal_full_name_th ?? user.legal_full_name_en ?? (user.email.includes("@") ? user.email.split("@")[0] : null);
-  if (!userNameForCert) throw new HttpError(409, "LEGAL_NAME_MISSING", "ผู้ใช้ไม่มีชื่อสำหรับออกใบรับรอง กรุณาให้ผู้ใช้กรอกชื่อก่อน");
+  if (!userNameForCert) throw new HttpError(409, "LEGAL_NAME_MISSING", "ผู้ใช้ไม่มีชื่อสำหรับออกวุฒิบัตร กรุณาให้ผู้ใช้กรอกชื่อก่อน");
 
   // Ensure legal name is locked
   if (!user.legal_name_locked_at) {

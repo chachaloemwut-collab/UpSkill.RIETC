@@ -18,7 +18,7 @@ export function VerifyCodeForm({ autoFocus = true }: { autoFocus?: boolean }) {
         router.push(`/verify/${encodeURIComponent(code)}`);
       }}
     >
-      <Field label="รหัสใบรับรอง">
+      <Field label="รหัสวุฒิบัตร">
         <Input name="code" required placeholder="CERT-2026-XXXX-XXXX-XXXX" className="h-11 font-mono uppercase tracking-wider" autoFocus={autoFocus} />
       </Field>
       <Button type="submit" size="lg" loading={busy}>

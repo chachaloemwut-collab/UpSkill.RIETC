@@ -59,10 +59,10 @@ export function ProfileFields({
   const [birthDate, setBirthDate] = useState(defaults.birthDate ?? "");
   const minor = /^\d{4}-\d{2}-\d{2}$/.test(birthDate) && ageOn(birthDate, new Date()) < ADULT_AGE;
   const hasId = !!defaults.nationalIdMasked;
-  const nameHint = namesLocked ? "ล็อกแล้วเพราะใช้พิมพ์บนใบรับรอง หากผิดกรุณาติดต่อผู้ดูแลระบบ" : undefined;
+  const nameHint = namesLocked ? "ล็อกแล้วเพราะใช้พิมพ์บนวุฒิบัตร หากผิดกรุณาติดต่อผู้ดูแลระบบ" : undefined;
   return (
     <div className="grid gap-4">
-      <Section title="ชื่อ-นามสกุล ภาษาไทย" description="ตามบัตรประจำตัวประชาชน ใช้พิมพ์บนใบรับรอง" hidden={hide("identity")}>
+      <Section title="ชื่อ-นามสกุล ภาษาไทย" description="ตามบัตรประจำตัวประชาชน ใช้พิมพ์บนวุฒิบัตร" hidden={hide("identity")}>
         <div className="grid gap-3 sm:grid-cols-[150px_1fr_1fr]">
           <Field label="คำนำหน้า" error={errors.titleTh}>
             {namesLocked ? <Input name="titleTh" defaultValue={defaults.titleTh} readOnly /> : <Select name="titleTh" defaultValue={defaults.titleTh} options={titleOptions(TITLES_TH)} creatable placeholder="เลือก…" />}
@@ -133,7 +133,7 @@ export function PdpaNotice({ consentName = "pdpaConsent", error }: { consentName
       <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="h-4 w-4 text-primary" /> การคุ้มครองข้อมูลส่วนบุคคล (PDPA)</p>
       <p className="text-muted-foreground">
         ระบบนี้ดำเนินการภายใต้พระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA) ข้อมูลที่กรอกใช้เพื่อยืนยันตัวตน ตรวจสอบว่าหนึ่งคนมีบัญชีเดียว
-        ติดต่อเรื่องการอบรม และออกใบรับรองเท่านั้น เลขประจำตัวประชาชนถูกเข้ารหัสก่อนจัดเก็บ และไม่แสดงต่อผู้อื่น
+        ติดต่อเรื่องการอบรม และออกวุฒิบัตรเท่านั้น เลขประจำตัวประชาชนถูกเข้ารหัสก่อนจัดเก็บ และไม่แสดงต่อผู้อื่น
         คุณขอเข้าถึง แก้ไข หรือขอลบข้อมูลได้ตามสิทธิของเจ้าของข้อมูล
       </p>
       <Link href="/privacy" target="_blank" className="w-fit font-medium text-primary underline-offset-4 hover:underline">อ่านประกาศความเป็นส่วนตัวฉบับเต็ม</Link>

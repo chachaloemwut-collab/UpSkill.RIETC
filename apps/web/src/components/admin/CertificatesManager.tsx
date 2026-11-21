@@ -8,6 +8,8 @@ import {
   Check,
   Copy,
   ExternalLink,
+  Eye,
+  FileSpreadsheet,
   Plus,
   RotateCcw,
   Search,
@@ -64,6 +66,7 @@ export interface CertificatesManagerProps {
   courses: { id: string; title: string; slug: string; visibility: string }[];
   searchQuery?: string;
   activeStatus?: string;
+  activeCourse?: string;
 }
 
 export function CertificatesManager({
@@ -71,6 +74,7 @@ export function CertificatesManager({
   courses,
   searchQuery = "",
   activeStatus = "",
+  activeCourse = "",
 }: CertificatesManagerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -88,7 +92,7 @@ export function CertificatesManager({
   const [userIdInput, setUserIdInput] = useState("");
   const [courseIdInput, setCourseIdInput] = useState(courses[0]?.id ?? "");
   const [scoreInput, setScoreInput] = useState("100");
-  const [reasonInput, setReasonInput] = useState("ออกใบรับรองกรณีพิเศษ / เทียบโอนผลการเรียน");
+  const [reasonInput, setReasonInput] = useState("ออกวุฒิบัตรกรณีพิเศษ / เทียบโอนผลการเรียน");
   const [issuing, setIssuing] = useState(false);
 
   const copyToClipboard = (text: string) => {
@@ -106,6 +110,14 @@ export function CertificatesManager({
     if (q) params.set("q", q);
     else params.delete("q");
     params.set("page", "1");
+    router.push(`/admin/certificates?${params.toString()}`);
+  };
+
+  const setCourseFilter = (course: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (course) params.set("course", course);
+    else params.delete("course");
+    params.delete("page");
     router.push(`/admin/certificates?${params.toString()}`);
   };
 
@@ -133,7 +145,7 @@ export function CertificatesManager({
         toast({ variant: "destructive", title: "เกิดข้อผิดพลาด", description: res.message });
         return;
       }
-      toast({ title: "เพิกถอนสำเร็จ", description: `เพิกถอนใบรับรอง ${revokeCert.certificate_code} แล้ว` });
+      toast({ title: "เพิกถอนสำเร็จ", description: `เพิกถอนวุฒิบัตร ${revokeCert.certificate_code} แล้ว` });
       setRevokeCert(null);
       setRevokeReason("");
       router.refresh();
@@ -172,7 +184,7 @@ export function CertificatesManager({
         toast({ variant: "destructive", title: "เกิดข้อผิดพลาด", description: res.message });
         return;
       }
-      toast({ title: "ออกใบรับรองสำเร็จ", description: `รหัสใบรับรอง: ${res.data.code}` });
+      toast({ title: "ออกวุฒิบัตรสำเร็จ", description: `รหัสวุฒิบัตร: ${res.data.code}` });
       setIssueOpen(false);
       setUserIdInput("");
       router.refresh();
@@ -193,15 +205,24 @@ export function CertificatesManager({
             <Input
               name="q"
               defaultValue={searchQuery}
-              placeholder="ค้นหารหัสใบรับรอง, ชื่อผู้เรียน, หรืออีเมล…"
+              placeholder="ค้นหารหัสวุฒิบัตร, ชื่อผู้เรียน, หรืออีเมล…"
               className="pl-9"
             />
           </div>
           <Button type="submit" variant="secondary">ค้นหา</Button>
         </form>
 
+        <Select value={activeCourse} onChange={(e) => setCourseFilter(e.target.value)} className="h-10 sm:max-w-xs" aria-label="กรองตามหลักสูตร">
+          <option value="">ทุกหลักสูตร</option>
+          {courses.map((c) => (
+            <option key={c.id} value={c.id}>{c.title}</option>
+          ))}
+        </Select>
+        <Link href={`/admin/reports${activeCourse ? `?course=${activeCourse}` : ""}`} className={buttonClass("outline", "md", "gap-1.5 self-start sm:self-auto")}>
+          <FileSpreadsheet className="h-4 w-4" /> รายงาน / ส่งออก
+        </Link>
         <Button onClick={() => setIssueOpen(true)} className="gap-1.5 self-start sm:self-auto">
-          <Plus className="h-4 w-4" /> ออกใบรับรองด้วยตนเอง
+          <Plus className="h-4 w-4" /> ออกวุฒิบัตรด้วยตนเอง
         </Button>
       </div>
 
@@ -250,7 +271,7 @@ export function CertificatesManager({
         {initialData.certificates.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground">
             <Award className="mx-auto h-12 w-12 stroke-[1.25] text-muted-foreground/60 mb-2" />
-            <p className="font-medium text-foreground">ไม่พบรายการใบรับรอง</p>
+            <p className="font-medium text-foreground">ไม่พบรายการวุฒิบัตร</p>
             <p className="text-sm mt-1">ลองเปลี่ยนคำค้นหาหรือตัวกรองสถานะ</p>
           </div>
         ) : (
@@ -258,7 +279,7 @@ export function CertificatesManager({
             <table className="w-full text-left text-sm">
               <thead className="border-b bg-muted/40 text-xs text-muted-foreground font-semibold">
                 <tr>
-                  <th className="px-4 py-3">รหัสใบรับรอง</th>
+                  <th className="px-4 py-3">รหัสวุฒิบัตร</th>
                   <th className="px-4 py-3">ผู้เรียน</th>
                   <th className="px-4 py-3">หลักสูตร</th>
                   <th className="px-4 py-3">ผลการเรียน</th>
@@ -287,7 +308,7 @@ export function CertificatesManager({
                           )}
                         </button>
                       </div>
-                      <span className="text-[11px] text-muted-foreground block mt-0.5">{c.document_name_snapshot}</span>
+                      <span className="text-[11px] text-muted-foreground block mt-0.5">{c.document_type_snapshot === "development_test" ? "วุฒิบัตร (ทดสอบระบบ)" : "วุฒิบัตร"}</span>
                     </td>
 
                     {/* Learner */}
@@ -371,6 +392,17 @@ export function CertificatesManager({
                         >
                           <ExternalLink className="h-3.5 w-3.5 mr-1" /> ตรวจสอบ
                         </Link>
+                        {c.status !== "revoked" && (
+                          <a
+                            href={`/api/certificates/${encodeURIComponent(c.certificate_code)}/download?inline=1`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={buttonClass("outline", "sm", "h-8 px-2")}
+                            title="เปิดดูไฟล์วุฒิบัตร (PDF)"
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1" /> ดู
+                          </a>
+                        )}
                         <DownloadCertificateButton code={c.certificate_code} variant="outline" size="sm" compact />
                         {c.status !== "revoked" && (
                           <Button
@@ -381,7 +413,7 @@ export function CertificatesManager({
                               setRevokeCert(c);
                               setRevokeReason("");
                             }}
-                            title="เพิกถอนใบรับรอง"
+                            title="เพิกถอนวุฒิบัตร"
                           >
                             <ShieldAlert className="h-3.5 w-3.5 mr-1" /> เพิกถอน
                           </Button>
@@ -435,8 +467,8 @@ export function CertificatesManager({
       <Dialog
         open={!!revokeCert}
         onOpenChange={(open) => !open && setRevokeCert(null)}
-        title="เพิกถอนใบรับรอง"
-        description="การเพิกถอนใบรับรองจะทำให้สถานะในระบบสาธารณะกลายเป็น ถูกเพิกถอน (REVOKED) ทันที และส่งอีเมลแจ้งผู้เรียน"
+        title="เพิกถอนวุฒิบัตร"
+        description="การเพิกถอนวุฒิบัตรจะทำให้สถานะในระบบสาธารณะกลายเป็น ถูกเพิกถอน (REVOKED) ทันที และส่งอีเมลแจ้งผู้เรียน"
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" disabled={revoking} onClick={() => setRevokeCert(null)}>
@@ -472,15 +504,15 @@ export function CertificatesManager({
       <Dialog
         open={issueOpen}
         onOpenChange={setIssueOpen}
-        title="ออกใบรับรองด้วยตนเอง (Manual Issue)"
-        description="สำหรับกรณีผู้เรียนผ่านการทดสอบภาคปฏิบัติภายนอก เทียบโอนผลการเรียน หรือการออกใบรับรองเป็นกรณีพิเศษโดยผู้ดูแลระบบ"
+        title="ออกวุฒิบัตรด้วยตนเอง (Manual Issue)"
+        description="สำหรับกรณีผู้เรียนผ่านการทดสอบภาคปฏิบัติภายนอก เทียบโอนผลการเรียน หรือการออกวุฒิบัตรเป็นกรณีพิเศษโดยผู้ดูแลระบบ"
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" disabled={issuing} onClick={() => setIssueOpen(false)}>
               ยกเลิก
             </Button>
             <Button loading={issuing} onClick={submitManualIssue}>
-              ออกใบรับรองทันที
+              ออกวุฒิบัตรทันที
             </Button>
           </div>
         }
@@ -494,7 +526,7 @@ export function CertificatesManager({
             />
           </Field>
 
-          <Field label="หลักสูตรที่ต้องการออกใบรับรอง">
+          <Field label="หลักสูตรที่ต้องการออกวุฒิบัตร">
             <Select
               value={courseIdInput}
               onChange={(e) => setCourseIdInput(e.target.value)}

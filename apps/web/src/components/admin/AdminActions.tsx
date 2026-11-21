@@ -232,12 +232,12 @@ export function RevokeCertificateForm() {
     setBusy(false);
     if (r.ok) {
       pending.form.reset();
-      toast({ title: "เพิกถอนใบรับรองแล้ว", description: pending.code, variant: "success" });
+      toast({ title: "เพิกถอนวุฒิบัตรแล้ว", description: pending.code, variant: "success" });
     } else toast({ title: "เพิกถอนไม่สำเร็จ", description: r.message, variant: "destructive" });
   }
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
-      <Field label="รหัสใบรับรอง">
+      <Field label="รหัสวุฒิบัตร">
         <Input name="code" required placeholder="CERT-2026-XXXX-XXXX-XXXX" className="font-mono" />
       </Field>
       <Field label="เหตุผล" hint="แสดงบนหน้าตรวจสอบสาธารณะ">
@@ -249,7 +249,7 @@ export function RevokeCertificateForm() {
       <AlertDialog
         open={!!pending}
         onOpenChange={(v) => !v && setPending(null)}
-        title="เพิกถอนใบรับรอง?"
+        title="เพิกถอนวุฒิบัตร?"
         description={`${pending?.code ?? ""} — การเพิกถอนย้อนกลับไม่ได้`}
         confirmLabel="เพิกถอน"
         cancelLabel="ยกเลิก"
@@ -427,7 +427,7 @@ export function CertificateDisplayForm({ defaults }: { defaults: { issuer_name: 
         <Input name="issuer_name" maxLength={160} defaultValue={defaults.issuer_name} />
       </Field>
       <p className="-mt-2 text-xs text-muted-foreground">
-        ลายเซ็นและชื่อผู้ลงนามตั้งแยกรายหลักสูตร (หน้าแก้ไขหลักสูตร ส่วนใบรับรอง) ใช้กับเอกสารที่ออกหลังบันทึก ฉบับที่ออกไปแล้วไม่เปลี่ยน
+        ลายเซ็นและชื่อผู้ลงนามตั้งแยกรายหลักสูตร (หน้าแก้ไขหลักสูตร ส่วนวุฒิบัตร) ใช้กับเอกสารที่ออกหลังบันทึก ฉบับที่ออกไปแล้วไม่เปลี่ยน
       </p>
       <Button type="submit" loading={busy} className="justify-self-end"><Save className="h-4 w-4" /> บันทึก</Button>
     </form>

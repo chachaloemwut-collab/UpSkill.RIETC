@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
-  Award, BookOpen, CalendarRange, GraduationCap, LayoutDashboard, Library, LogIn, Megaphone, Presentation, Search, Settings, ShieldAlert, ShieldCheck, Sun, Moon, UserPlus, UsersRound,
+  Award, BookOpen, CalendarRange, FileSpreadsheet, GraduationCap, LayoutDashboard, Library, LogIn, Megaphone, Presentation, Search, Settings, ShieldAlert, ShieldCheck, Sun, Moon, UserPlus, UsersRound,
 } from "lucide-react";
 import {
   AppShell, Avatar, Button, CommandPalette, DropdownMenu, Kbd, LogoutIcon, MenuToggleIcon, ThemeCustomizer, ThemeToggle, buttonClass, useActionScene, useHotkey, useThemeSettings, useToast,
@@ -32,10 +32,10 @@ function buildNav(user: ShellUser | null): ShellNavGroup[] {
         ...(user
           ? [
               { id: "/my-courses", href: "/my-courses", label: "คอร์สของฉัน", icon: <BookOpen /> },
-              { id: "/certificates", href: "/certificates", label: "ใบรับรองของฉัน", icon: <Award /> },
+              { id: "/certificates", href: "/certificates", label: "วุฒิบัตรของฉัน", icon: <Award /> },
             ]
           : []),
-        { id: "/verify", href: "/verify", label: "ตรวจสอบใบรับรอง", icon: <ShieldCheck /> },
+        { id: "/verify", href: "/verify", label: "ตรวจสอบวุฒิบัตร", icon: <ShieldCheck /> },
       ],
     },
   ];
@@ -48,7 +48,8 @@ function buildNav(user: ShellUser | null): ShellNavGroup[] {
       items: [
         { id: "/admin", href: "/admin", label: "ภาพรวมระบบ", icon: <ShieldAlert /> },
         { id: "/admin/users", href: "/admin/users", label: "จัดการสมาชิก", icon: <UsersRound /> },
-        { id: "/admin/certificates", href: "/admin/certificates", label: "จัดการใบประกาศ", icon: <Award /> },
+        { id: "/admin/certificates", href: "/admin/certificates", label: "จัดการวุฒิบัตร", icon: <Award /> },
+        { id: "/admin/reports", href: "/admin/reports", label: "รายงานผู้อบรม", icon: <FileSpreadsheet /> },
         { id: "/admin/programs", href: "/admin/programs", label: "หลักสูตรและรอบอบรม", icon: <CalendarRange /> },
         { id: "/admin/announcements", href: "/admin/announcements", label: "ประกาศประชาสัมพันธ์", icon: <Megaphone /> },
       ],
@@ -82,14 +83,15 @@ function getBreadcrumbs(pathname: string, navTitle: string): { label: string; hr
     }
   }
   if (pathname === "/my-courses") return [{ label: "คอร์สของฉัน" }];
-  if (pathname === "/certificates") return [{ label: "ใบรับรองของฉัน" }];
-  if (pathname === "/verify") return [{ label: "ตรวจสอบใบรับรอง" }];
-  if (pathname.startsWith("/verify/")) return [{ label: "ตรวจสอบใบรับรอง", href: "/verify" }, { label: "ผลการตรวจสอบ" }];
+  if (pathname === "/certificates") return [{ label: "วุฒิบัตรของฉัน" }];
+  if (pathname === "/verify") return [{ label: "ตรวจสอบวุฒิบัตร" }];
+  if (pathname.startsWith("/verify/")) return [{ label: "ตรวจสอบวุฒิบัตร", href: "/verify" }, { label: "ผลการตรวจสอบ" }];
   if (pathname.startsWith("/admin")) {
     if (pathname === "/admin") return [{ label: "ผู้ดูแลระบบ", href: "/admin" }, { label: "ภาพรวม" }];
     if (pathname === "/admin/users") return [{ label: "ผู้ดูแลระบบ", href: "/admin" }, { label: "จัดการสมาชิก" }];
     if (pathname.startsWith("/admin/users/")) return [{ label: "ผู้ดูแลระบบ", href: "/admin" }, { label: "จัดการสมาชิก", href: "/admin/users" }, { label: "รายละเอียดสมาชิก" }];
-    if (pathname === "/admin/certificates") return [{ label: "ผู้ดูแลระบบ", href: "/admin" }, { label: "จัดการใบประกาศ" }];
+    if (pathname === "/admin/certificates") return [{ label: "ผู้ดูแลระบบ", href: "/admin" }, { label: "จัดการวุฒิบัตร" }];
+    if (pathname === "/admin/reports") return [{ label: "ผู้ดูแลระบบ", href: "/admin" }, { label: "รายงานผู้อบรม" }];
     if (pathname === "/admin/programs") return [{ label: "ผู้ดูแลระบบ", href: "/admin" }, { label: "หลักสูตรและรอบอบรม" }];
     if (pathname === "/admin/announcements") return [{ label: "ผู้ดูแลระบบ", href: "/admin" }, { label: "ประกาศประชาสัมพันธ์" }];
     return [{ label: "ผู้ดูแลระบบ", href: "/admin" }, { label: navTitle }];
@@ -133,9 +135,9 @@ export function LmsShell({ user, children }: { user: ShellUser | null; children:
     { id: "nav-announcements", label: "ประกาศและกิจกรรม", group: "นำทางด่วน", icon: <Megaphone className="h-4 w-4" />, onSelect: () => router.push("/announcements") },
     ...(user ? [
       { id: "nav-my-courses", label: "คอร์สของฉัน", group: "นำทางด่วน", icon: <BookOpen className="h-4 w-4" />, onSelect: () => router.push("/my-courses") },
-      { id: "nav-certs", label: "ใบรับรองของฉัน", group: "นำทางด่วน", icon: <Award className="h-4 w-4" />, onSelect: () => router.push("/certificates") },
+      { id: "nav-certs", label: "วุฒิบัตรของฉัน", group: "นำทางด่วน", icon: <Award className="h-4 w-4" />, onSelect: () => router.push("/certificates") },
     ] : []),
-    { id: "nav-verify", label: "ตรวจสอบใบรับรอง", group: "นำทางด่วน", icon: <ShieldCheck className="h-4 w-4" />, onSelect: () => router.push("/verify") },
+    { id: "nav-verify", label: "ตรวจสอบวุฒิบัตร", group: "นำทางด่วน", icon: <ShieldCheck className="h-4 w-4" />, onSelect: () => router.push("/verify") },
 
     // Quick Commands
     { id: "cmd-toggle-theme", label: `สลับเป็นโหมด${settings.dark ? "สว่าง" : "มืด"}`, group: "คำสั่งด่วน", icon: settings.dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />, onSelect: () => setDark(!settings.dark) },
@@ -153,7 +155,8 @@ export function LmsShell({ user, children }: { user: ShellUser | null; children:
     ...(user?.role === "admin" ? [
       { id: "adm-overview", label: "ภาพรวมระบบ (แอดมิน)", group: "สำหรับผู้ดูแลระบบ", icon: <ShieldAlert className="h-4 w-4" />, onSelect: () => router.push("/admin") },
       { id: "adm-users", label: "จัดการสมาชิก (ค้นหา/สิทธิ์/ปลดล็อกชื่อ)", group: "สำหรับผู้ดูแลระบบ", icon: <UsersRound className="h-4 w-4" />, onSelect: () => router.push("/admin/users") },
-      { id: "adm-certificates", label: "จัดการใบประกาศ (ค้นหา/เพิกถอน/ออก)", group: "สำหรับผู้ดูแลระบบ", icon: <Award className="h-4 w-4" />, onSelect: () => router.push("/admin/certificates") },
+      { id: "adm-certificates", label: "จัดการวุฒิบัตร (ค้นหา/เพิกถอน/ออก)", group: "สำหรับผู้ดูแลระบบ", icon: <Award className="h-4 w-4" />, onSelect: () => router.push("/admin/certificates") },
+      { id: "adm-reports", label: "รายงานผู้อบรม (ตาราง/Excel/ภาพ)", group: "สำหรับผู้ดูแลระบบ", icon: <FileSpreadsheet className="h-4 w-4" />, onSelect: () => router.push("/admin/reports") },
       { id: "adm-programs", label: "หลักสูตรและรอบอบรม", group: "สำหรับผู้ดูแลระบบ", icon: <CalendarRange className="h-4 w-4" />, onSelect: () => router.push("/admin/programs") },
       { id: "adm-announcements", label: "จัดการประกาศประชาสัมพันธ์", group: "สำหรับผู้ดูแลระบบ", icon: <Megaphone className="h-4 w-4" />, onSelect: () => router.push("/admin/announcements") },
     ] : []),
@@ -227,7 +230,7 @@ export function LmsShell({ user, children }: { user: ShellUser | null; children:
                 )}
               >
                 <Award className="h-4 w-4" />
-                <span>ใบรับรอง</span>
+                <span>วุฒิบัตร</span>
               </Link>
               <button
                 type="button"
@@ -347,7 +350,7 @@ function TopBar({
             { label: user.email, disabled: true },
             { label: "", separator: true },
             { label: "คอร์สของฉัน", icon: <BookOpen className="h-4 w-4" />, onSelect: () => router.push("/my-courses") },
-            { label: "ใบรับรองของฉัน", icon: <Award className="h-4 w-4" />, onSelect: () => router.push("/certificates") },
+            { label: "วุฒิบัตรของฉัน", icon: <Award className="h-4 w-4" />, onSelect: () => router.push("/certificates") },
             { label: "ตั้งค่าบัญชี", icon: <Settings className="h-4 w-4" />, onSelect: () => router.push("/me") },
             { label: "", separator: true },
             { label: "ออกจากระบบ", icon: <LogoutIcon />, destructive: true, onSelect: onSignOut },

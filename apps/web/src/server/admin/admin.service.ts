@@ -147,7 +147,7 @@ export async function revokeCertificate(adminId: string, rawCode: string, reason
     if (!updated) return null;
     await addEmailToOutbox(
       trx,
-      { template: "credential-revoked", to: certificate.email, documentName: "ใบรับรอง", courseTitle: certificate.course_title_snapshot, code, reason: reason.trim(), verifyLink: `${env.APP_ORIGIN}/verify/${encodeURIComponent(code)}` },
+      { template: "credential-revoked", to: certificate.email, documentName: "วุฒิบัตร", courseTitle: certificate.course_title_snapshot, code, reason: reason.trim(), verifyLink: `${env.APP_ORIGIN}/verify/${encodeURIComponent(code)}` },
       { userId: certificate.user_id, deduplicationKey: `credential-revoked:${certificate.id}` },
     );
     return updated;

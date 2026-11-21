@@ -30,14 +30,20 @@ export function certificatePattern(key: string): CertificatePalette {
   return (CERTIFICATE_PATTERNS as Record<string, CertificatePalette>)[key] ?? CERTIFICATE_PATTERNS.standard;
 }
 
-const KICKERS: Record<string, string> = {
-  completion: "Certificate of Completion",
-  program: "Certificate of Training",
-  development_test: "Development Test",
-};
+/**
+ * Every document this platform issues is a วุฒิบัตร, worded like Thai government online-training certificates
+ * (กรมพัฒนาฝีมือแรงงาน / กรมพัฒนาพลังงานทดแทนฯ): "วุฒิบัตรฉบับนี้ให้ไว้เพื่อแสดงว่า … ได้ผ่านการอบรม(ออนไลน์) หลักสูตร …
+ * จำนวนชั่วโมงการอบรม … ให้ไว้ ณ วันที่ …". The wording is fixed here (not per course) and applies to documents
+ * already issued when their PDF is re-rendered; the signed record itself is never changed.
+ */
+export const CERTIFICATE_TITLE = "วุฒิบัตร";
+export const CERTIFICATE_INTRO = "ฉบับนี้ให้ไว้เพื่อแสดงว่า";
 
-/** Small caps line above the document name, from the credential type code. */
-export const certificateKicker = (type: string) => KICKERS[type] ?? `Certificate · ${type.replace(/_/g, " ")}`;
+/** "ได้ผ่านการอบรมออนไลน์" for an online course, "ได้ผ่านการอบรม" for a program/cohort (may be on site). */
+export const certificateAchievement = (documentType: string) => (documentType === "program" ? "ได้ผ่านการอบรม" : "ได้ผ่านการอบรมออนไลน์");
+
+/** Small caps line under the title, from the credential type code. */
+export const certificateKicker = (type: string) => (type === "development_test" ? "Development Test" : "Certificate of Training");
 
 /**
  * Site-wide certificate layout options (system_settings key "certificate_display").

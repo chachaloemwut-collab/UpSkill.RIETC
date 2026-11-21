@@ -33,7 +33,7 @@ export function LockLegalNameForm({ className, defaultTh, defaultEn }: { classNa
     });
     setBusy(false);
     if (r.ok) {
-      toast({ title: "ล็อกชื่อสำหรับใบรับรองแล้ว", variant: "success" });
+      toast({ title: "ล็อกชื่อสำหรับวุฒิบัตรแล้ว", variant: "success" });
       router.refresh();
     } else setError(r.message);
   }
@@ -46,8 +46,8 @@ export function LockLegalNameForm({ className, defaultTh, defaultEn }: { classNa
             <Lock className="h-5 w-5" />
           </span>
           <div>
-            <h2 className="font-semibold">ชื่อ-นามสกุลจริงสำหรับใบรับรอง</h2>
-            <p className="text-sm text-muted-foreground">ชื่อนี้จะพิมพ์บนใบรับรองทุกใบ และแก้ไขไม่ได้อีกหลังยืนยัน</p>
+            <h2 className="font-semibold">ชื่อ-นามสกุลจริงสำหรับวุฒิบัตร</h2>
+            <p className="text-sm text-muted-foreground">ชื่อนี้จะพิมพ์บนวุฒิบัตรทุกใบ และแก้ไขไม่ได้อีกหลังยืนยัน</p>
           </div>
         </div>
         {error && <Alert variant="destructive" title={error} />}
@@ -59,7 +59,7 @@ export function LockLegalNameForm({ className, defaultTh, defaultEn }: { classNa
             <Input name="en" autoComplete="name" maxLength={120} placeholder="e.g. Mr. Somchai Jaidee" defaultValue={defaultEn ?? ""} />
           </Field>
         </div>
-        <Checkbox name="confirm" required label="ข้าพเจ้ายืนยันว่าชื่อ-นามสกุลนี้ถูกต้อง และรับทราบว่าจะแก้ไขชื่อในใบรับรองไม่ได้อีก" />
+        <Checkbox name="confirm" required label="ข้าพเจ้ายืนยันว่าชื่อ-นามสกุลนี้ถูกต้อง และรับทราบว่าจะแก้ไขชื่อในวุฒิบัตรไม่ได้อีก" />
         <Button type="submit" loading={busy} className="justify-self-start">
           <Lock className="h-4 w-4" /> ยืนยันและล็อกชื่อ
         </Button>
@@ -68,7 +68,7 @@ export function LockLegalNameForm({ className, defaultTh, defaultEn }: { classNa
         open={!!pending}
         onOpenChange={(v) => !v && setPending(null)}
         title="ยืนยันการล็อกชื่อ"
-        description={`ชื่อที่จะพิมพ์บนใบรับรอง: ${[pending?.th, pending?.en].filter(Boolean).join(" / ")} — หลังยืนยันจะแก้ไขไม่ได้อีก`}
+        description={`ชื่อที่จะพิมพ์บนวุฒิบัตร: ${[pending?.th, pending?.en].filter(Boolean).join(" / ")} — หลังยืนยันจะแก้ไขไม่ได้อีก`}
         confirmLabel="ล็อกชื่อ"
         cancelLabel="แก้ไขก่อน"
         onConfirm={() => void lock()}
@@ -96,11 +96,11 @@ export function IssueCertificateButton({ courseId, nameTh, nameEn }: { courseId:
   return (
     <Card className="grid gap-5 p-6">
       <div>
-        <h2 className="font-semibold">ออกใบรับรอง</h2>
-        <p className="text-sm text-muted-foreground">ออกได้ 1 ใบต่อหลักสูตร เลือกภาษาของชื่อที่จะพิมพ์บนใบรับรอง</p>
+        <h2 className="font-semibold">ออกวุฒิบัตร</h2>
+        <p className="text-sm text-muted-foreground">ออกได้ 1 ใบต่อหลักสูตร เลือกภาษาของชื่อที่จะพิมพ์บนวุฒิบัตร</p>
       </div>
       {error && <Alert variant="destructive" title={error} />}
-      <div role="radiogroup" aria-label="ภาษาบนใบรับรอง" className="grid gap-3 sm:grid-cols-2">
+      <div role="radiogroup" aria-label="ภาษาบนวุฒิบัตร" className="grid gap-3 sm:grid-cols-2">
         {choices.map((c) => (
           <button
             key={c.value}
@@ -119,7 +119,7 @@ export function IssueCertificateButton({ courseId, nameTh, nameEn }: { courseId:
         ))}
       </div>
       <Button size="lg" loading={busy} onClick={issue} className="justify-self-start">
-        <Award className="h-4 w-4" /> ออกใบรับรอง
+        <Award className="h-4 w-4" /> ออกวุฒิบัตร
       </Button>
     </Card>
   );
@@ -218,7 +218,7 @@ export function CertificateViewerCard({
             <p className="text-sm text-muted-foreground">{courseTitle}</p>
           </div>
           <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-4 py-1.5 backdrop-blur-xs">
-            <span className="text-xs text-muted-foreground">รหัสใบรับรอง:</span>
+            <span className="text-xs text-muted-foreground">รหัสวุฒิบัตร:</span>
             <span className="font-mono text-sm font-semibold tracking-wider text-primary">{code}</span>
           </div>
         </div>
@@ -226,10 +226,10 @@ export function CertificateViewerCard({
         {/* Certificate Details & Actions */}
         <div className="grid gap-4 p-6">
           {revokedAt ? (
-            <Alert variant="destructive" title="ใบรับรองนี้ถูกเพิกถอนแล้ว" />
+            <Alert variant="destructive" title="วุฒิบัตรนี้ถูกเพิกถอนแล้ว" />
           ) : (
-            <Alert variant="success" title="ออกใบรับรองเรียบร้อยแล้ว">
-              ใบรับรองนี้ลงนามด้วยระบบ Ed25519 ดิจิทัล สามารถใช้สมัครงานหรือเทียบโอนหน่วยกิตได้
+            <Alert variant="success" title="ออกวุฒิบัตรเรียบร้อยแล้ว">
+              วุฒิบัตรนี้ลงนามด้วยระบบ Ed25519 ดิจิทัล สามารถใช้สมัครงานหรือเทียบโอนหน่วยกิตได้
             </Alert>
           )}
 

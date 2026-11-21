@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import { InAppBrowserGate } from "@/components/InAppBrowserGate";
 import { Providers } from "@/components/providers";
 import { THEME_INIT_SCRIPT } from "@/components/ui/theme-script";
+import { detectOutdatedBrowser } from "@upskill/core/user-agent";
 import "./globals.css";
 
 // Self-hosted fonts (SIL OFL). No Google CDN at runtime — the CSP stays closed.
@@ -44,9 +45,9 @@ const jetbrainsMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: { default: "UpskillReskill.RIETC — เรียนออนไลน์พร้อมใบรับรอง", template: "%s · UpskillReskill.RIETC" },
+  title: { default: "UpskillReskill.RIETC — เรียนออนไลน์พร้อมวุฒิบัตร", template: "%s · UpskillReskill.RIETC" },
   applicationName: "UpskillReskill.RIETC",
-  description: "เรียนออนไลน์จาก YouTube บันทึกเวลาเรียนจริง และรับใบรับรองที่ตรวจสอบได้",
+  description: "เรียนออนไลน์จาก YouTube บันทึกเวลาเรียนจริง และรับวุฒิบัตรที่ตรวจสอบได้",
   icons: { icon: "/favicon.svg" },
 };
 
@@ -61,7 +62,9 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const h = await headers();
+  const nonce = h.get("x-nonce") ?? undefined;
+  const outdated = detectOutdatedBrowser(h.get("user-agent") ?? "");
   return (
     // The theme script sets class/data-theme/--radius on <html> before React hydrates
     <html lang="th" suppressHydrationWarning className={`${prompt.variable} ${sarabun.variable} ${jetbrainsMono.variable}`}>
@@ -71,6 +74,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-dvh font-sans">
+        {outdated && (
+          // Inline styles on purpose: on these browsers the app's CSS may not apply
+          <div role="status" style={{ background: "#fff7ed", color: "#9a3412", borderBottom: "1px solid #fdba74", padding: "10px 16px", fontSize: "14px", lineHeight: 1.5, textAlign: "center" }}>
+            {outdated.reason === "ios"
+              ? `อุปกรณ์นี้ใช้ iOS/iPadOS ${outdated.version} ซึ่งเก่าเกินไป บางปุ่มอาจกดไม่ได้ กรุณาอัปเดตเป็น iOS/iPadOS 16.4 ขึ้นไป`
+              : `เบราว์เซอร์นี้เป็นรุ่นเก่า (${outdated.version}) บางปุ่มอาจกดไม่ได้ กรุณาอัปเดตเบราว์เซอร์หรือใช้ Chrome/Safari รุ่นล่าสุด`}
+            {" "}— หน้าเข้าสู่ระบบยังใช้งานได้
+          </div>
+        )}
         <Providers>
           <InAppBrowserGate />
           {children}

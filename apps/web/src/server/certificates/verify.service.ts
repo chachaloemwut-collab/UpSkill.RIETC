@@ -69,7 +69,7 @@ export async function verifyPublicCertificate(rawCode: string): Promise<PublicVe
     // Deduped per certificate so a single bad row can't spam the whole admin team.
     await enqueueAdminAlert(
       db,
-      "ตรวจพบใบรับรองถูกแก้ไข",
+      "ตรวจพบวุฒิบัตรถูกแก้ไข",
       `รหัส ${code} ไม่ผ่านการตรวจสอบลายเซ็น (ฐานข้อมูลถูกแก้ไข หรือคีย์ลงนามไม่ตรง) โปรดตรวจสอบทันที`,
       `cert-tampered:${code}`,
       env.APP_ORIGIN,

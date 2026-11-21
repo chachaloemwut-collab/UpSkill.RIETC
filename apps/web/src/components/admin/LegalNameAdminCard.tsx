@@ -69,7 +69,7 @@ export function LegalNameAdminCard({
       <div className="flex items-center justify-between mb-4">
         <h2 className="flex items-center gap-2 font-semibold">
           {lockedAt ? <Lock className="h-4 w-4 text-amber-500" /> : <LockOpen className="h-4 w-4 text-emerald-500" />}
-          ชื่อ-นามสกุลทางการสำหรับใบรับรอง
+          ชื่อ-นามสกุลทางการสำหรับวุฒิบัตร
         </h2>
         <div className="flex items-center gap-2">
           {lockedAt ? (

@@ -21,10 +21,10 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
   const r = await verifyPublicCertificate(code);
 
   if (r.status === "not_found")
-    return <Notice tone="muted" icon={<CircleHelp className="h-7 w-7" />} title="ไม่พบใบรับรอง" body="รหัสใบรับรองไม่ถูกต้องหรือไม่มีอยู่ในระบบ" />;
+    return <Notice tone="muted" icon={<CircleHelp className="h-7 w-7" />} title="ไม่พบวุฒิบัตร" body="รหัสวุฒิบัตรไม่ถูกต้องหรือไม่มีอยู่ในระบบ" />;
   if (r.status === "tampered")
     return (
-      <Notice tone="destructive" icon={<ShieldX className="h-7 w-7" />} title="ไม่สามารถยืนยันความถูกต้องได้" body="ข้อมูลใบรับรองไม่ตรงกับลายเซ็นดิจิทัล กรุณาติดต่อผู้ดูแลระบบ" />
+      <Notice tone="destructive" icon={<ShieldX className="h-7 w-7" />} title="ไม่สามารถยืนยันความถูกต้องได้" body="ข้อมูลวุฒิบัตรไม่ตรงกับลายเซ็นดิจิทัล กรุณาติดต่อผู้ดูแลระบบ" />
     );
 
   return <VerificationTrustCard data={r} />;

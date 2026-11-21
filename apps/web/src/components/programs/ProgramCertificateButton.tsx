@@ -24,7 +24,7 @@ export function ProgramCertificateButton({ programId }: { programId: string }) {
           ? "ยังเรียนไม่ครบทุกวิชาบังคับของหลักสูตร"
           : j.error === "NOT_APPROVED"
             ? "ต้องได้รับการอนุมัติเข้าอบรมก่อน"
-            : "ยังไม่สามารถออกใบประกาศนียบัตรได้",
+            : "ยังไม่สามารถออกวุฒิบัตรได้",
       );
     } finally {
       setBusy(false);
@@ -33,7 +33,7 @@ export function ProgramCertificateButton({ programId }: { programId: string }) {
 
   return (
     <Button size="sm" loading={busy} onClick={issue}>
-      <Award className="h-4 w-4" /> รับใบประกาศนียบัตร
+      <Award className="h-4 w-4" /> รับวุฒิบัตร
     </Button>
   );
 }

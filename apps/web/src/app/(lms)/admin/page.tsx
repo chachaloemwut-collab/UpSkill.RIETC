@@ -28,9 +28,9 @@ export default async function AdminPage() {
 
   return (
     <>
-      <PageHeader title="ภาพรวมระบบ" description="ดูแลหลักสูตร ผู้ใช้ ใบรับรอง และพฤติกรรมผิดปกติ">
+      <PageHeader title="ภาพรวมระบบ" description="ดูแลหลักสูตร ผู้ใช้ วุฒิบัตร และพฤติกรรมผิดปกติ">
         <Link href="/admin/users" className={buttonClass("outline")}><Users className="h-4 w-4" /> สมาชิก</Link>
-        <Link href="/admin/certificates" className={buttonClass("outline")}><Award className="h-4 w-4" /> ใบประกาศ</Link>
+        <Link href="/admin/certificates" className={buttonClass("outline")}><Award className="h-4 w-4" /> วุฒิบัตร</Link>
         <Link href="/admin/programs" className={buttonClass("outline")}><GraduationCap className="h-4 w-4" /> หลักสูตรอบรม</Link>
         <Link href="/admin/announcements" className={buttonClass("outline")}><Megaphone className="h-4 w-4" /> ประกาศ</Link>
       </PageHeader>
@@ -39,7 +39,7 @@ export default async function AdminPage() {
         <StatCard index={0} label="ผู้ใช้ทั้งหมด" value={stats.users} unit="คน" icon={<Users />} />
         <StatCard index={1} label="หลักสูตรที่เผยแพร่" value={stats.publishedCourses} unit="หลักสูตร" icon={<BookOpen />} />
         <StatCard index={2} label="การลงทะเบียน" value={stats.enrollments} unit="ครั้ง" icon={<GraduationCap />} />
-        <StatCard index={3} label="ใบรับรองที่ใช้งานได้" value={stats.certificates} unit="ใบ" icon={<Award />} />
+        <StatCard index={3} label="วุฒิบัตรที่ใช้งานได้" value={stats.certificates} unit="ใบ" icon={<Award />} />
         <StatCard index={4} label="ผิดปกติ (7 วัน)" value={stats.flags7d} unit="ครั้ง" icon={<Flag />} />
       </div>
 
@@ -55,7 +55,7 @@ export default async function AdminPage() {
           <TabsTrigger value="flags">พฤติกรรมผิดปกติ</TabsTrigger>
           <TabsTrigger value="users">ผู้ใช้</TabsTrigger>
           <TabsTrigger value="invitations">เชิญผู้สอน</TabsTrigger>
-          <TabsTrigger value="certs">ใบรับรอง</TabsTrigger>
+          <TabsTrigger value="certs">วุฒิบัตร</TabsTrigger>
           <TabsTrigger value="email">อีเมลและ Google ({stats.emailPending}/{stats.emailFailed})</TabsTrigger>
           <TabsTrigger value="settings">ตั้งค่าระบบ</TabsTrigger>
         </TabsList>
@@ -184,12 +184,12 @@ export default async function AdminPage() {
                   <Ban className="h-5 w-5" />
                 </span>
                 <div>
-                  <h3 className="font-semibold">เพิกถอนใบรับรอง</h3>
+                  <h3 className="font-semibold">เพิกถอนวุฒิบัตร</h3>
                   <p className="text-sm text-muted-foreground">ใช้เมื่อพบการทุจริต หน้าตรวจสอบสาธารณะจะแสดงสถานะถูกเพิกถอนพร้อมเหตุผล</p>
                 </div>
               </div>
               <Link href="/admin/certificates" className={buttonClass("outline", "sm")}>
-                ศูนย์จัดการใบประกาศ
+                ศูนย์จัดการวุฒิบัตร
               </Link>
             </div>
             <RevokeCertificateForm />

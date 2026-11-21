@@ -78,7 +78,7 @@ export function ReassignInstructorDialog({ courseId, title, currentId, instructo
     } else toast({ title: "เปลี่ยนผู้สอนไม่สำเร็จ", description: r.message, variant: "destructive" });
   }
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="เปลี่ยนผู้สอน" description={`“${title}” · ชื่อผู้สอนใหม่จะใช้ในใบรับรองที่ออกหลังจากนี้ (หากไม่ได้กำหนดผู้ลงนามไว้)`}>
+    <Dialog open={open} onOpenChange={onOpenChange} title="เปลี่ยนผู้สอน" description={`“${title}” · ชื่อผู้สอนใหม่จะใช้ในวุฒิบัตรที่ออกหลังจากนี้ (หากไม่ได้กำหนดผู้ลงนามไว้)`}>
       <div className="grid gap-4">
         <Field label="ผู้สอน"><Select value={owner} onValueChange={setOwner} options={options(instructors)} /></Field>
         <div className="flex justify-end gap-2">

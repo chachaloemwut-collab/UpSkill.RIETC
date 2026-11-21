@@ -63,7 +63,7 @@ export async function Dashboard({ viewer }: { viewer: Viewer }) {
         />
         <StatCard
           index={2}
-          label="ใบรับรองที่ได้รับ"
+          label="วุฒิบัตรที่ได้รับ"
           value={stats.certificates}
           unit="ใบ"
           tone="info"
@@ -161,7 +161,7 @@ export async function Dashboard({ viewer }: { viewer: Viewer }) {
                           href={`/courses/${inProgress[0].slug}/quiz`}
                           className={buttonClass("default", "lg", "h-10 px-5 shadow-sm gap-2")}
                         >
-                          <Award className="h-4 w-4" /> ทำแบบทดสอบรับใบรับรอง
+                          <Award className="h-4 w-4" /> ทำแบบทดสอบรับวุฒิบัตร
                         </Link>
                       )}
                     </div>
@@ -221,7 +221,7 @@ export async function Dashboard({ viewer }: { viewer: Viewer }) {
       {/* ---------- Learning Activity & Certificate Readiness Widget ---------- */}
       {nearCompletion.length > 0 && (
         <section className="mt-8">
-          <SectionTitle>ความพร้อมรับใบรับรอง (Certificate Readiness)</SectionTitle>
+          <SectionTitle>ความพร้อมรับวุฒิบัตร (Certificate Readiness)</SectionTitle>
           <div className="grid gap-4 sm:grid-cols-2">
             {nearCompletion.map((c) => (
               <Card key={c.slug} className="flex items-center justify-between gap-4 p-4 border-success/30 bg-success/5 transition hover:shadow-xs">

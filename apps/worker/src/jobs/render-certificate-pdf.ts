@@ -29,7 +29,8 @@ async function fontFace(family: string, file: string, weight: number): Promise<s
   }
 }
 
-export async function renderCertificatePdf(db: Database, env: Env, code: string) {
+/** opts.notify=false: re-render of an issued document (artwork update) — replace the PDF only, send no email. */
+export async function renderCertificatePdf(db: Database, env: Env, code: string, opts: { notify?: boolean } = {}) {
   const c = await db.selectFrom("certificates").selectAll().where("certificate_code", "=", code).executeTakeFirstOrThrow();
 
   // Site-wide layout options (issuing body); a missing row means the defaults
@@ -111,6 +112,7 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string)
     const owner = await db.selectFrom("users").select("email").where("id", "=", c.user_id).executeTakeFirstOrThrow();
     await db.transaction().execute(async (trx) => {
       await trx.updateTable("certificates").set({ pdf_ready_at: new Date(), pdf_failed_at: null, pdf_last_error: null }).where("id", "=", c.id).execute();
+      if (opts.notify === false) return;
       await addWorkerEmail(
         trx,
         {

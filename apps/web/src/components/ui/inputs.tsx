@@ -32,7 +32,7 @@ export function PasswordInput(props: Omit<InputGroupProps, "type" | "suffix">) {
       {...props}
       type={show ? "text" : "password"}
       suffix={
-        <button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"} className="transition-[color,transform,translate,scale,rotate] hover:text-foreground active:scale-90">
+        <button type="button" onClick={() => setShow(!show)} aria-label={show ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"} className="-m-2.5 inline-flex h-10 w-10 items-center justify-center rounded-md transition-[color,transform,translate,scale,rotate] hover:text-foreground active:scale-90">
           <EyeToggleIcon hidden={show} />
         </button>
       }

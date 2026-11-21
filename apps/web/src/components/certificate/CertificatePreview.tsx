@@ -1,6 +1,9 @@
 import { QrCode } from "lucide-react";
 import {
   CERTIFICATE_DISPLAY_DEFAULTS,
+  CERTIFICATE_INTRO,
+  CERTIFICATE_TITLE,
+  certificateAchievement,
   DEFAULT_ISSUER_EN,
   DEFAULT_ISSUER_TH,
   certificateKicker,
@@ -30,8 +33,6 @@ export function CertificatePreview({
   template,
   align,
   documentType,
-  documentName,
-  achievement,
   courseTitle,
   signerName,
   signerTitle,
@@ -43,7 +44,8 @@ export function CertificatePreview({
   template: string;
   align: string;
   documentType: string;
-  documentName: string;
+  /** Kept for callers; the printed title/sentence are the fixed วุฒิบัตร wording (CERTIFICATE_TITLE) */
+  documentName?: string;
   achievement?: string | null;
   courseTitle: string;
   signerName?: string | null;
@@ -99,20 +101,20 @@ export function CertificatePreview({
           {issuer === DEFAULT_ISSUER_TH && (
             <p style={{ fontSize: "0.95cqw", letterSpacing: "0.3em", textTransform: "uppercase", color: p.muted, fontFamily: prompt }}>{DEFAULT_ISSUER_EN}</p>
           )}
-          <p className="font-semibold" style={{ fontSize: documentName.length <= 12 ? "3.9cqw" : "3cqw", lineHeight: 1.2, color: p.title, fontFamily: prompt, marginTop: "0.8cqw" }}>
-            {documentName || "วุฒิบัตร"}
+          <p className="font-semibold" style={{ fontSize: "3.9cqw", lineHeight: 1.2, color: p.title, fontFamily: prompt, marginTop: "0.8cqw" }}>
+            {CERTIFICATE_TITLE}
           </p>
           <p style={{ fontSize: "1.2cqw", letterSpacing: "0.34em", color: p.accent, textTransform: "uppercase", fontFamily: prompt, marginTop: "0.2cqw" }}>
             {certificateKicker(documentType)}
           </p>
-          <p style={{ fontSize: "1.8cqw", marginTop: "1.2cqw" }}>{documentName.length <= 16 ? `${documentName}ฉบับนี้ให้ไว้เพื่อแสดงว่า` : "ให้ไว้เพื่อแสดงว่า"}</p>
+          <p style={{ fontSize: "1.8cqw", marginTop: "1.2cqw" }}>{CERTIFICATE_INTRO}</p>
           <p className="font-semibold" style={{ fontSize: r.recipientName.length > 30 ? "3.4cqw" : "4.2cqw", lineHeight: 1.3, fontFamily: prompt }}>
             {r.recipientName}
           </p>
           <div style={{ height: "0.12cqw", width: "46cqw", background: p.accent, marginTop: "0.3cqw" }} aria-hidden />
-          <p style={{ fontSize: "1.8cqw", marginTop: "0.7cqw" }}>{achievement || "ได้ผ่านการอบรมออนไลน์"}</p>
+          <p style={{ fontSize: "1.8cqw", marginTop: "0.7cqw" }}>{certificateAchievement(documentType)}</p>
           <p className="font-semibold" style={{ fontSize: courseTitle.length > 60 ? "1.9cqw" : "2.4cqw", lineHeight: 1.35, color: p.title, fontFamily: prompt }}>
-            {documentType === "program" ? "หลักสูตรอบรม" : "หลักสูตร"} {courseTitle}
+            หลักสูตร {courseTitle}
           </p>
           <p style={{ fontSize: "1.6cqw", color: p.muted, marginTop: "0.7cqw" }}>
             {isTest

@@ -59,7 +59,7 @@ export async function setCourseSignerShown(admin: CurrentUser, courseId: string,
   const { db } = ctx();
   const c = await loadCourse(courseId);
   if (show && !c.credential_signature_key) throw new HttpError(409, "NO_SIGNATURE", "อัปโหลดลายเซ็นก่อน จึงจะเปิดการแสดงผู้ลงนามได้");
-  if (show && !c.credential_signer_name?.trim()) throw new HttpError(409, "NO_SIGNER_NAME", "กรอกชื่อผู้ลงนามในการตั้งค่าใบรับรองของหลักสูตรก่อน");
+  if (show && !c.credential_signer_name?.trim()) throw new HttpError(409, "NO_SIGNER_NAME", "กรอกชื่อผู้ลงนามในการตั้งค่าวุฒิบัตรของหลักสูตรก่อน");
   await db.updateTable("courses").set({ credential_show_signer: show, updated_at: new Date() }).where("id", "=", courseId).execute();
   await audit(db, { action: "course.signer_toggled", userId: admin.id, entityType: "course", entityId: courseId, ip: meta.ip, details: { show } });
   return { showSigner: show };

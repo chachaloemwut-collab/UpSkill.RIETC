@@ -11,7 +11,7 @@ import { formatDateTh } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { learnerOverview } from "@/server/courses/courses.service";
 
-export const metadata: Metadata = { title: "ใบรับรองของฉัน" };
+export const metadata: Metadata = { title: "วุฒิบัตรของฉัน" };
 
 export default async function MyCertificatesPage() {
   const user = await getCurrentUser();
@@ -23,23 +23,23 @@ export default async function MyCertificatesPage() {
 
   return (
     <>
-      <PageHeader title="ใบรับรองของฉัน" description="ใบรับรองทุกใบลงนามดิจิทัล ตรวจสอบได้ผ่านหน้าสาธารณะและ QR Code" />
+      <PageHeader title="วุฒิบัตรของฉัน" description="วุฒิบัตรทุกใบลงนามดิจิทัล ตรวจสอบได้ผ่านหน้าสาธารณะและ QR Code" />
       {isDev && certs.length === 0 && <DeveloperTestCertificateButton />}
       {claimable.length > 0 && (
         <Card className="mb-6 flex flex-wrap items-center gap-3 border-success/30 p-4">
           <Award className="h-5 w-5 text-success" />
           <p className="mr-auto text-sm">
-            คุณเรียนจบ <span className="font-medium">{claimable.length}</span> หลักสูตรที่ยังไม่ได้รับใบรับรอง
+            คุณเรียนจบ <span className="font-medium">{claimable.length}</span> หลักสูตรที่ยังไม่ได้รับวุฒิบัตร
           </p>
           {claimable.map((e) => (
             <Link key={e.slug} href={`/courses/${e.slug}/certificate`} className={buttonClass("default", "sm")}>
-              รับใบรับรอง: {e.title}
+              รับวุฒิบัตร: {e.title}
             </Link>
           ))}
         </Card>
       )}
       {certs.length === 0 ? (
-        <EmptyState icon={<Award className="h-5 w-5" />} title="ยังไม่มีใบรับรอง" description="เรียนให้ครบและสอบผ่านเพื่อรับใบรับรองใบแรกของคุณ" />
+        <EmptyState icon={<Award className="h-5 w-5" />} title="ยังไม่มีวุฒิบัตร" description="เรียนให้ครบและสอบผ่านเพื่อรับวุฒิบัตรใบแรกของคุณ" />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {certs.map((e, i) => (

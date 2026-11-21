@@ -1,4 +1,5 @@
 "use client";
+import { CERTIFICATE_TITLE } from "@upskill/core/certificate-patterns";
 import Link from "next/link";
 import { useState } from "react";
 import {
@@ -104,14 +105,14 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
     if (typeof window !== "undefined") {
       navigator.clipboard.writeText(data.code);
       setCopiedHash(true);
-      toast({ title: "คัดลอกรหัสใบรับรองแล้ว", variant: "success" });
+      toast({ title: "คัดลอกรหัสวุฒิบัตรแล้ว", variant: "success" });
       setTimeout(() => setCopiedHash(false), 2000);
     }
   };
 
   const rows = [
     { icon: UserRound, label: "ผู้สำเร็จการศึกษา", value: <span className="font-semibold text-foreground">{data.recipientName}</span> },
-    { icon: BadgeCheck, label: "เอกสารรับรอง", value: `${data.documentName} (${data.documentType})` },
+    { icon: BadgeCheck, label: "เอกสารรับรอง", value: CERTIFICATE_TITLE },
     { icon: GraduationCap, label: "หลักสูตร", value: <span className="font-medium text-foreground">{data.courseTitle}</span> },
     { icon: UserRound, label: "ผู้สอน / ผู้จัดทำ", value: data.instructorName },
     {
@@ -144,7 +145,7 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
     ...(data.expiresAt ? [{ icon: Clock, label: "วันหมดอายุ", value: formatDateTh(data.expiresAt, "long") }] : []),
     {
       icon: Hash,
-      label: "รหัสใบรับรอง",
+      label: "รหัสวุฒิบัตร",
       value: (
         <div className="flex items-center gap-2">
           <span className="font-mono font-semibold tracking-wider text-foreground">{data.code}</span>
@@ -177,7 +178,7 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
             </div>
             <p className="mt-1 text-xs sm:text-sm text-amber-800/90 dark:text-amber-200/90">
               {data.testNotice ??
-                "ใบประกาศนียบัตรฉบับนี้ออกเพื่อการทดสอบทางเทคนิคของระบบ UpSkill.RIETC สำหรับบัญชีผู้พัฒนา โดยไม่มีผลรับรองการเรียนหรือการสอบผ่านจริง"}
+                "วุฒิบัตรฉบับนี้ออกเพื่อการทดสอบทางเทคนิคของระบบ UpSkill.RIETC สำหรับบัญชีผู้พัฒนา โดยไม่มีผลรับรองการเรียนหรือการสอบผ่านจริง"}
             </p>
           </div>
         )}
@@ -212,10 +213,10 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
               </div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                 {valid
-                  ? `${data.documentName} ผ่านการตรวจสอบ`
+                  ? `${CERTIFICATE_TITLE} ผ่านการตรวจสอบ`
                   : expired
-                    ? `${data.documentName} หมดอายุแล้ว`
-                    : `${data.documentName} ถูกเพิกถอนแล้ว`}
+                    ? `${CERTIFICATE_TITLE} หมดอายุแล้ว`
+                    : `${CERTIFICATE_TITLE} ถูกเพิกถอนแล้ว`}
               </h1>
               <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
                 {valid
@@ -269,7 +270,7 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
 
       <div className="mt-6 flex items-center justify-center gap-4 no-print text-center">
         <Link href="/verify" className={buttonClass("ghost", "sm")}>
-          ← ตรวจสอบใบรับรองอื่น
+          ← ตรวจสอบวุฒิบัตรอื่น
         </Link>
       </div>
     </div>
