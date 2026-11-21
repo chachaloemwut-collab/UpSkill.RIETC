@@ -210,6 +210,7 @@ export async function updateCourse(
     application_settings: unknown;
   }>,
   ip?: string,
+  expectedUpdatedAt?: string,
 ) {
   const { db } = ctx();
   await loadOwnedCourse(user, courseId);
@@ -226,11 +227,16 @@ export async function updateCourse(
   }
 
   const { application_settings, ...rest } = patch;
-  await db
+  const result = await db
     .updateTable("courses")
     .set({ ...rest, ...(application_settings !== undefined ? { application_settings: JSON.stringify(parseApplicationSettings(application_settings)) } : {}) })
     .where("id", "=", courseId)
-    .execute();
+    // Millisecond precision: the editor's copy came through a JS Date
+    .$if(Boolean(expectedUpdatedAt), (q) => q.where(sql<boolean>`date_trunc('milliseconds', updated_at) = date_trunc('milliseconds', ${expectedUpdatedAt!}::timestamptz)`))
+    .executeTakeFirst();
+  if (expectedUpdatedAt && Number(result.numUpdatedRows) === 0) {
+    throw new HttpError(409, "EDIT_CONFLICT", "หลักสูตรนี้ถูกแก้ไขโดยผู้อื่นหลังจากที่คุณเปิดหน้านี้ โหลดหน้าใหม่เพื่อดูข้อมูลล่าสุด แล้วแก้ไขอีกครั้ง");
+  }
 
   if (ip && changedRestorable.length > 0) {
     const after: Partial<Record<CourseRestorableField, string | null>> = {};
