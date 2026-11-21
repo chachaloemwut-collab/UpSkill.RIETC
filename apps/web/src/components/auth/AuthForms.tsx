@@ -154,7 +154,8 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
           <OrDivider />
         </>
       )}
-      <form method="post" onSubmit={onSubmit} className="grid gap-4">
+      {/* action: plain-form fallback when JavaScript did not run (older Safari / in-app browsers); onSubmit handles the normal case */}
+      <form method="post" action="/api/auth/login/form" onSubmit={onSubmit} className="grid gap-4">
         {error && (
           <Alert
             variant="destructive"
@@ -180,18 +181,18 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
           </Button>
         )}
         <Field label="อีเมลหรือชื่อผู้ใช้">
-          <Input name="email" type="text" autoComplete="username" placeholder="you@example.com" required className="h-10" />
+          <Input name="email" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email" placeholder="you@example.com" required className="h-11" />
         </Field>
         <div className="grid gap-1.5">
           <div className="flex items-center justify-between">
             <label htmlFor="login-password" className="text-sm font-medium leading-none">
               รหัสผ่าน
             </label>
-            <Link href="/forgot-password" className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+            <Link href="/forgot-password" className="-my-2 -mr-2 inline-flex min-h-10 items-center px-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
               ลืมรหัสผ่าน?
             </Link>
           </div>
-          <PasswordInput id="login-password" name="password" autoComplete="current-password" required className="h-10" />
+          <PasswordInput id="login-password" name="password" autoComplete="current-password" required className="h-11" />
         </div>
         <Button
           type="submit"

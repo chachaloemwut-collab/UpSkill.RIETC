@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectInAppBrowser, externalBrowserUrl } from "./user-agent.ts";
+import { detectInAppBrowser, detectOutdatedBrowser, externalBrowserUrl } from "./user-agent.ts";
 
 const UA = {
   lineIos:
@@ -36,5 +36,21 @@ describe("externalBrowserUrl", () => {
   });
   it("returns null on iOS non-LINE (show copy-link instead)", () => {
     expect(externalBrowserUrl("https://x.test/a", detectInAppBrowser(UA.igIos))).toBeNull();
+  });
+});
+
+describe("detectOutdatedBrowser", () => {
+  it("flags iPad/iPhone below iOS 16.4 and old desktop Safari", () => {
+    expect(detectOutdatedBrowser("Mozilla/5.0 (iPad; CPU OS 15_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6 Mobile/15E148 Safari/604.1")?.reason).toBe("ios");
+    expect(detectOutdatedBrowser("Mozilla/5.0 (iPhone; CPU iPhone OS 16_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.3 Mobile/15E148 Safari/604.1")?.version).toBe("16.3");
+    expect(detectOutdatedBrowser("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6 Safari/605.1.15")?.reason).toBe("safari");
+    expect(detectOutdatedBrowser("Mozilla/5.0 (Linux; Android 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Mobile Safari/537.36")?.reason).toBe("chrome");
+  });
+  it("accepts current browsers", () => {
+    expect(detectOutdatedBrowser("Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1")).toBeNull();
+    expect(detectOutdatedBrowser("Mozilla/5.0 (iPhone; CPU iPhone OS 16_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0 Mobile/15E148 Safari/604.1")).toBeNull();
+    expect(detectOutdatedBrowser("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15")).toBeNull();
+    expect(detectOutdatedBrowser("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36")).toBeNull();
+    expect(detectOutdatedBrowser("")).toBeNull();
   });
 });
