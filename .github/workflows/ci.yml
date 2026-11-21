@@ -154,7 +154,7 @@ jobs:
         with: { languages: javascript-typescript, queries: security-extended }
       # Code scanning is not enabled on this private repo (needs GitHub Code Security): keep the analysis, keep the
       # SARIF as a run artifact instead of uploading it. Switch to upload: always once code scanning is enabled.
-      - uses: github/codeql-action/analyze@5895b2c9be147bc7f1c75ce72c5cb577febb1907 # v4
+      - uses: github/codeql-action/analyze@38112626f97ac1fd7acf3df7ebca51f4677c1b38 # v4
         with: { upload: never, output: codeql-results }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with: { name: codeql-sarif, path: codeql-results, retention-days: 30 }
