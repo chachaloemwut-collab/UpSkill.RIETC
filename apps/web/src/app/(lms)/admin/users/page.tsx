@@ -56,6 +56,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <option value="active">ใช้งาน</option>
             <option value="suspended">ระงับชั่วคราว</option>
             <option value="banned">ระงับถาวร</option>
+            <option value="deleted">ลบบัญชีแล้ว</option>
           </select>
           <button type="submit" className={buttonClass("default", "md")}>ค้นหา</button>
           <Link
@@ -69,46 +70,48 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       </Card>
 
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
-              <th className="px-4 py-3">สมาชิก</th>
-              <th className="px-4 py-3">บทบาท</th>
-              <th className="px-4 py-3">สถานะ</th>
-              <th className="px-4 py-3 text-right">ลงทะเบียน</th>
-              <th className="px-4 py-3 text-right">วุฒิบัตร</th>
-              <th className="px-4 py-3">สมัครเมื่อ</th>
-              <th className="px-4 py-3 text-right">ใช้งานล่าสุด</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.users.map((u) => (
-              <tr key={u.id} className="border-b last:border-0 hover:bg-muted/30">
-                <td className="px-4 py-3">
-                  <Link href={`/admin/users/${u.id}`} className="font-medium hover:underline">
-                    {u.legal_full_name_th ?? u.legal_full_name_en ?? u.username ?? u.email}
-                  </Link>
-                  <p className="text-xs text-muted-foreground">{u.email}{u.deleted_at ? " · ลบบัญชีแล้ว" : ""}</p>
-                </td>
-                <td className="px-4 py-3"><Badge variant="secondary">{ROLE_LABEL[u.role] ?? u.role}</Badge></td>
-                <td className="px-4 py-3">
-                  <Badge variant={u.deleted_at ? "destructive" : (STATUS_LABEL[u.status]?.variant ?? "secondary")}>
-                    {u.deleted_at ? "ลบบัญชีแล้ว" : (STATUS_LABEL[u.status]?.label ?? u.status)}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3 text-right">{u.enrollments}</td>
-                <td className="px-4 py-3 text-right">{u.certificates}</td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">{formatDateTh(u.created_at)}</td>
-                <td className="px-4 py-3 text-right text-xs text-muted-foreground">{u.last_active_at ? formatDateTh(u.last_active_at) : "—"}</td>
+        <div className="overflow-x-auto">
+          <table className="min-w-[640px] w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
+                <th className="px-4 py-3">สมาชิก</th>
+                <th className="px-4 py-3">บทบาท</th>
+                <th className="px-4 py-3">สถานะ</th>
+                <th className="px-4 py-3 text-right">ลงทะเบียน</th>
+                <th className="px-4 py-3 text-right">วุฒิบัตร</th>
+                <th className="px-4 py-3">สมัครเมื่อ</th>
+                <th className="px-4 py-3 text-right">ใช้งานล่าสุด</th>
               </tr>
-            ))}
-            {data.users.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">ไม่พบสมาชิกที่ตรงเงื่อนไข</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.users.map((u) => (
+                <tr key={u.id} className="border-b last:border-0 hover:bg-muted/30">
+                  <td className="px-4 py-3">
+                    <Link href={`/admin/users/${u.id}`} className="font-medium hover:underline">
+                      {u.legal_full_name_th ?? u.legal_full_name_en ?? u.username ?? u.email}
+                    </Link>
+                    <p className="text-xs text-muted-foreground">{u.email}{u.deleted_at ? " · ลบบัญชีแล้ว" : ""}</p>
+                  </td>
+                  <td className="px-4 py-3"><Badge variant="secondary">{ROLE_LABEL[u.role] ?? u.role}</Badge></td>
+                  <td className="px-4 py-3">
+                    <Badge variant={u.deleted_at ? "destructive" : (STATUS_LABEL[u.status]?.variant ?? "secondary")}>
+                      {u.deleted_at ? "ลบบัญชีแล้ว" : (STATUS_LABEL[u.status]?.label ?? u.status)}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-right">{u.enrollments}</td>
+                  <td className="px-4 py-3 text-right">{u.certificates}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{formatDateTh(u.created_at)}</td>
+                  <td className="px-4 py-3 text-right text-xs text-muted-foreground">{u.last_active_at ? formatDateTh(u.last_active_at) : "—"}</td>
+                </tr>
+              ))}
+              {data.users.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">ไม่พบสมาชิกที่ตรงเงื่อนไข</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 text-sm">
           <p className="text-muted-foreground">หน้า {data.page} / {totalPages} · {data.total} คน</p>
           <div className="flex flex-wrap items-center gap-1">

@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { Check, Copy, KeyRound, Link2, LockOpen, Mail, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import { Alert, Button, Checkbox, Dialog, Field, Input, useToast } from "@/components/ui";
+import { useConfirm } from "@/components/common/ConfirmProvider";
 
 type Result = { title: string; secret: string; lines: string[] } | null;
 
@@ -16,6 +17,7 @@ type Result = { title: string; secret: string; lines: string[] } | null;
 export function PasswordAdminPanel({ userId, email, emailVerified, mustChange }: { userId: string; email: string; emailVerified: boolean; mustChange: boolean }) {
   const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
   const [tempOpen, setTempOpen] = useState(false);
   const [tempError, setTempError] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function PasswordAdminPanel({ userId, email, emailVerified, mustChange }:
     const msg = logout
       ? `ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${email} และออกจากระบบทุกอุปกรณ์ของผู้ใช้ทันที?`
       : `ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${email}? (ผู้ใช้ยังใช้งานต่อได้จนกว่าจะตั้งรหัสใหม่)`;
-    if (!window.confirm(msg)) return;
+    if (!(await confirm({ title: msg, destructive: logout }))) return;
     const r = await call<{ sentTo: string }>(logout ? "email-logout" : "email", "reset-password", { logout });
     if (r.ok) {
       toast({ title: "ส่งอีเมลแล้ว", description: `ลิงก์ใช้ได้ 1 ชั่วโมง · ${r.data.sentTo}`, variant: "success" });

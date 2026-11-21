@@ -14,4 +14,6 @@ export function ProfileBanner({ show }: { show: boolean }) {
   );
 }
 
-export const needsProfile = (v: { isSystemOwner: boolean; hasProfile: boolean } | null) => !!v && !v.isSystemOwner && !v.hasProfile;
+/** Learners only: the profile is required to enrol, so staff (instructors/admins) are not nagged on every page */
+export const needsProfile = (v: { isSystemOwner: boolean; hasProfile: boolean; role?: string } | null) =>
+  !!v && !v.isSystemOwner && !v.hasProfile && (v.role === undefined || v.role === "member");

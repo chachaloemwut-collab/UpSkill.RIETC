@@ -6,6 +6,7 @@ import { PenLine, Trash2, Upload } from "lucide-react";
 import { api } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { Alert, Button, Card, Switch, useToast } from "@/components/ui";
+import { useConfirm } from "@/components/common/ConfirmProvider";
 
 /**
  * Admin-only: the course's signature image and the switch that prints the signer on its certificates.
@@ -15,6 +16,7 @@ import { Alert, Button, Card, Switch, useToast } from "@/components/ui";
 export function SignatureAdminCard({ courseId, signatureKey, showSigner, signerName }: { courseId: string; signatureKey: string | null; showSigner: boolean; signerName: string | null }) {
   const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const base = `/api/admin/courses/${courseId}`;
@@ -34,7 +36,7 @@ export function SignatureAdminCard({ courseId, signatureKey, showSigner, signerN
   }
 
   async function remove() {
-    if (!window.confirm("ลบลายเซ็นของหลักสูตรนี้? การแสดงผู้ลงนามจะถูกปิดด้วย (เอกสารที่ออกไปแล้วไม่เปลี่ยน)")) return;
+    if (!(await confirm({ title: "ลบลายเซ็นของหลักสูตรนี้? การแสดงผู้ลงนามจะถูกปิดด้วย (เอกสารที่ออกไปแล้วไม่เปลี่ยน)", destructive: true }))) return;
     setBusy(true);
     const r = await api(`${base}/signature`, { method: "DELETE" });
     setBusy(false);

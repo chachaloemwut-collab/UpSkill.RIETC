@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Award, CheckCircle, RotateCcw } from "lucide-react";
 import { Button, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
+import { useConfirm } from "@/components/common/ConfirmProvider";
 
 export interface EnrollmentAdminActionsProps {
   userId: string;
@@ -23,6 +24,7 @@ export function EnrollmentAdminActions({
 }: EnrollmentAdminActionsProps) {
   const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
 
   const setStatus = async (status: "completed" | "in_progress") => {
@@ -30,7 +32,7 @@ export function EnrollmentAdminActions({
       status === "completed"
         ? "ยืนยันอนุมัติจบหลักสูตรสำหรับผู้เรียนคนนี้เป็นกรณีพิเศษ?"
         : "ยืนยันรีเซ็ตสถานะกลับเป็นกำลังเรียน?";
-    if (!window.confirm(confirmMsg)) return;
+    if (!(await confirm({ title: confirmMsg, destructive: true }))) return;
 
     setBusy(true);
     try {

@@ -11,12 +11,29 @@ export function youtubeThumb(videoId: string | null | undefined): string | null 
   return videoId && /^[A-Za-z0-9_-]{11}$/.test(videoId) ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
 }
 
-export function formatDateTh(d: Date | string, style: "long" | "medium" = "medium"): string {
-  return new Date(d).toLocaleDateString("th-TH", { dateStyle: style, timeZone: "Asia/Bangkok" });
+// Thai dates are built by hand instead of Intl: the server (Node ICU) and browsers (Safari/Chrome ICU) format
+// th-TH differently ("18:10" vs "18:10 น."), which broke React hydration on client components.
+const TH_MONTH_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+const TH_MONTH_LONG = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+
+/** Date parts in Bangkok time (UTC+7, no DST) */
+function bangkok(d: Date | string) {
+  const t = new Date(new Date(d).getTime() + 7 * 3600_000);
+  return { y: t.getUTCFullYear() + 543, m: t.getUTCMonth(), day: t.getUTCDate(), hh: t.getUTCHours(), mm: t.getUTCMinutes() };
 }
 
+/** "16 พ.ย. 2569" (medium) or "16 พฤศจิกายน 2569" (long) — identical on server and every browser */
+export function formatDateTh(d: Date | string, style: "long" | "medium" = "medium"): string {
+  if (Number.isNaN(new Date(d).getTime())) return "-";
+  const p = bangkok(d);
+  return `${p.day} ${(style === "long" ? TH_MONTH_LONG : TH_MONTH_SHORT)[p.m]} ${p.y}`;
+}
+
+/** "16 พ.ย. 2569 18:10 น." */
 export function formatDateTimeTh(d: Date | string): string {
-  return new Date(d).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" });
+  if (Number.isNaN(new Date(d).getTime())) return "-";
+  const p = bangkok(d);
+  return `${formatDateTh(d)} ${String(p.hh).padStart(2, "0")}:${String(p.mm).padStart(2, "0")} น.`;
 }
 
 export const ROLE_LABEL: Record<string, string> = { member: "ผู้เรียน", instructor: "ผู้สอน", admin: "ผู้ดูแลระบบ" };
