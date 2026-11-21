@@ -160,3 +160,18 @@
 - ข้อมูลผิดที่ยังค้าง: สคริปต์ seed กระทง (`complete-krathong-flow.ts`, `krathong-contest-2569.ts`) ใช้ชื่อสถาบันผิด
   ("สถาบันการอาชีวศึกษาภาคตะวันออก…") — ข้อมูลที่ seed ลง production แล้วอาจยังเป็นชื่อเก่า
 - agent-work lease ค้าง (owner human, 2026-11-18 16:23 UTC, stale) — ไม่ได้ยึด/ปิด
+
+## 2026-11-21T16:45:00+00:00 (23:45 Asia/Bangkok) — Claude Code: release 24df7b9 (วุฒิบัตรทั้งระบบ, mobile login, admin reports)
+
+- Released 24df7b9 (live เดิม 056d953) = PR #47; migration 0040 (data: courses.credential_name_th → วุฒิบัตร)
+- main CI 44924645139 ✅ → Deploy Jasmine 44924980522 → `released 24df7b9 ✓` (hosting receiver ช้า: script อัปโหลด manifest ซ้ำ 2 ครั้งตามกลไกปกติ)
+- วุฒิบัตร: ถ้อยคำตามวุฒิบัตรอบรมของ กรมพัฒนาฝีมือแรงงาน / กรมพัฒนาพลังงานทดแทนฯ; ฉบับที่ออกแล้ว → worker re-render PDF
+  ทุกฉบับที่ไม่ถูกเพิกถอน ครั้งเดียวต่อ `CERTIFICATE_ARTWORK_VERSION` (`system_settings.certificate_artwork_version`)
+  — ไม่แตะ record ที่ลงนาม ไม่ส่งอีเมล ล้มเหลวก็คง PDF เดิม; ทดสอบบนเครื่อง 5/5 ฉบับ
+- มือถือ: fallback `/api/auth/login/form` (ล็อกอินได้แม้ JS ไม่ทำงาน), แถบเตือนเบราว์เซอร์เก่า (< iOS/Safari 16.4, Chrome 111, Firefox 128),
+  tap target ใหญ่ขึ้น — ทดสอบ WebKit iPhone/iPad + Chromium Android บน production ก่อนแก้: ไม่มี element บังปุ่ม, hydrate ปกติ
+- แอดมิน: `/admin/reports` (ตาราง + CSV รายชื่อ/สรุป + PNG + พิมพ์; audit `admin.trainees_exported`), วุฒิบัตร: กรองตามหลักสูตร + ปุ่มดู PDF
+- Live check (read-only): health ok; `/admin/reports` 307 (ต้องล็อกอิน); CSV 401; login form fallback ตอบ 303 + BAD_ORIGIN เมื่อไม่มี Origin;
+  แถบเตือนขึ้นกับ UA iPadOS 15.7; หน้าแรกไม่มีคำว่า "ใบรับรอง" แล้ว
+- ยังไม่ได้ตรวจ: PDF ที่ re-render บน production (ต้องล็อกอินแอดมิน/เจ้าของเอกสาร), ล็อกอิน superadmin (ไม่มีรหัสในเซสชันนี้)
+- ⚠️ ยังค้าง: รหัสผ่านเจ้าของระบบเขียนตายตัวใน `login()` (ดูบันทึก release 056d953)
