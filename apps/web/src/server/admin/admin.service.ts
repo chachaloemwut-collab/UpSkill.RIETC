@@ -13,7 +13,7 @@ export async function adminOverview() {
   const courses = await db
     .selectFrom("courses as c")
     .innerJoin("users as u", "u.id", "c.instructor_id")
-    .select(["c.id", "c.slug", "c.title", "c.visibility", "c.is_verified_course", "c.instructor_id", "u.email as instructor_email"])
+    .select(["c.id", "c.slug", "c.title", "c.visibility", "c.is_verified_course", "c.instructor_id", "u.email as instructor_email", "u.legal_full_name_th as instructor_name"])
     .orderBy("c.updated_at", "desc")
     .limit(200)
     .execute();

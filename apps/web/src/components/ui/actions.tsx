@@ -62,7 +62,7 @@ export function SegmentedControl({ options, value, onValueChange }: { options: {
   const ref = React.useRef<HTMLDivElement>(null);
   const rect = useIndicator(ref, "[aria-checked=true]", value);
   return (
-    <div ref={ref} role="radiogroup" className="relative inline-flex h-9 items-center rounded-lg bg-muted p-1">
+    <div ref={ref} role="radiogroup" className="relative inline-flex h-11 max-w-full items-center overflow-x-auto rounded-lg bg-muted p-1 [scrollbar-width:none] sm:h-9">
       <Indicator rect={rect} className="bg-background shadow-xs" />
       {options.map((o) => (
         <button
@@ -71,7 +71,7 @@ export function SegmentedControl({ options, value, onValueChange }: { options: {
           aria-checked={o.value === value}
           onClick={() => onValueChange(o.value)}
           className={cn(
-            "relative z-10 inline-flex h-7 items-center rounded-md px-3 text-sm font-medium text-muted-foreground transition-[color,transform,translate,scale,rotate] hover:text-foreground active:scale-95",
+            "relative z-10 inline-flex h-9 shrink-0 items-center whitespace-nowrap sm:h-7 rounded-md px-3 text-sm font-medium text-muted-foreground transition-[color,transform,translate,scale,rotate] hover:text-foreground active:scale-95",
             focusRing,
             o.value === value && "text-foreground"
           )}

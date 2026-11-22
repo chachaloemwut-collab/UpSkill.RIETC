@@ -238,7 +238,7 @@ export function ThemeCustomizer() {
 export function ThemeToggle() {
   const { settings, setDark } = useThemeSettings();
   return (
-    <Button variant="ghost" size="icon" aria-label="Toggle theme" onClick={(e) => setDark(!settings.dark, e)}>
+    <Button variant="ghost" size="icon" aria-label="สลับโหมดสว่าง/มืด" onClick={(e) => setDark(!settings.dark, e)}>
       <ThemeIcon dark={settings.dark} />
     </Button>
   );

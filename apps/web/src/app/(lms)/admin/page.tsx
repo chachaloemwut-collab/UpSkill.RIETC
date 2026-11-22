@@ -35,7 +35,7 @@ export default async function AdminPage() {
         <Link href="/admin/announcements" className={buttonClass("outline")}><Megaphone className="h-4 w-4" /> ประกาศ</Link>
       </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard index={0} label="ผู้ใช้ทั้งหมด" value={stats.users} unit="คน" icon={<Users />} />
         <StatCard index={1} label="หลักสูตรที่เผยแพร่" value={stats.publishedCourses} unit="หลักสูตร" icon={<BookOpen />} />
         <StatCard index={2} label="การลงทะเบียน" value={stats.enrollments} unit="ครั้ง" icon={<GraduationCap />} />
@@ -43,7 +43,7 @@ export default async function AdminPage() {
         <StatCard index={4} label="ผิดปกติ (7 วัน)" value={stats.flags7d} unit="ครั้ง" icon={<Flag />} />
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:mt-4 sm:grid-cols-3 sm:gap-4">
         <Link href="/admin/programs" className="block"><StatCard index={5} label="หลักสูตรอบรมที่เผยแพร่" value={stats.publishedPrograms} unit="หลักสูตร" icon={<GraduationCap />} /></Link>
         <Link href="/admin/programs" className="block"><StatCard index={6} label="รอบที่เปิดรับสมัคร" value={stats.openCohorts} unit="รอบ" icon={<CalendarCheck />} /></Link>
         <Link href="/admin/programs" className="block"><StatCard index={7} label="ใบสมัครรอพิจารณา" value={stats.pendingRegistrations} unit="ใบ" hint={stats.pendingRegistrations ? "เปิดหลักสูตรเพื่อพิจารณา" : undefined} icon={<ClipboardList />} /></Link>
@@ -85,7 +85,10 @@ export default async function AdminPage() {
                           {c.is_verified_course && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-success" aria-label="Verified" />}
                         </Link>
                       </td>
-                      <td className="text-muted-foreground">{c.instructor_email}</td>
+                      <td>
+                        <span className="block">{c.instructor_name || c.instructor_email}</span>
+                        {c.instructor_name && <span className="block text-xs text-muted-foreground">{c.instructor_email}</span>}
+                      </td>
                       <td>
                         <Badge variant={vis?.variant ?? "secondary"}>{vis?.label ?? c.visibility}</Badge>
                       </td>

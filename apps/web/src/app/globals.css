@@ -378,6 +378,12 @@
 @layer base {
   :root { color-scheme: light; }
   .dark { color-scheme: dark; }
+  /*
+   * A plain `grid` (no grid-cols-*) gets one implicit `auto` column, which grows to the widest unbreakable content
+   * (long Thai titles, emails, tables) and pushes the whole page wider than a phone screen. Make that single column
+   * fill the container and shrink instead. Any grid-cols-* / grid-flow-col utility (utilities layer) still wins.
+   */
+  .grid:not([class*="grid-cols-"]):not([class*="grid-flow-col"]) { grid-template-columns: minmax(0, 1fr); }
 }
 
 @keyframes grow-x { from { transform: scaleX(0); } }

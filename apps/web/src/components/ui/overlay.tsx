@@ -84,7 +84,7 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
         className={cn("relative w-full max-w-md rounded-lg border bg-background p-6 shadow-lg", open ? "animate-zoom-in" : "animate-zoom-out", className)}
       >
         {dismissible && (
-          <button data-close onClick={close} aria-label="Close" className="absolute right-4 top-4 rounded-sm text-muted-foreground transition-[color,transform,translate,scale,rotate] duration-200 hover:rotate-90 hover:text-foreground">
+          <button data-close onClick={close} aria-label="ปิด" className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-[color,transform,translate,scale,rotate] duration-200 hover:rotate-90 hover:text-foreground">
             <XIcon />
           </button>
         )}

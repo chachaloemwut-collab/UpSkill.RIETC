@@ -198,8 +198,8 @@ export function CertificatesManager({
   return (
     <div className="space-y-6">
       {/* Top action bar: Search & Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <form onSubmit={handleSearch} className="flex flex-1 items-center gap-2 max-w-md">
+      <div className="flex flex-wrap items-center gap-3">
+        <form onSubmit={handleSearch} className="flex w-full min-w-0 items-center gap-2 lg:w-auto lg:max-w-md lg:flex-1">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -212,7 +212,7 @@ export function CertificatesManager({
           <Button type="submit" variant="secondary">ค้นหา</Button>
         </form>
 
-        <Select value={activeCourse} onChange={(e) => setCourseFilter(e.target.value)} className="h-10 sm:max-w-xs" aria-label="กรองตามหลักสูตร">
+        <Select value={activeCourse} onChange={(e) => setCourseFilter(e.target.value)} className="h-10 w-full sm:w-auto sm:max-w-xs" aria-label="กรองตามหลักสูตร">
           <option value="">ทุกหลักสูตร</option>
           {courses.map((c) => (
             <option key={c.id} value={c.id}>{c.title}</option>

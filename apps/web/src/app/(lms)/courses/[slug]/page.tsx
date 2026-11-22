@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowRight, Award, BadgeCheck, ClipboardList, BookOpen, ChevronRight, Clock, Eye, ListOrdered, Pencil, PlayCircle, Target, Timer, TriangleAlert, UserRound } from "lucide-react";
 import { Alert, Badge, Card, Progress, buttonClass } from "@/components/ui";
 import { EnrollButton } from "@/components/course/EnrollButton";
+import { ClampText } from "@/components/common/ClampText";
 import { CourseCover } from "@/components/course/CourseCard";
 import { LessonList } from "@/components/course/LessonList";
 import { VISIBILITY, formatDuration } from "@/lib/format";
@@ -109,9 +110,7 @@ export default async function CoursePage({ params }: Props) {
           )}
 
           {course.description && (
-            <p className="mt-4 max-w-3xl whitespace-pre-line text-sm sm:text-base leading-relaxed text-foreground/80">
-              {course.description}
-            </p>
+            <ClampText className="mt-4 max-w-3xl text-sm leading-relaxed text-foreground/80 sm:text-base">{course.description}</ClampText>
           )}
 
           {manager && (
@@ -124,69 +123,69 @@ export default async function CoursePage({ params }: Props) {
         </div>
       </div>
 
-      {/* ---------- Visual Learning Path Stepper ---------- */}
-      <Card className="mb-6 p-5 sm:p-6">
-        <h2 className="text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
-          <Target className="h-4 w-4 text-primary" /> เส้นทางการเรียนรู้สู่ความสำเร็จ (Learning Path)
-        </h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-5">
-          {/* Step 1 */}
-          <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
-              1
-            </span>
-            <p className="font-semibold text-xs text-foreground">
-              {data.preTest.required ? "ทำแบบทดสอบ Pre-test" : "ลงทะเบียนเรียน"}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {data.preTest.required ? "วัดระดับก่อนเริ่ม" : "เข้าสู่บทเรียน"}
-            </p>
-          </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid min-w-0 grid-cols-1 content-start gap-6">
+          {/* ---------- Visual Learning Path Stepper ---------- */}
+          <Card className="p-5 sm:p-6">
+            <h2 className="text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
+              <Target className="h-4 w-4 text-primary" /> เส้นทางการเรียนรู้สู่ความสำเร็จ
+            </h2>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-5">
+              {/* Step 1 */}
+              <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
+                  1
+                </span>
+                <p className="font-semibold text-xs text-foreground">
+                  {data.preTest.required ? "ทำแบบทดสอบ Pre-test" : "ลงทะเบียนเรียน"}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {data.preTest.required ? "วัดระดับก่อนเริ่ม" : "เข้าสู่บทเรียน"}
+                </p>
+              </div>
 
-          {/* Step 2 */}
-          <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
-              2
-            </span>
-            <p className="font-semibold text-xs text-foreground">
-              เรียนวิดีโอ {lessons.length} คลิป{units.length > 0 ? ` (${units.length} หน่วย)` : ""}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{free ? "ดูครบทุกช่วง" : `ผ่านเกณฑ์ ≥ ${course.min_watch_percentage}%`}</p>
-          </div>
+              {/* Step 2 */}
+              <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
+                  2
+                </span>
+                <p className="font-semibold text-xs text-foreground">
+                  เรียนวิดีโอ {lessons.length} คลิป{units.length > 0 ? ` (${units.length} หน่วย)` : ""}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{free ? "ดูครบทุกช่วง" : `ผ่านเกณฑ์ ≥ ${course.min_watch_percentage}%`}</p>
+              </div>
 
-          {/* Step 3 */}
-          <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
-              3
-            </span>
-            <p className="font-semibold text-xs text-foreground">
-              {lessons.some((l) => l.lessonTestRequired) ? "แบบทดสอบท้ายคลิป" : "คำถามระหว่างคลิป"}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">ทบทวนความเข้าใจ</p>
-          </div>
+              {/* Step 3 */}
+              <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
+                  3
+                </span>
+                <p className="font-semibold text-xs text-foreground">
+                  {lessons.some((l) => l.lessonTestRequired) ? "แบบทดสอบท้ายคลิป" : "คำถามระหว่างคลิป"}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">ทบทวนความเข้าใจ</p>
+              </div>
 
-          {/* Step 4 */}
-          <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
-              4
-            </span>
-            <p className="font-semibold text-xs text-foreground">{averageRule ? "คะแนนรวมแบบทดสอบ" : "ทำแบบทดสอบ Post-test"}</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">ผ่านเกณฑ์ ≥ {course.passing_quiz_score}%</p>
-          </div>
+              {/* Step 4 */}
+              <div className="relative flex flex-col items-center text-center p-3 rounded-lg border bg-muted/20">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mb-2">
+                  4
+                </span>
+                <p className="font-semibold text-xs text-foreground">{averageRule ? "คะแนนรวมแบบทดสอบ" : "ทำแบบทดสอบ Post-test"}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">ผ่านเกณฑ์ ≥ {course.passing_quiz_score}%</p>
+              </div>
 
-          {/* Step 5 */}
-          <div className="col-span-2 sm:col-span-4 lg:col-span-1 relative flex flex-col items-center text-center p-3 rounded-lg border border-primary/20 bg-primary/5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2 shadow-xs">
-              5
-            </span>
-            <p className="font-semibold text-xs text-primary">รับวุฒิบัตรดิจิทัล</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">ลงนาม Ed25519</p>
-          </div>
-        </div>
-      </Card>
+              {/* Step 5 */}
+              <div className="col-span-2 sm:col-span-4 lg:col-span-1 relative flex flex-col items-center text-center p-3 rounded-lg border border-primary/20 bg-primary/5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground mb-2 shadow-xs">
+                  5
+                </span>
+                <p className="font-semibold text-xs text-primary">รับวุฒิบัตรดิจิทัล</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">ลงนาม Ed25519</p>
+              </div>
+            </div>
+          </Card>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <div className="grid min-w-0 content-start gap-6">
 
           <Card>
             <div className="flex items-center justify-between border-b px-5 py-4">
@@ -217,7 +216,7 @@ export default async function CoursePage({ params }: Props) {
           </Card>
         </div>
 
-        <aside className="lg:sticky lg:top-20 lg:self-start">
+        <aside className="order-first min-w-0 lg:order-none lg:sticky lg:top-20 lg:self-start">
           <Card className="overflow-hidden">
             <CourseCover videoId={lessons[0]?.videoId ?? null} title={course.title} />
             <div className="grid gap-4 p-5">

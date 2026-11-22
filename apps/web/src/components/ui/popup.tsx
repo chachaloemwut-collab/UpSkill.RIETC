@@ -56,8 +56,8 @@ export function Popup({ open, onOpenChange, label, position = "center", modal = 
           <button
             data-close
             onClick={close}
-            aria-label="Close"
-            className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-background/80 text-muted-foreground backdrop-blur transition-[color,transform,translate,scale,rotate] duration-200 hover:rotate-90 hover:text-foreground"
+            aria-label="ปิด"
+            className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-background/80 text-muted-foreground backdrop-blur transition-[color,transform,translate,scale,rotate] duration-200 hover:rotate-90 hover:text-foreground"
           >
             <XIcon />
           </button>

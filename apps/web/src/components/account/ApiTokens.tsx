@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Copy, KeyRound, Trash2 } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import { formatDateTh } from "@/lib/format";
@@ -8,7 +8,14 @@ import { formatDateTh } from "@/lib/format";
 type TokenRow = { id: string; name: string; last_used_at: string | null; created_at: string; revoked_at: string | null };
 
 /** Personal API tokens for MCP clients (Cursor / Claude Desktop / scripts). */
+/** Site origin, read after hydration so the server and client render the same first HTML */
+const noSubscribe = () => () => {};
+function useOrigin() {
+  return useSyncExternalStore(noSubscribe, () => window.location.origin, () => "");
+}
+
 export function ApiTokens() {
+  const origin = useOrigin();
   const [tokens, setTokens] = useState<TokenRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [newToken, setNewToken] = useState<string | null>(null);
@@ -74,7 +81,7 @@ export function ApiTokens() {
               <Copy className="h-4 w-4" /> คัดลอก
             </Button>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">ใช้กับ MCP: URL {typeof window !== "undefined" ? window.location.origin : ""}/api/mcp + header Authorization: Bearer &lt;token&gt;</p>
+          <p className="mt-2 text-xs text-muted-foreground">ใช้กับ MCP: URL {origin}/api/mcp + header Authorization: Bearer &lt;token&gt;</p>
         </div>
       )}
       <form onSubmit={create} className="flex flex-wrap items-center gap-2">
@@ -105,7 +112,7 @@ export function ApiTokens() {
         </ul>
       )}
       <p className="text-xs text-muted-foreground">
-        ใช้กับ Cursor: Settings → MCP → Add server → URL <span className="font-mono">{typeof window !== "undefined" ? `${window.location.origin}/api/mcp` : "/api/mcp"}</span> + header <span className="font-mono">Authorization: Bearer &lt;token&gt;</span>
+        ใช้กับ Cursor: Settings → MCP → Add server → URL <span className="font-mono">{`${origin}/api/mcp`}</span> + header <span className="font-mono">Authorization: Bearer &lt;token&gt;</span>
       </p>
     </div>
   );

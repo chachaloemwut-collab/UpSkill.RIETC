@@ -26,14 +26,14 @@ export function ChangePasswordForm({ hasPassword }: { hasPassword: boolean }) {
     } else setError(r.message);
   }
   return (
-    <form onSubmit={onSubmit} className="grid gap-4">
+    <form onSubmit={onSubmit} className="grid gap-4 [&>*]:min-w-0">
       {error && <Alert variant="destructive" title={error} />}
       {hasPassword && (
         <Field label="รหัสผ่านปัจจุบัน">
           <PasswordInput name="current" autoComplete="current-password" required />
         </Field>
       )}
-      <div className="grid items-start gap-4 sm:grid-cols-2">
+      <div className="grid items-start gap-4 xl:grid-cols-2 [&>*]:min-w-0">
         <Field label="รหัสผ่านใหม่" hint="อย่างน้อย 12 ตัวอักษร">
           <PasswordInput name="new" autoComplete="new-password" minLength={12} required />
         </Field>

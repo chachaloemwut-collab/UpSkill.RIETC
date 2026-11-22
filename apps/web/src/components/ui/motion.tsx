@@ -176,15 +176,34 @@ const hidden = {
   fade: "opacity-0",
 };
 
-/** Fades and slides its children in when they scroll into view. */
+/**
+ * Fades and slides its children in when they scroll into view.
+ * Content is visible in the server HTML and stays visible until script runs, so slow phones, in-app browsers and
+ * reduced-motion users never see empty sections; only content still below the fold after hydration is hidden
+ * (before paint) and then revealed on scroll.
+ */
 export function Reveal({ children, from = "up", delay = 0, className }: { children: React.ReactNode; from?: keyof typeof hidden; delay?: number; className?: string }) {
   const ref = React.useRef<HTMLDivElement>(null);
-  const inView = useInView(ref);
+  const [state, setState] = React.useState<"static" | "waiting" | "shown">("static");
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || prefersReducedMotion() || typeof IntersectionObserver === "undefined") return;
+    if (el.getBoundingClientRect().top < window.innerHeight) return; // already on screen: leave it be
+    setState("waiting");
+    const io = new IntersectionObserver(([e]) => {
+      if (e?.isIntersecting) {
+        setState("shown");
+        io.disconnect();
+      }
+    }, { rootMargin: "0px 0px -10% 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   return (
     <div
       ref={ref}
-      style={{ transitionDelay: `${delay}ms` }}
-      className={cn("transition-[opacity,transform,translate,scale,rotate] duration-[900ms] ease-spring-smooth", !inView && hidden[from], className)}
+      style={{ transitionDelay: state === "shown" ? `${delay}ms` : undefined }}
+      className={cn(state !== "static" && "transition-[opacity,transform,translate,scale,rotate] duration-[900ms] ease-spring-smooth", state === "waiting" && hidden[from], className)}
     >
       {children}
     </div>
