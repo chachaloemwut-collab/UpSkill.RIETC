@@ -1,23 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { Award, Copy, ExternalLink, Eye, FileSpreadsheet, Plus, RotateCcw, ShieldAlert, ShieldCheck, XCircle } from "lucide-react";
 import {
-  Award,
-  Check,
-  Copy,
-  ExternalLink,
-  Eye,
-  FileSpreadsheet,
-  Plus,
-  RotateCcw,
-  Search,
-  ShieldAlert,
-  ShieldCheck,
-  XCircle,
-} from "lucide-react";
-import {
+  AdvancedDataTable,
+  Alert,
   Badge,
   Button,
   Card,
@@ -28,12 +17,17 @@ import {
   Textarea,
   buttonClass,
   useToast,
+  type Column,
+  type TableView,
 } from "@/components/ui";
+import { PageHeader } from "@/components/common/PageHeader";
+import { StatCard } from "@/components/common/StatCard";
 import { formatDateTh, formatDuration } from "@/lib/format";
 import { api } from "@/lib/api";
 import { DownloadCertificateButton } from "@/components/course/CertificatePanel";
 
-export interface CertificateRow {
+// A type alias (not an interface) so it satisfies the table's Record<string, unknown> row constraint
+export type CertificateRow = {
   id: string;
   certificate_code: string;
   recipient_name_snapshot: string;
@@ -53,34 +47,38 @@ export interface CertificateRow {
   course_id: string | null;    // null for program-level certificates
   course_slug: string | null;
   status: "valid" | "expired" | "revoked";
-}
+};
 
 export interface CertificatesManagerProps {
   initialData: {
     certificates: CertificateRow[];
     counts: { total: number; valid: number; expired: number; revoked: number };
     total: number;
-    page: number;
-    pageSize: number;
   };
   courses: { id: string; title: string; slug: string; visibility: string }[];
-  searchQuery?: string;
-  activeStatus?: string;
-  activeCourse?: string;
+  initialQuery?: string;
+  initialStatus?: string;
+  /** Title of the course the page was opened for (?course=…), or null for every course */
+  courseFilter?: string | null;
+  limit: number;
 }
 
-export function CertificatesManager({
-  initialData,
-  courses,
-  searchQuery = "",
-  activeStatus = "",
-  activeCourse = "",
-}: CertificatesManagerProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const toast = useToast();
+const STATUS_LABEL: Record<CertificateRow["status"], string> = { valid: "ใช้งานได้", expired: "หมดอายุ", revoked: "ถูกเพิกถอน" };
 
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+const VIEWS: TableView[] = [
+  { name: "ใช้งานได้", state: { filters: { status: { kind: "enum", values: ["valid"] } } } },
+  { name: "ถูกเพิกถอน", state: { filters: { status: { kind: "enum", values: ["revoked"] } } } },
+  { name: "ออก 30 วันล่าสุด", state: { filters: { issued_at: { kind: "date", op: "between", preset: "30d" } } } },
+];
+
+/**
+ * Admin certificate register, laid out like the OVEC (vec-day01) admin template: page header with the main actions,
+ * KPI tiles that also filter, and the template's AdvancedDataTable (search, per-column filters, sort, column
+ * show/hide/pin, saved views, paging) inside a card. Row actions stay on the row as labelled icon buttons.
+ */
+export function CertificatesManager({ initialData, courses, initialQuery = "", initialStatus = "", courseFilter = null, limit }: CertificatesManagerProps) {
+  const router = useRouter();
+  const toast = useToast();
 
   // Revoke Dialog State
   const [revokeCert, setRevokeCert] = useState<CertificateRow | null>(null);
@@ -95,57 +93,163 @@ export function CertificatesManager({
   const [reasonInput, setReasonInput] = useState("ออกวุฒิบัตรกรณีพิเศษ / เทียบโอนผลการเรียน");
   const [issuing, setIssuing] = useState(false);
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedCode(text);
-    setTimeout(() => setCopiedCode(null), 2000);
-    toast({ title: "คัดลอกรหัสแล้ว", description: text });
+  // A KPI tile re-opens the table with that status filter (the key remounts it with the new starting state)
+  const [statusView, setStatusView] = useState(["valid", "expired", "revoked"].includes(initialStatus) ? initialStatus : "");
+
+  const copy = (code: string) => {
+    void navigator.clipboard.writeText(code).then(
+      () => toast({ title: "คัดลอกรหัสแล้ว", description: code, variant: "success" }),
+      () => toast({ title: "คัดลอกไม่สำเร็จ", description: code, variant: "destructive" }),
+    );
   };
 
-  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const q = (fd.get("q") as string) || "";
-    const params = new URLSearchParams(searchParams.toString());
-    if (q) params.set("q", q);
-    else params.delete("q");
-    params.set("page", "1");
-    router.push(`/admin/certificates?${params.toString()}`);
-  };
+  const courseOptions = useMemo(
+    () => [...new Set(initialData.certificates.map((c) => c.course_title_snapshot))].sort((a, b) => a.localeCompare(b, "th")).map((t) => ({ value: t, label: t })),
+    [initialData.certificates],
+  );
 
-  const setCourseFilter = (course: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (course) params.set("course", course);
-    else params.delete("course");
-    params.delete("page");
-    router.push(`/admin/certificates?${params.toString()}`);
-  };
-
-  const setStatusFilter = (status: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (status) params.set("status", status);
-    else params.delete("status");
-    params.set("page", "1");
-    router.push(`/admin/certificates?${params.toString()}`);
-  };
+  const columns: Column<CertificateRow>[] = [
+    {
+      key: "certificate_code",
+      header: "รหัสวุฒิบัตร",
+      sortable: true,
+      filter: "text",
+      hideable: false,
+      render: (c) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="flex items-center gap-1 whitespace-nowrap">
+            <span className="font-mono text-xs font-semibold text-primary">{c.certificate_code}</span>
+            <button type="button" onClick={() => copy(c.certificate_code)} aria-label={`คัดลอกรหัส ${c.certificate_code}`} title="คัดลอกรหัส" className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground">
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          </span>
+          {c.document_type_snapshot === "development_test" && <Badge variant="warning" className="w-fit text-[10px]">ทดสอบระบบ</Badge>}
+        </div>
+      ),
+    },
+    {
+      key: "recipient_name_snapshot",
+      header: "ผู้ได้รับ",
+      sortable: true,
+      filter: "text",
+      render: (c) => (
+        <div className="min-w-0">
+          <Link href={`/admin/users/${c.user_id}`} className="font-medium hover:underline">{c.recipient_name_snapshot}</Link>
+          <div className="max-w-[12rem] truncate text-xs text-muted-foreground" title={c.user_email}>{c.user_email}</div>
+        </div>
+      ),
+    },
+    {
+      key: "course_title_snapshot",
+      header: "หลักสูตร",
+      sortable: true,
+      filter: "enum",
+      options: courseOptions,
+      render: (c) => (
+        <div className="min-w-0 max-w-[11rem]">
+          <div className="truncate font-medium" title={c.course_title_snapshot}>{c.course_title_snapshot}</div>
+          <div className="truncate text-xs text-muted-foreground">ผู้สอน {c.instructor_name_snapshot}</div>
+        </div>
+      ),
+    },
+    {
+      key: "issued_at",
+      header: "วันที่ออก",
+      sortable: true,
+      filter: "date",
+      accessor: (c) => c.issued_at,
+      render: (c) => (
+        <div className="whitespace-nowrap">
+          <div>{formatDateTh(c.issued_at)}</div>
+          <div className="text-xs text-muted-foreground">{c.expires_at ? `หมดอายุ ${formatDateTh(c.expires_at)}` : "ไม่มีวันหมดอายุ"}</div>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "สถานะ",
+      sortable: true,
+      filter: "enum",
+      options: [
+        { value: "valid", label: "ใช้งานได้" },
+        { value: "expired", label: "หมดอายุ" },
+        { value: "revoked", label: "ถูกเพิกถอน" },
+      ],
+      render: (c) => (
+        <div className="flex flex-col gap-1">
+          <Badge variant={c.status === "valid" ? "success" : c.status === "expired" ? "warning" : "destructive"} className="w-fit gap-1">
+            {c.status === "valid" ? <ShieldCheck className="h-3 w-3" /> : c.status === "expired" ? <RotateCcw className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+            {STATUS_LABEL[c.status]}
+          </Badge>
+          {c.revoked_reason && <span className="max-w-[9rem] truncate text-xs text-destructive" title={c.revoked_reason}>{c.revoked_reason}</span>}
+        </div>
+      ),
+    },
+    {
+      key: "total_actual_study_sec",
+      header: "เวลาเรียน",
+      sortable: true,
+      filter: "number",
+      align: "right",
+      render: (c) => <span className="whitespace-nowrap tabular-nums">{formatDuration(c.total_actual_study_sec)}</span>,
+    },
+    {
+      key: "id",
+      header: "จัดการ",
+      align: "right",
+      hideable: false,
+      render: (c) => (
+        <div className="flex items-center justify-end gap-1">
+          {c.status !== "revoked" && (
+            <a
+              href={`/api/certificates/${encodeURIComponent(c.certificate_code)}/download?inline=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClass("ghost", "icon", "h-8 w-8")}
+              aria-label={`เปิดดูวุฒิบัตร ${c.certificate_code}`}
+              title="เปิดดูไฟล์ PDF"
+            >
+              <Eye className="h-4 w-4" />
+            </a>
+          )}
+          <DownloadCertificateButton code={c.certificate_code} variant="outline" size="sm" compact />
+          <Link href={`/verify/${encodeURIComponent(c.certificate_code)}`} target="_blank" className={buttonClass("ghost", "icon", "h-8 w-8")} aria-label="หน้าตรวจสอบสาธารณะ" title="หน้าตรวจสอบสาธารณะ">
+            <ExternalLink className="h-4 w-4" />
+          </Link>
+          {c.status !== "revoked" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              aria-label={`เพิกถอนวุฒิบัตร ${c.certificate_code}`}
+              title="เพิกถอนวุฒิบัตร"
+              onClick={() => {
+                setRevokeCert(c);
+                setRevokeReason("");
+              }}
+            >
+              <ShieldAlert className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   const submitRevoke = async () => {
     if (!revokeCert) return;
     if (revokeReason.trim().length < 5) {
-      toast({ variant: "destructive", title: "ข้อผิดพลาด", description: "กรุณาระบุเหตุผลในการเพิกถอนอย่างน้อย 5 ตัวอักษร" });
+      toast({ variant: "destructive", title: "ระบุเหตุผลอย่างน้อย 5 ตัวอักษร", description: "เหตุผลจะแสดงในหน้าตรวจสอบและบันทึกประวัติ" });
       return;
     }
     setRevoking(true);
     try {
-      const res = await api(`/api/admin/certificates/${encodeURIComponent(revokeCert.certificate_code)}/revoke`, {
-        method: "POST",
-        body: { reason: revokeReason.trim() },
-      });
+      const res = await api(`/api/admin/certificates/${encodeURIComponent(revokeCert.certificate_code)}/revoke`, { method: "POST", body: { reason: revokeReason.trim() } });
       if (!res.ok) {
-        toast({ variant: "destructive", title: "เกิดข้อผิดพลาด", description: res.message });
+        toast({ variant: "destructive", title: "เพิกถอนไม่สำเร็จ", description: res.message });
         return;
       }
-      toast({ title: "เพิกถอนสำเร็จ", description: `เพิกถอนวุฒิบัตร ${revokeCert.certificate_code} แล้ว` });
+      toast({ title: "เพิกถอนแล้ว", description: `วุฒิบัตร ${revokeCert.certificate_code}`, variant: "success" });
       setRevokeCert(null);
       setRevokeReason("");
       router.refresh();
@@ -156,11 +260,11 @@ export function CertificatesManager({
 
   const submitManualIssue = async () => {
     if (!userIdInput.trim()) {
-      toast({ variant: "destructive", title: "ข้อผิดพลาด", description: "กรุณาระบุ User ID ของผู้เรียน" });
+      toast({ variant: "destructive", title: "ระบุ User ID ของผู้เรียน", description: "คัดลอกได้จากหน้ารายละเอียดสมาชิก" });
       return;
     }
     if (!courseIdInput) {
-      toast({ variant: "destructive", title: "ข้อผิดพลาด", description: "กรุณาเลือกหลักสูตร" });
+      toast({ variant: "destructive", title: "เลือกหลักสูตร" });
       return;
     }
     const scoreText = scoreInput.trim();
@@ -171,20 +275,12 @@ export function CertificatesManager({
     }
     setIssuing(true);
     try {
-      const res = await api<{ code: string }>("/api/admin/certificates", {
-        method: "POST",
-        body: {
-          userId: userIdInput.trim(),
-          courseId: courseIdInput,
-          score,
-          reason: reasonInput.trim(),
-        },
-      });
+      const res = await api<{ code: string }>("/api/admin/certificates", { method: "POST", body: { userId: userIdInput.trim(), courseId: courseIdInput, score, reason: reasonInput.trim() } });
       if (!res.ok) {
-        toast({ variant: "destructive", title: "เกิดข้อผิดพลาด", description: res.message });
+        toast({ variant: "destructive", title: "ออกวุฒิบัตรไม่สำเร็จ", description: res.message });
         return;
       }
-      toast({ title: "ออกวุฒิบัตรสำเร็จ", description: `รหัสวุฒิบัตร: ${res.data.code}` });
+      toast({ title: "ออกวุฒิบัตรแล้ว", description: `รหัสวุฒิบัตร ${res.data.code}`, variant: "success" });
       setIssueOpen(false);
       setUserIdInput("");
       router.refresh();
@@ -193,275 +289,71 @@ export function CertificatesManager({
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(initialData.total / initialData.pageSize));
+  const { counts } = initialData;
+  const tiles: Array<{ key: string; label: string; value: number; icon: React.ReactNode; tone: "primary" | "success" | "warning" | "info" }> = [
+    { key: "", label: "วุฒิบัตรทั้งหมด", value: counts.total, icon: <Award />, tone: "primary" },
+    { key: "valid", label: "ใช้งานได้", value: counts.valid, icon: <ShieldCheck />, tone: "success" },
+    { key: "expired", label: "หมดอายุ", value: counts.expired, icon: <RotateCcw />, tone: "warning" },
+    { key: "revoked", label: "ถูกเพิกถอน", value: counts.revoked, icon: <XCircle />, tone: "info" },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Top action bar: Search & Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <form onSubmit={handleSearch} className="flex w-full min-w-0 items-center gap-2 lg:w-auto lg:max-w-md lg:flex-1">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              name="q"
-              defaultValue={searchQuery}
-              placeholder="ค้นหารหัสวุฒิบัตร, ชื่อผู้เรียน, หรืออีเมล…"
-              className="pl-9"
-            />
-          </div>
-          <Button type="submit" variant="secondary">ค้นหา</Button>
-        </form>
-
-        <Select value={activeCourse} onChange={(e) => setCourseFilter(e.target.value)} className="h-10 w-full sm:w-auto sm:max-w-xs" aria-label="กรองตามหลักสูตร">
-          <option value="">ทุกหลักสูตร</option>
-          {courses.map((c) => (
-            <option key={c.id} value={c.id}>{c.title}</option>
-          ))}
-        </Select>
-        <Link href={`/admin/reports${activeCourse ? `?course=${activeCourse}` : ""}`} className={buttonClass("outline", "md", "gap-1.5 self-start sm:self-auto")}>
+    <div className="grid gap-6">
+      <PageHeader title="จัดการวุฒิบัตร" description="ค้นหา ตรวจสอบ ดาวน์โหลด เพิกถอน หรือออกวุฒิบัตรเป็นกรณีพิเศษ">
+        <Link href="/admin/reports" className={buttonClass("outline", "md")}>
           <FileSpreadsheet className="h-4 w-4" /> รายงาน / ส่งออก
         </Link>
-        <Button onClick={() => setIssueOpen(true)} className="gap-1.5 self-start sm:self-auto">
+        <Button onClick={() => setIssueOpen(true)}>
           <Plus className="h-4 w-4" /> ออกวุฒิบัตรด้วยตนเอง
         </Button>
+      </PageHeader>
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        {tiles.map((t, i) => (
+          <button
+            key={t.key || "all"}
+            type="button"
+            onClick={() => setStatusView(t.key)}
+            aria-pressed={statusView === t.key}
+            className={`rounded-lg text-left ring-offset-background transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${statusView === t.key ? "ring-2 ring-primary" : ""}`}
+          >
+            <StatCard label={t.label} value={t.value} unit="ฉบับ" icon={t.icon} tone={t.tone} index={i} />
+          </button>
+        ))}
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b pb-3">
-        <button
-          type="button"
-          onClick={() => setStatusFilter("")}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-            !activeStatus ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-          }`}
-        >
-          ทั้งหมด ({initialData.counts.total})
-        </button>
-        <button
-          type="button"
-          onClick={() => setStatusFilter("valid")}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-            activeStatus === "valid" ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"
-          }`}
-        >
-          <ShieldCheck className="h-3.5 w-3.5" /> ใช้งานได้ ({initialData.counts.valid})
-        </button>
-        <button
-          type="button"
-          onClick={() => setStatusFilter("expired")}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-            activeStatus === "expired" ? "bg-amber-600 text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"
-          }`}
-        >
-          <RotateCcw className="h-3.5 w-3.5" /> หมดอายุ ({initialData.counts.expired})
-        </button>
-        <button
-          type="button"
-          onClick={() => setStatusFilter("revoked")}
-          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-            activeStatus === "revoked" ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-          }`}
-        >
-          <XCircle className="h-3.5 w-3.5" /> ถูกเพิกถอน ({initialData.counts.revoked})
-        </button>
-      </div>
-
-      {/* Certificates Table */}
-      <Card className="overflow-hidden">
-        {initialData.certificates.length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground">
-            <Award className="mx-auto h-12 w-12 stroke-[1.25] text-muted-foreground/60 mb-2" />
-            <p className="font-medium text-foreground">ไม่พบรายการวุฒิบัตร</p>
-            <p className="text-sm mt-1">ลองเปลี่ยนคำค้นหาหรือตัวกรองสถานะ</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b bg-muted/40 text-xs text-muted-foreground font-semibold">
-                <tr>
-                  <th className="px-4 py-3">รหัสวุฒิบัตร</th>
-                  <th className="px-4 py-3">ผู้เรียน</th>
-                  <th className="px-4 py-3">หลักสูตร</th>
-                  <th className="px-4 py-3">ผลการเรียน</th>
-                  <th className="px-4 py-3">วันที่ออก / หมดอายุ</th>
-                  <th className="px-4 py-3">สถานะ</th>
-                  <th className="px-4 py-3 text-right">การจัดการ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {initialData.certificates.map((c) => (
-                  <tr key={c.id} className="hover:bg-muted/20 transition-colors">
-                    {/* Certificate Code */}
-                    <td className="px-4 py-3.5 align-top">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs font-semibold text-primary">{c.certificate_code}</span>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(c.certificate_code)}
-                          className="text-muted-foreground hover:text-foreground"
-                          title="คัดลอกรหัส"
-                        >
-                          {copiedCode === c.certificate_code ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-500" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground block mt-0.5">{c.document_type_snapshot === "development_test" ? "วุฒิบัตร (ทดสอบระบบ)" : "วุฒิบัตร"}</span>
-                    </td>
-
-                    {/* Learner */}
-                    <td className="px-4 py-3.5 align-top">
-                      <Link
-                        href={`/admin/users/${c.user_id}`}
-                        className="font-medium text-foreground hover:underline"
-                      >
-                        {c.recipient_name_snapshot}
-                      </Link>
-                      <span className="text-xs text-muted-foreground block truncate max-w-[200px]">
-                        {c.user_email}
-                      </span>
-                    </td>
-
-                    {/* Course */}
-                    <td className="px-4 py-3.5 align-top">
-                      <div className="flex items-center gap-1">
-                        <span className="font-medium text-foreground line-clamp-1 max-w-[220px]">
-                          {c.course_title_snapshot}
-                        </span>
-                        {c.is_verified_course_snapshot && (
-                          <Badge variant="success" className="text-[10px] px-1.5 py-0">Verified</Badge>
-                        )}
-                      </div>
-                      <span className="text-xs text-muted-foreground">ผู้สอน: {c.instructor_name_snapshot}</span>
-                    </td>
-
-                    {/* Performance */}
-                    <td className="px-4 py-3.5 align-top whitespace-nowrap">
-                      <div className="text-xs font-mono tabular-nums">
-                        คะแนน: <span className="font-semibold text-foreground">{c.quiz_score_snapshot}%</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground block font-mono">
-                        เวลาเรียน: {formatDuration(c.total_actual_study_sec)}
-                      </span>
-                    </td>
-
-                    {/* Dates */}
-                    <td className="px-4 py-3.5 align-top whitespace-nowrap text-xs">
-                      <div>ออกเมื่อ: {formatDateTh(c.issued_at)}</div>
-                      {c.expires_at ? (
-                        <div className="text-muted-foreground text-[11px]">หมดอายุ: {formatDateTh(c.expires_at)}</div>
-                      ) : (
-                        <div className="text-muted-foreground text-[11px]">ตลอดชีพ (No Expiry)</div>
-                      )}
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-4 py-3.5 align-top whitespace-nowrap">
-                      {c.status === "valid" ? (
-                        <Badge variant="success" className="gap-1">
-                          <ShieldCheck className="h-3 w-3" /> ใช้งานได้
-                        </Badge>
-                      ) : c.status === "expired" ? (
-                        <Badge variant="warning" className="gap-1">
-                          <RotateCcw className="h-3 w-3" /> หมดอายุ
-                        </Badge>
-                      ) : (
-                        <div>
-                          <Badge variant="destructive" className="gap-1">
-                            <XCircle className="h-3 w-3" /> ถูกเพิกถอน
-                          </Badge>
-                          {c.revoked_reason && (
-                            <span className="text-[11px] text-destructive block mt-1 line-clamp-1 max-w-[160px]" title={c.revoked_reason}>
-                              เหตุผล: {c.revoked_reason}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-3.5 align-top text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Link
-                          href={`/verify/${encodeURIComponent(c.certificate_code)}`}
-                          target="_blank"
-                          className={buttonClass("ghost", "sm", "h-8 px-2 text-muted-foreground hover:text-foreground")}
-                          title="ดูหน้าตรวจสอบสาธารณะ"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5 mr-1" /> ตรวจสอบ
-                        </Link>
-                        {c.status !== "revoked" && (
-                          <a
-                            href={`/api/certificates/${encodeURIComponent(c.certificate_code)}/download?inline=1`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={buttonClass("outline", "sm", "h-8 px-2")}
-                            title="เปิดดูไฟล์วุฒิบัตร (PDF)"
-                          >
-                            <Eye className="h-3.5 w-3.5 mr-1" /> ดู
-                          </a>
-                        )}
-                        <DownloadCertificateButton code={c.certificate_code} variant="outline" size="sm" compact />
-                        {c.status !== "revoked" && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="h-8 px-2"
-                            onClick={() => {
-                              setRevokeCert(c);
-                              setRevokeReason("");
-                            }}
-                            title="เพิกถอนวุฒิบัตร"
-                          >
-                            <ShieldAlert className="h-3.5 w-3.5 mr-1" /> เพิกถอน
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>แสดงหน้า {initialData.page} จาก {totalPages} (ทั้งหมด {initialData.total} รายการ)</span>
-          <div className="flex items-center gap-1">
-            {initialData.page > 1 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.set("page", String(initialData.page - 1));
-                  router.push(`/admin/certificates?${params.toString()}`);
-                }}
-              >
-                ก่อนหน้า
-              </Button>
-            )}
-            {initialData.page < totalPages && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.set("page", String(initialData.page + 1));
-                  router.push(`/admin/certificates?${params.toString()}`);
-                }}
-              >
-                ถัดไป
-              </Button>
-            )}
-          </div>
-        </div>
+      {courseFilter && (
+        <Alert variant="default" title={`แสดงเฉพาะหลักสูตร “${courseFilter}”`}>
+          <Link href="/admin/certificates" className="font-medium text-primary hover:underline">ดูวุฒิบัตรทุกหลักสูตร</Link>
+        </Alert>
       )}
+      {initialData.total > limit && (
+        <Alert variant="warning" title={`แสดง ${limit.toLocaleString("th-TH")} ฉบับล่าสุด จากทั้งหมด ${initialData.total.toLocaleString("th-TH")} ฉบับ`}>
+          ใช้หน้ารายงานเพื่อส่งออกทั้งหมด หรือเปิดจากหลักสูตรเพื่อดูเฉพาะหลักสูตรนั้น
+        </Alert>
+      )}
+
+      <Card className="p-5">
+        <AdvancedDataTable
+          key={statusView}
+          data={initialData.certificates}
+          columns={columns}
+          rowKey="id"
+          pageSize={20}
+          searchKeys={["certificate_code", "recipient_name_snapshot", "user_email", "course_title_snapshot"]}
+          searchPlaceholder="ค้นหารหัส ชื่อ อีเมล หรือหลักสูตร…"
+          itemLabel="ฉบับ"
+          emptyText="ไม่พบวุฒิบัตรตามเงื่อนไขนี้"
+          defaultState={{
+            query: initialQuery,
+            hidden: ["total_actual_study_sec"],
+            sort: { key: "issued_at", dir: -1 },
+            ...(statusView ? { filters: { status: { kind: "enum", values: [statusView] } } } : {}),
+          }}
+          views={VIEWS}
+          viewsStorageKey="upskill:admin-certificates-views"
+        />
+      </Card>
 
       {/* Revocation Modal */}
       <Dialog
