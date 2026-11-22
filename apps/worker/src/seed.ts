@@ -11,7 +11,7 @@ const env = getEnv();
 if (env.APP_ENV === "production") throw new Error("seed must not run in production");
 
 const db = createDb(env.DATABASE_URL);
-const PASSWORD = "upskill-dev-password";
+const PASSWORD = "upskill-dev-password"; // secrets-check: allow (local dev seed; refuses production above)
 
 // Big Buck Bunny (Blender Foundation, CC BY 3.0): public and embeddable
 const DEMO_VIDEO = { id: "aqz-KE-bpKQ", fallbackDurationSec: 634, title: "Big Buck Bunny" };
