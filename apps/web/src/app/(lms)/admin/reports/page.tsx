@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FileSpreadsheet, Filter, Users } from "lucide-react";
@@ -15,6 +17,10 @@ const PAGE_ROWS = 500;
 
 export default async function AdminReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requireAdminPage();
+  return <Suspense fallback={<LoadingSkeleton label="กำลังโหลดรายงาน" />}><ReportDetails searchParams={searchParams} /></Suspense>;
+}
+
+async function ReportDetails({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
   const filter = parseReportFilter(sp);
   const [courses, summary, rows] = await Promise.all([listReportCourses(), courseSummary(filter), listTrainees(filter, PAGE_ROWS + 1)]);

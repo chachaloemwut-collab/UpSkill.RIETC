@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -15,6 +17,10 @@ type Enrollment = Awaited<ReturnType<typeof learnerOverview>>["enrollments"][num
 export default async function MyCoursesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  return <Suspense fallback={<LoadingSkeleton label="กำลังโหลดหลักสูตรของฉัน" />}><EnrolledCourses user={user} /></Suspense>;
+}
+
+async function EnrolledCourses({ user }: { user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>> }) {
   const { enrollments } = await learnerOverview(user.id);
   const inProgress = enrollments.filter((e) => e.status === "in_progress");
   const completed = enrollments.filter((e) => e.status === "completed");

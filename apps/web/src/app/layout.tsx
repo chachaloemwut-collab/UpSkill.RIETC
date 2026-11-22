@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { NavigationFeedback } from "@/components/common/NavigationFeedback";
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import localFont from "next/font/local";
@@ -89,6 +91,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Providers>
           <InAppBrowserGate />
           <ServiceWorkerRegistrar />
+          <Suspense fallback={null}><NavigationFeedback /></Suspense>
           {children}
         </Providers>
       </body>

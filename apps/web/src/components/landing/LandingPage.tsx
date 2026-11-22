@@ -1,3 +1,5 @@
+import { Suspense, cache } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import { buttonClass } from "@/components/ui";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, QrCode } from "lucide-react";
@@ -5,14 +7,14 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 import { BRAND_NAME } from "@/components/brand/states";
 import { CertificatePreview } from "@/components/certificate/CertificatePreview";
 import { VerifyCodeForm } from "@/components/certificate/VerifyCodeForm";
-import { listPublishedCourses, publicStats } from "@/server/courses/courses.service";
+import { publicStats } from "@/server/courses/courses.service";
 import { getCertificateDisplay } from "@/server/system-settings.service";
 import { listUpcomingCohorts } from "@/server/programs/programs.service";
 import { listPublicAnnouncements } from "@/server/programs/announcements.service";
 import { ANNOUNCEMENT_KIND, COHORT_PHASE, formatDateRangeTh, formatDateTh } from "@/lib/format";
 import { cohortWhen } from "@/components/programs/ProgramCard";
 import { COURSE_TYPES, COURSE_TYPE_INFO } from "@upskill/core/application";
-import { DEFAULT_ISSUER_TH, type CertificateDisplay } from "@upskill/core/certificate-patterns";
+import { DEFAULT_ISSUER_TH } from "@upskill/core/certificate-patterns";
 import { LandingNav } from "./LandingNav";
 import styles from "./landing.module.css";
 
@@ -30,7 +32,11 @@ const questions = [
   ["ดาวน์โหลดเอกสารได้ที่ไหน", "เมื่อผ่านเกณฑ์ของหลักสูตรและระบบออกเอกสารแล้ว ให้เข้าสู่ระบบและเลือกเมนูวุฒิบัตรของฉัน"],
 ];
 
-function DocumentSample({ display, small = false }: { display: CertificateDisplay; small?: boolean }) {
+const certificateDisplay = cache(getCertificateDisplay);
+const landingStats = cache(publicStats);
+
+async function DocumentSample({ small = false }: { small?: boolean }) {
+  const display = await certificateDisplay();
   return <CertificatePreview align="center" template={small ? "classic" : "royal"} documentType="completion"
     courseTitle={small ? "การพัฒนาทักษะวิชาชีพ" : "การประยุกต์ใช้เทคโนโลยีดิจิทัลในการจัดการเรียนรู้"}
     display={display} />;
@@ -44,22 +50,10 @@ function FooterLinks({ title, links }: { title: string; links: [string, string][
   return <nav aria-label={title}><h3>{title}</h3>{links.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}</nav>;
 }
 
-export async function LandingPage() {
-  const [courses, stats, upcoming, announcements, display] = await Promise.all([
-    listPublishedCourses(), publicStats(), listUpcomingCohorts(3), listPublicAnnouncements({ limit: 3 }), getCertificateDisplay(),
-  ]);
-  const hours = stats.durationSec >= 36_000;
-  const numbers = [
-    ["หลักสูตรที่เผยแพร่", stats.courses], ["บทเรียนวิดีโอ", stats.lessons],
-    [hours ? "ชั่วโมงของเนื้อหา" : "นาทีของเนื้อหา", Math.round(stats.durationSec / (hours ? 3600 : 60))],
-    ["เอกสารที่ออกแล้ว", stats.certificates],
-  ] as const;
-  const counts = { certified_training: stats.certifiedTraining, short_course: stats.shortCourses };
-  const hasEvents = upcoming.length > 0 || announcements.length > 0;
-
+export function LandingPage() {
   return (
     <div className={styles.page}>
-      <LandingNav hasEvents={hasEvents} />
+      <Suspense fallback={<LandingNav hasEvents={false} />}><EventNav /></Suspense>
       <main>
         <section className={styles.hero} aria-labelledby="home-title">
           <div className={styles.heroGrid}>
@@ -72,12 +66,10 @@ export async function LandingPage() {
                 <Link href="/courses" className={buttonClass("default", "lg")}>ดูหลักสูตรทั้งหมด <ArrowRight size={17} aria-hidden /></Link>
                 <Link href="/verify" className={buttonClass("outline", "lg")}><QrCode size={17} aria-hidden /> ตรวจสอบเอกสาร</Link>
               </div>
-              <dl className={styles.numbers}>{numbers.map(([label, value]) => (
-                <div key={label}><dt>{label}</dt><dd>{value.toLocaleString("th-TH")}</dd></div>
-              ))}</dl>
+              <Suspense fallback={<LoadingSkeleton rows={1} label="กำลังโหลดสถิติ" />}><LandingNumbers /></Suspense>
             </div>
             <figure className={styles.document}>
-              <div className={styles.mount}><DocumentSample display={display} /></div>
+              <div className={styles.mount}><Suspense fallback={<LoadingSkeleton rows={2} label="กำลังโหลดตัวอย่างวุฒิบัตร" />}><DocumentSample /></Suspense></div>
               <figcaption><span>ตัวอย่างวุฒิบัตรของวิทยาลัย</span><span>A4 · PDF</span></figcaption>
             </figure>
           </div>
@@ -97,7 +89,7 @@ export async function LandingPage() {
           <div className={styles.records}>
             <article className={styles.recordWide}>
               <div><h3>ตรวจสอบวุฒิบัตรจากทะเบียน</h3><p>รหัสประจำฉบับและ QR Code เชื่อมไปยังข้อมูลที่วิทยาลัยรับรอง เพื่อเทียบชื่อ หลักสูตร และสถานะของเอกสาร</p></div>
-              <div aria-hidden="true" className={styles.miniDocument}><DocumentSample small display={display} /></div>
+              <div aria-hidden="true" className={styles.miniDocument}><Suspense fallback={<LoadingSkeleton rows={1} />}><DocumentSample small /></Suspense></div>
             </article>
             <article><h3>เวลาเรียนที่บันทึก</h3><p>ระบบนับช่วงที่รับชมวิดีโอตามเงื่อนไขของบทเรียน และตัดช่วงเวลาที่ซ้ำกันออก</p></article>
             <article><h3>ความก้าวหน้าของผู้เรียน</h3><p>ตรวจสอบบทเรียนที่เรียนจบ ผลประเมิน และรายการที่ต้องทำต่อได้ในหน้าหลักสูตร</p></article>
@@ -105,41 +97,9 @@ export async function LandingPage() {
           </div>
         </section>
 
-        <section id="courses" className={styles.band}>
-          <div className={styles.container}>
-            <div className={styles.headingRow}><h2>เลือกรูปแบบการอบรม</h2>{courses.length > 0 && <More href="/courses">ทั้งหมด {courses.length} หลักสูตร</More>}</div>
-            {courses.length ? (
-              <div className={styles.catalogue}>{COURSE_TYPES.map((type) => (
-                <Link href={`/courses?type=${type}`} key={type}>
-                  <h3>{COURSE_TYPE_INFO[type].label}</h3><p>{COURSE_TYPE_INFO[type].description}</p>
-                  <span>{counts[type] ? `ดู ${counts[type]} หลักสูตร` : "ยังไม่มีหลักสูตรที่เปิด"} <ArrowRight size={16} aria-hidden /></span>
-                </Link>
-              ))}</div>
-            ) : <p className={styles.empty}>ยังไม่มีหลักสูตรที่เผยแพร่</p>}
-          </div>
-        </section>
+        <Suspense fallback={<LoadingSkeleton label="กำลังโหลดรูปแบบการอบรม" />}><CourseTypes /></Suspense>
 
-        {hasEvents && <section id="events" className={styles.container}>
-          {!!upcoming.length && <div>
-            <div className={styles.headingRow}><h2>กิจกรรมที่กำลังจะเกิดขึ้น</h2><More href="/programs">หลักสูตรอบรมทั้งหมด</More></div>
-            <div className={styles.notices}>{upcoming.map((c) => (
-              <Link href={`/programs/${c.program_slug}`} key={c.id}>
-                <span className={styles.date}>{formatDateTh(c.starts_at)} · {COHORT_PHASE[c.phase]?.label}</span><h3>{c.program_title}</h3><p>{c.title}</p>
-                <small>{cohortWhen({ phase: c.phase, registrationOpensAt: c.registration_opens_at, registrationClosesAt: c.registration_closes_at, startsAt: c.starts_at })}</small>
-              </Link>
-            ))}</div>
-          </div>}
-          {!!announcements.length && <div>
-            <div className={styles.headingRow}><h2>ประกาศและข่าวสาร</h2><More href="/announcements">ประกาศทั้งหมด</More></div>
-            <div className={styles.notices}>{announcements.map((a) => (
-              <Link href={`/announcements/${a.slug}`} key={a.id}>
-                <span className={styles.date}>{formatDateTh(a.publish_at)} · {ANNOUNCEMENT_KIND[a.kind] ?? a.kind}{a.is_pinned && " · ปักหมุด"}</span>
-                <h3>{a.title}</h3>{a.summary && <p>{a.summary}</p>}
-                {a.event_starts_at && <small>{formatDateRangeTh(a.event_starts_at, a.event_ends_at)}</small>}{a.location && <small>{a.location}</small>}
-              </Link>
-            ))}</div>
-          </div>}
-        </section>}
+        <Suspense fallback={<LoadingSkeleton label="กำลังโหลดประกาศและรอบอบรม" />}><Events /></Suspense>
 
         <section id="verify" className={styles.support}>
           <div className={styles.supportGrid}>
@@ -165,4 +125,71 @@ export async function LandingPage() {
       </footer>
     </div>
   );
+}
+
+async function LandingNumbers() {
+  const stats = await landingStats();
+  const hours = stats.durationSec >= 36_000;
+  const numbers = [
+    ["หลักสูตรที่เผยแพร่", stats.courses], ["บทเรียนวิดีโอ", stats.lessons],
+    [hours ? "ชั่วโมงของเนื้อหา" : "นาทีของเนื้อหา", Math.round(stats.durationSec / (hours ? 3600 : 60))],
+    ["เอกสารที่ออกแล้ว", stats.certificates],
+  ] as const;
+  return <dl className={styles.numbers}>{numbers.map(([label, value]) => (
+                <div key={label}><dt>{label}</dt><dd>{value.toLocaleString("th-TH")}</dd></div>
+              ))}</dl>;
+}
+
+async function CourseTypes() {
+  const stats = await landingStats();
+  const counts = { certified_training: stats.certifiedTraining, short_course: stats.shortCourses };
+  return (<section id="courses" className={styles.band}>
+          <div className={styles.container}>
+            <div className={styles.headingRow}><h2>เลือกรูปแบบการอบรม</h2>{stats.courses > 0 && <More href="/courses">ทั้งหมด {stats.courses} หลักสูตร</More>}</div>
+            {stats.courses ? (
+              <div className={styles.catalogue}>{COURSE_TYPES.map((type) => (
+                <Link href={`/courses?type=${type}`} key={type}>
+                  <h3>{COURSE_TYPE_INFO[type].label}</h3><p>{COURSE_TYPE_INFO[type].description}</p>
+                  <span>{counts[type] ? `ดู ${counts[type]} หลักสูตร` : "ยังไม่มีหลักสูตรที่เปิด"} <ArrowRight size={16} aria-hidden /></span>
+                </Link>
+              ))}</div>
+            ) : <p className={styles.empty}>ยังไม่มีหลักสูตรที่เผยแพร่</p>}
+          </div>
+        </section>);
+}
+
+const landingEvents = cache(async () => {
+  const [upcoming, announcements] = await Promise.all([listUpcomingCohorts(3), listPublicAnnouncements({ limit: 3 })]);
+  return { upcoming, announcements, hasEvents: upcoming.length > 0 || announcements.length > 0 };
+});
+
+async function EventNav() {
+  const { hasEvents } = await landingEvents();
+  return <LandingNav hasEvents={hasEvents} />;
+}
+
+async function Events() {
+  const { upcoming, announcements, hasEvents } = await landingEvents();
+  if (!hasEvents) return null;
+  return (<section id="events" className={styles.container}>
+          {!!upcoming.length && <div>
+            <div className={styles.headingRow}><h2>กิจกรรมที่กำลังจะเกิดขึ้น</h2><More href="/programs">หลักสูตรอบรมทั้งหมด</More></div>
+            <div className={styles.notices}>{upcoming.map((c) => (
+              <Link href={`/programs/${c.program_slug}`} key={c.id}>
+                <span className={styles.date}>{formatDateTh(c.starts_at)} · {COHORT_PHASE[c.phase]?.label}</span><h3>{c.program_title}</h3><p>{c.title}</p>
+                <small>{cohortWhen({ phase: c.phase, registrationOpensAt: c.registration_opens_at, registrationClosesAt: c.registration_closes_at, startsAt: c.starts_at })}</small>
+              </Link>
+            ))}</div>
+          </div>}
+          {!!announcements.length && <div>
+            <div className={styles.headingRow}><h2>ประกาศและข่าวสาร</h2><More href="/announcements">ประกาศทั้งหมด</More></div>
+            <div className={styles.notices}>{announcements.map((a) => (
+              <Link href={`/announcements/${a.slug}`} key={a.id}>
+                <span className={styles.date}>{formatDateTh(a.publish_at)} · {ANNOUNCEMENT_KIND[a.kind] ?? a.kind}{a.is_pinned && " · ปักหมุด"}</span>
+                <h3>{a.title}</h3>{a.summary && <p>{a.summary}</p>}
+                {a.event_starts_at && <small>{formatDateRangeTh(a.event_starts_at, a.event_ends_at)}</small>}{a.location && <small>{a.location}</small>}
+              </Link>
+            ))}</div>
+          </div>}
+        </section>);
 }

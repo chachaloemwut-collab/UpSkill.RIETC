@@ -13,7 +13,7 @@ import { asNavigationMode } from "../learning/heartbeat.service";
 
 const NO_ID = "00000000-0000-0000-0000-000000000000";
 
-export async function listPublishedCourses() {
+export async function listPublishedCourses(options: { recommendFor?: string } = {}) {
   return ctx()
     .db.selectFrom("courses as c")
     .innerJoin("users as u", "u.id", "c.instructor_id")
@@ -26,7 +26,10 @@ export async function listPublishedCourses() {
     ])
     .where("c.visibility", "=", "published")
     .orderBy("c.published_at", "desc")
-    .limit(100)
+    .$if(Boolean(options.recommendFor), query => query.where(({ not, exists, selectFrom }) =>
+      not(exists(selectFrom("enrollments as e").select("e.id").whereRef("e.course_id", "=", "c.id").where("e.user_id", "=", options.recommendFor!))),
+    ))
+    .limit(options.recommendFor ? 4 : 100)
     .execute();
 }
 

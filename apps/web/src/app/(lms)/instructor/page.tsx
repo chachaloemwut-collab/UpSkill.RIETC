@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -18,6 +20,10 @@ export default async function InstructorPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role !== "instructor" && user.role !== "admin") redirect("/");
+  return <Suspense fallback={<LoadingSkeleton label="กำลังโหลดหลักสูตรที่ดูแล" />}><InstructorOverview user={user} /></Suspense>;
+}
+
+async function InstructorOverview({ user }: { user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>> }) {
   const isAdmin = user.role === "admin";
   const [courses, instructors] = await Promise.all([listMyCourses(user), isAdmin ? listInstructors() : Promise.resolve([])]);
   const learners = courses.reduce((n, c) => n + c.enrollment_count, 0);

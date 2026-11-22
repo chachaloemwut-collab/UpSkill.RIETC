@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
 import { requireAdminPage } from "@/server/programs/admin-page";
 import { ADMIN_TABLE_LIMIT, listCertificatesAdmin, listEligibleCoursesForAdmin } from "@/server/admin/certificates.service";
@@ -14,6 +16,14 @@ export default async function AdminCertificatesPage({
   searchParams: Promise<{ q?: string; status?: string; course?: string }>;
 }) {
   await requireAdminPage();
+  return <Suspense fallback={<LoadingSkeleton label="กำลังโหลดทะเบียนวุฒิบัตร" />}><CertificateRegister searchParams={searchParams} /></Suspense>;
+}
+
+async function CertificateRegister({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; status?: string; course?: string }>;
+}) {
   const sp = await searchParams;
 
   const [data, courses] = await Promise.all([

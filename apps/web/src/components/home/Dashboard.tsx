@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import Link from "next/link";
 import { ArrowRight, Award, BookOpen, CheckCircle2, Clock, GraduationCap, Library, PlayCircle, Presentation, Sparkles } from "lucide-react";
 import { Card, EmptyState, Progress, buttonClass } from "@/components/ui";
@@ -15,18 +17,19 @@ import type { getViewer } from "@/server/viewer";
 type Viewer = NonNullable<Awaited<ReturnType<typeof getViewer>>>;
 
 /** Signed-in home: stats, continue learning spotlight, readiness widget, suggestions. */
-export async function Dashboard({ viewer }: { viewer: Viewer }) {
-  const courses = await listPublishedCourses();
+export function Dashboard({ viewer }: { viewer: Viewer }) {
+  return <>
+    <Suspense fallback={<LoadingSkeleton label="กำลังโหลดความคืบหน้า" />}><LearningOverview viewer={viewer} /></Suspense>
+    <Suspense fallback={<LoadingSkeleton label="กำลังโหลดรอบอบรม" />}><TrainingRounds userId={viewer.id} /></Suspense>
+    <Suspense fallback={<LoadingSkeleton label="กำลังโหลดหลักสูตรแนะนำ" />}><Suggestions userId={viewer.id} /></Suspense>
+  </>;
+}
 
-  const [{ enrollments, stats }, registrations, upcoming] = await Promise.all([learnerOverview(viewer.id), myRegistrations(viewer.id), listUpcomingCohorts(3)]);
-  const activeRegs = registrations.filter((r) => r.phase !== "completed" && r.phase !== "cancelled" && r.status !== "rejected");
-  const appliedCohorts = new Set(registrations.map((r) => r.cohort_id));
-  const openForMe = upcoming.filter((c) => !appliedCohorts.has(c.id));
+async function LearningOverview({ viewer }: { viewer: Viewer }) {
+  const { enrollments, stats } = await learnerOverview(viewer.id);
   const inProgress = enrollments.filter((e) => e.status === "in_progress");
   const nearCompletion = inProgress.filter((e) => e.progressPercent >= 75 || !e.next_lesson_id);
   const otherInProgress = inProgress.slice(1, 5);
-  const enrolledSlugs = new Set(enrollments.map((e) => e.slug));
-  const suggestions = courses.filter((c) => !enrolledSlugs.has(c.slug)).slice(0, 4);
   const studyHours = Math.floor(stats.studySec / 3600);
   const studyMinutes = Math.round((stats.studySec % 3600) / 60);
 
@@ -247,6 +250,16 @@ export async function Dashboard({ viewer }: { viewer: Viewer }) {
         </section>
       )}
 
+    </>
+  );
+}
+
+async function TrainingRounds({ userId }: { userId: string }) {
+  const [registrations, upcoming] = await Promise.all([myRegistrations(userId), listUpcomingCohorts(3)]);
+  const activeRegs = registrations.filter((r) => r.phase !== "completed" && r.phase !== "cancelled" && r.status !== "rejected");
+  const appliedCohorts = new Set(registrations.map((r) => r.cohort_id));
+  const openForMe = upcoming.filter((c) => !appliedCohorts.has(c.id));
+  return <>
       {activeRegs.length > 0 && (
         <section className="mt-8">
           <SectionTitle>รอบอบรมที่คุณสมัคร</SectionTitle>
@@ -286,6 +299,12 @@ export async function Dashboard({ viewer }: { viewer: Viewer }) {
         </section>
       )}
 
+  </>;
+}
+
+async function Suggestions({ userId }: { userId: string }) {
+  const suggestions = await listPublishedCourses({ recommendFor: userId });
+  return <>
       {suggestions.length > 0 && (
         <section className="mt-8">
           <SectionTitle
@@ -304,6 +323,5 @@ export async function Dashboard({ viewer }: { viewer: Viewer }) {
           </div>
         </section>
       )}
-    </>
-  );
+  </>;
 }

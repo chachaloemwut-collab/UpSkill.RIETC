@@ -34,15 +34,14 @@ export async function listCertificatesAdmin(input: {
   const pageSize = input.all ? ADMIN_TABLE_LIMIT : input.pageSize ? Math.min(100, Math.max(10, input.pageSize)) : PAGE_SIZE;
 
   // Counts by category
-  const counts = await db
+  const countsQuery = db
     .selectFrom("certificates")
     .select([
       sql<number>`count(*)::int`.as("total"),
       sql<number>`count(*) filter (where revoked_at is not null)::int`.as("revoked"),
       sql<number>`count(*) filter (where revoked_at is null and expires_at is not null and expires_at <= now())::int`.as("expired"),
       sql<number>`count(*) filter (where revoked_at is null and (expires_at is null or expires_at > now()))::int`.as("valid"),
-    ])
-    .executeTakeFirstOrThrow();
+    ]);
 
   let query = db
     .selectFrom("certificates as cert")
@@ -97,16 +96,12 @@ export async function listCertificatesAdmin(input: {
   if (input.courseId && /^[0-9a-f-]{36}$/i.test(input.courseId)) query = query.where("cert.course_id", "=", input.courseId);
 
   // The page count must use the same search + status filters as the rows (the category totals above ignore the search)
-  const filtered = await db
-    .selectFrom(query.as("f"))
-    .select(sql<number>`count(*)::int`.as("n"))
-    .executeTakeFirstOrThrow();
-
-  const certificates = await query
-    .orderBy("cert.issued_at", "desc")
-    .limit(pageSize)
-    .offset(input.all ? 0 : (page - 1) * pageSize)
-    .execute();
+  const hasFilters = Boolean(q || input.status || input.courseId);
+  const [counts, filtered, certificates] = await Promise.all([
+    countsQuery.executeTakeFirstOrThrow(),
+    hasFilters ? db.selectFrom(query.as("f")).select(sql<number>`count(*)::int`.as("n")).executeTakeFirstOrThrow() : null,
+    query.orderBy("cert.issued_at", "desc").limit(pageSize).offset(input.all ? 0 : (page - 1) * pageSize).execute(),
+  ]);
 
   return {
     certificates: certificates.map((c) => {
@@ -128,7 +123,7 @@ export async function listCertificatesAdmin(input: {
     },
     page,
     pageSize,
-    total: filtered.n,
+    total: filtered?.n ?? counts.total,
   };
 }
 
