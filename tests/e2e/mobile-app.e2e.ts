@@ -10,7 +10,8 @@ it("opens the mobile task menu and lets a member navigate into and back from dev
     const tasks = page.getByRole("navigation", { name: "งานหลัก", exact: true });
     expect(await tasks.isVisible()).toBe(true);
     await page.getByRole("link", { name: "ดูหน้าเว็บไซต์เต็ม" }).click();
-    expect(await tasks.count()).toBe(0);
+    await page.waitForURL(BASE + "/?view=website");
+    await tasks.waitFor({ state: "detached" });
     await page.goto(BASE + "/login");
     await page.getByLabel("อีเมลหรือชื่อผู้ใช้", { exact: true }).fill("learner@upskill.test");
     await page.locator('input[name="password"]').fill(SEED_PASSWORD);
@@ -18,14 +19,14 @@ it("opens the mobile task menu and lets a member navigate into and back from dev
     await tasks.getByRole("link", { name: "บัญชีของฉัน" }).click();
     const devices = page.locator('.account-task[href="#devices"]');
     await devices.click();
-    expect(await page.locator("#devices").isVisible()).toBe(true);
+    await page.locator("#devices").waitFor({ state: "visible" });
     expect(await page.locator("#emails").isVisible()).toBe(false);
     await page.goBack();
-    expect(await devices.isVisible()).toBe(true);
+    await devices.waitFor({ state: "visible" });
     await page.setViewportSize({ width: 1366, height: 960 });
     await page.reload();
     expect(await page.locator("#emails").isVisible()).toBe(true);
-    expect(await page.locator("#devices").isVisible()).toBe(true);
+    await page.locator("#devices").waitFor({ state: "visible" });
   } finally {
     await browser.close();
   }
