@@ -24,6 +24,8 @@ export type AuditAction =
   | "user.instructor_accepted"
   | "admin.users_exported"
   | "admin.trainees_exported"
+  | "admin.partner_client_created"
+  | "admin.partner_client_revoked"
   | "user.legal_name_locked"
   | "user.legal_name_unlocked"
   | "user.pdpa_consent"

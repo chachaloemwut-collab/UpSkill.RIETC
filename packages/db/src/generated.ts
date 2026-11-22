@@ -477,6 +477,35 @@ export interface Lessons {
   youtube_video_id: string;
 }
 
+export interface PartnerApiClients {
+  allowed_ips: string[];
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  key_hash: string;
+  key_prefix: string;
+  last_used_at: Timestamp | null;
+  name: string;
+  purpose: string;
+  revoked_at: Timestamp | null;
+  revoked_by: string | null;
+  scopes: Generated<string[]>;
+}
+
+export interface PartnerApiRequests {
+  client_id: string | null;
+  created_at: Generated<Timestamp>;
+  endpoint: string;
+  error_code: string | null;
+  id: Generated<string>;
+  ip: string;
+  matched: boolean | null;
+  reference: string | null;
+  result_count: number | null;
+  status: number;
+}
+
 export interface PasswordResetTokens {
   created_at: Generated<Timestamp>;
   expires_at: Timestamp;
@@ -720,6 +749,8 @@ export interface DB {
   lesson_activity_results: LessonActivityResults;
   lesson_progress: LessonProgress;
   lessons: Lessons;
+  partner_api_clients: PartnerApiClients;
+  partner_api_requests: PartnerApiRequests;
   password_reset_tokens: PasswordResetTokens;
   program_cohorts: ProgramCohorts;
   program_courses: ProgramCourses;

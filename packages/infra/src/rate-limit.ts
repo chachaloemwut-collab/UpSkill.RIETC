@@ -28,6 +28,9 @@ export const RATE_LIMITS = {
   cohortApplyPerUser: { name: "cohort-apply:user", limit: 20, windowMs: 15 * 60_000 },
   courseApplyPerUser: { name: "course-apply:user", limit: 20, windowMs: 15 * 60_000 },
   applicationUploadPerUser: { name: "app-upload:user", limit: 40, windowMs: 15 * 60_000 },
+  /** Partner (server-to-server) API: per client key, and per source IP before the key is checked */
+  partnerPerClient: { name: "partner:client", limit: 120, windowMs: 60_000 },
+  partnerPerIp: { name: "partner:ip", limit: 300, windowMs: 60_000 },
 } satisfies Record<string, RateLimitRule>;
 
 export interface RateLimitResult {
