@@ -200,3 +200,15 @@
 - Live check (read-only): health, `/`, `/login`, `/privacy` 200; `/admin` 307
 - ⚠️ ต้องทำโดยเจ้าของ: เปลี่ยนรหัสผ่านเจ้าของระบบเองที่ /me (รหัสเดิมยังอยู่ในประวัติ git สาธารณะ); ล็อกอิน superadmin หนึ่งครั้งหลัง deploy
 - ยังค้าง: คำอธิบายหลักสูตร krathong-contest-2569 ใน DB อาจยังเขียน "ประกาศนียบัตร" (ข้อมูลจริง แก้ผ่านหน้าแก้ไขหลักสูตร); X-Real-IP จาก nginx ยังไม่ยืนยัน
+
+## 2026-11-22T08:45:00+00:00 (15:45 Asia/Bangkok) — Claude Code: release 2362183 (UX round 1: mobile/iPad)
+
+- Released 2362183 (live เดิม 2b58788) = PR #54; ไม่มี migration ไม่แตะข้อมูล (ครั้งแรกล้มเพราะ GitHub API connection reset → สั่งใหม่ผ่าน)
+- ตรวจ UX ทุกหน้า 4 บทบาท × 375/768/1024/1440 บน `next build` ในเครื่อง (Playwright isMobile)
+- ต้นเหตุหลัก: `grid` ที่ไม่มี grid-cols ได้คอลัมน์ auto ที่ขยายตามเนื้อหายาว → หน้าหลักสูตรกว้าง 597px บนจอ 375px
+  แก้ด้วยกฎ base ใน globals.css (`.grid:not([class*=grid-cols-])` → `minmax(0,1fr)`) — utility grid-cols-* ยังชนะ
+- หน้าหลักสูตรบนมือถือ: การ์ดปุ่มลงทะเบียน/เรียนต่อขึ้นก่อน, คำอธิบายยาวย่อ 5 บรรทัด (ClampText)
+- ปุ่มไอคอนไม่หด (shrink-0), แท็บ/segmented 36px บนจอสัมผัส, ปุ่มปิด dialog 36px, aria-label ภาษาไทย,
+  Reveal ไม่ซ่อนเนื้อหาจาก SSR, hydration error /me (ApiTokens origin) แก้แล้ว, การ์ดตัวเลข 2 คอลัมน์บนมือถือ
+- Live check: health/`/`/login/courses 200; หน้า public บน production 375/768 ไม่ล้นจอ (ยกเว้น /courses เกิน 1px)
+- หมายเหตุ dev: dev server พอร์ต 3000 ค้าง next 16.4.5 (MODULE_NOT_FOUND หลังอัปเดต deps) — ตรวจด้วย `next build && next start -p 3100` แทน
