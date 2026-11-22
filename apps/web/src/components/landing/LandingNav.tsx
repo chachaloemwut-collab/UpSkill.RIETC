@@ -50,7 +50,7 @@ export function LandingNav() {
       )}
     >
       <nav className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 sm:px-6">
-        <BrandLogo mode="hover" className="sm:hidden" />
+        <BrandLogo mode="mark" className="sm:hidden" />
         <BrandLogo mode="unfold" className="hidden sm:inline-flex" />
         <div className="ml-6 hidden items-center gap-1 md:flex">
           {LINKS.map((l) => {

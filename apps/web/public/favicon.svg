@@ -1,1 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#18181b"/><path d="M6.5 9.5v7.2a4.3 4.3 0 0 0 8.6 0V9.5" fill="none" stroke="#fafafa" stroke-width="2.6" stroke-linecap="round"/><path d="M18.4 23V9.5h3.7a3.6 3.6 0 0 1 0 7.2h-3.7m3.4 0 3.4 6.3" fill="none" stroke="#fafafa" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M24.5 4.8 27.4 4.6l-.2 2.9M27.3 4.7l-2.6 2.6" fill="none" stroke="#a1a1aa" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bg-ur" x1="6" y1="4" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#16345B"/>
+    </linearGradient>
+    <linearGradient id="g-ur" x1="42" y1="22" x2="54" y2="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#D4A03D"/>
+      <stop offset="100%" stop-color="#FDE08D"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="17" fill="url(#bg-ur)"/>
+  <rect x="4" y="4" width="56" height="56" rx="16" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
+  <path d="M 14 25 V 38 C 14 42.4 17.2 45 21 45 C 24.8 45 28 42.4 28 38 V 25" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 35 45 V 25 H 42 C 45.6 25 48 27.1 48 30 C 48 32.9 45.6 35 42 35 H 35 M 41.8 35 L 48.2 45" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 42 21 L 51.5 11.5 M 45 11.5 H 51.5 V 18" stroke="url(#g-ur)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

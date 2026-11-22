@@ -20,7 +20,7 @@ export function EnrollButton({ courseId, loggedIn }: { courseId: string; loggedI
     <Button
       size="lg"
       className="w-full"
-      loading={busy}
+      loadingState="enrolling" loading={busy}
       onClick={async (e) => {
         const el = e.currentTarget;
         setBusy(true);
@@ -28,7 +28,7 @@ export function EnrollButton({ courseId, loggedIn }: { courseId: string; loggedI
         setBusy(false);
         if (r.ok) {
           confettiFrom(el, { count: 60 });
-          toast({ title: "ลงทะเบียนเรียนแล้ว", description: "เริ่มเรียนบทแรกได้เลย", variant: "success" });
+          toast({ brandState: "enroll-success", title: "ลงทะเบียนเรียนแล้ว", description: "เริ่มเรียนบทแรกได้เลย", variant: "success" });
           router.refresh();
         } else toast({ title: "ลงทะเบียนไม่สำเร็จ", description: r.message, variant: "destructive" });
       }}

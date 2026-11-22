@@ -56,7 +56,7 @@ export function CohortApply({
     setAnswers({});
     if (r.data.status === "approved" && el) confettiFrom(el, { count: 60 });
     const msg = RESULT[r.data.status] ?? RESULT.pending!;
-    toast({ title: msg.title, description: msg.description, variant: "success" });
+    toast({ brandState: r.data.status === "approved" ? "enroll-success" : r.data.status === "waitlisted" ? "waitlist" : "saving", title: msg.title, description: msg.description, variant: "success" });
     router.refresh();
   }
 
@@ -70,7 +70,7 @@ export function CohortApply({
     const r = await api(`/api/cohorts/${cohortId}/apply`, { method: "DELETE" });
     setBusy(false);
     if (r.ok) {
-      toast({ title: "ยกเลิกการสมัครแล้ว", variant: "success" });
+      toast({ brandState: "cancel-enroll", title: "ยกเลิกการสมัครแล้ว", variant: "success" });
       router.refresh();
     } else toast({ title: "ยกเลิกไม่สำเร็จ", description: r.message, variant: "destructive" });
   }
@@ -86,7 +86,7 @@ export function CohortApply({
     <>
       {canApply && (
         <Button
-          loading={busy && !open}
+          loadingState="enrolling" loading={busy && !open}
           className="w-full sm:w-auto"
           onClick={(e) => (form.length ? setOpen(true) : void submit(answers, e.currentTarget))}
         >
@@ -120,7 +120,7 @@ export function CohortApply({
           ))}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>
-            <Button type="submit" loading={busy}>ส่งใบสมัคร</Button>
+            <Button type="submit" loadingState="enrolling" loading={busy}>ส่งใบสมัคร</Button>
           </div>
         </form>
       </Dialog>

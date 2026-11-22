@@ -98,8 +98,7 @@ function renderEmailEn(job: EmailJob): { subject: string; text: string; html: st
   }
 }
 
-export function renderEmail(job: EmailJob): { subject: string; text: string; html: string } {
-  if (job.locale === "en") return renderEmailEn(job);
+function renderEmailTh(job: EmailJob): { subject: string; text: string; html: string } {
   switch (job.template) {
     case "verify-email":
       return { subject: "ยืนยันอีเมลของคุณ", text: `กดลิงก์เพื่อยืนยันอีเมล (หมดอายุใน 24 ชั่วโมง):\n${job.link}\n\nหากคุณไม่ได้สมัคร ไม่ต้องดำเนินการ`, html: `<p>กดลิงก์เพื่อยืนยันอีเมล (หมดอายุใน 24 ชั่วโมง)</p>${action(job.link, "ยืนยันอีเมล")}<p>หากคุณไม่ได้สมัคร ไม่ต้องดำเนินการ</p>` };
@@ -168,6 +167,14 @@ export function renderEmail(job: EmailJob): { subject: string; text: string; htm
         html: `<p><b>${esc(job.inviterName)}</b> เชิญคุณเป็นผู้สอนในระบบ UpskillReskill.RIETC</p>${optionalHtml("ข้อความ", job.message)}<p>ลิงก์นี้ใช้ได้ 7 วันและใช้ได้ครั้งเดียว</p>${action(job.link, "ยอมรับคำเชิญ")}`,
       };
   }
+}
+
+// Email clients may block external images, web fonts and animation. Keep the name selectable in both formats.
+const emailWordmark = '<p style="margin:0 0 18px;font-family:Arial,sans-serif;font-size:18px;font-weight:bold"><span style="color:#16345b">Upskill</span><span style="color:#2563eb">Reskill</span><span style="color:#d4a03d">.</span><span style="color:#475569">RIETC</span></p>';
+
+export function renderEmail(job: EmailJob) {
+  const message = job.locale === "en" ? renderEmailEn(job) : renderEmailTh(job);
+  return { ...message, html: emailWordmark + message.html, text: `${message.text}\n\nUpskillReskill.RIETC` };
 }
 
 export function createMailer(smtpUrl: string, from: string, replyTo?: string | null) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandSignal } from "@/components/brand/BrandActivity";
 import { useState, useEffect } from "react";
 import {
   Search,
@@ -321,7 +322,7 @@ export function CourseLearnersRoster({
               disabled={loading}
               className="h-9"
             >
-              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+              {loading ? <BrandSignal state="syncing" broadcast /> : <RefreshCw className="size-3.5" />}
             </Button>
           </div>
 
@@ -356,7 +357,7 @@ export function CourseLearnersRoster({
               {loading && learners.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-muted-foreground">
-                    <RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                    <BrandSignal state="syncing" className="mx-auto mb-2 size-5" />
                     กำลังโหลดรายชื่อผู้เรียน...
                   </td>
                 </tr>
@@ -551,7 +552,7 @@ export function CourseLearnersRoster({
       >
         {detailLoading || !detailData ? (
           <div className="py-12 text-center text-muted-foreground">
-            <RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin" />
+            <BrandSignal state="syncing" className="mx-auto mb-2 size-5" />
             กำลังโหลดข้อมูลเชิงลึก...
           </div>
         ) : (

@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
     name: "UpskillReskill.RIETC · วิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง",
-    short_name: "UpSkill RIETC",
+    short_name: "UpskillReskill.RIETC",
     description: "เรียนออนไลน์ ทำแบบทดสอบ และรับวุฒิบัตรที่ตรวจสอบได้",
     lang: "th",
     dir: "ltr",

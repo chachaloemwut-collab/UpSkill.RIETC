@@ -192,7 +192,7 @@ export function UserEmailsManager({ initialEmails }: { initialEmails: UserEmailI
                   <Button
                     variant="ghost"
                     size="sm"
-                    loading={isWorking}
+                    loadingState="verify-email" loading={isWorking}
                     onClick={() => handleResend(item.id)}
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
@@ -233,7 +233,7 @@ export function UserEmailsManager({ initialEmails }: { initialEmails: UserEmailI
             />
           </Field>
         </div>
-        <Button type="submit" size="md" loading={busy} className="w-full sm:w-auto shrink-0 mb-1">
+        <Button type="submit" size="md" loadingState="saving" loading={busy} className="w-full sm:w-auto shrink-0 mb-1">
           <Plus className="h-4 w-4" /> เพิ่มอีเมล
         </Button>
       </form>

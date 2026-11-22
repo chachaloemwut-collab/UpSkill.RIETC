@@ -1,4 +1,5 @@
 "use client";
+import { BrandSignal } from "@/components/brand/BrandActivity";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
@@ -120,8 +121,12 @@ export function LmsShell({ user, children }: { user: ShellUser | null; children:
 
   const signOut = useCallback(async () => {
     const done = api("/api/auth/logout", { method: "POST" });
-    await runScene({ icon: <LogoutIcon play={1} />, title: "กำลังออกจากระบบ", subtitle: "แล้วพบกันใหม่" }, 1200);
-    await done;
+    await runScene({ icon: <BrandSignal state="logout" full />, title: "กำลังออกจากระบบ" }, 1200);
+    const result = await done;
+    if (!result.ok) {
+      toast({ title: "ออกจากระบบไม่สำเร็จ", description: result.message, variant: "destructive" });
+      return;
+    }
     router.push("/");
     router.refresh();
     toast({ title: "ออกจากระบบแล้ว", variant: "success" });
@@ -165,7 +170,6 @@ export function LmsShell({ user, children }: { user: ShellUser | null; children:
   // Hide mobile bottom nav on video classrooms and exam pages
   const hideBottomNav = pathname.includes("/lessons/") || pathname.includes("/assessments/") || pathname.includes("/quiz");
 
-  // URSkill unfolds into the full name once the shell appears
   const brand = <BrandLogo mode="unfold" />;
 
   return (
@@ -302,8 +306,8 @@ function TopBar({
   const router = useRouter();
   return (
     <>
-      {/* Phones: compact "URSkill" (no room for the full name beside the actions); unfolds on hover/focus */}
-      <BrandLogo mode="hover" className="md:hidden" />
+      {/* The phone toolbar reserves space for its actions with the square UR mark. */}
+      <BrandLogo mode="mark" className="md:hidden" />
       <nav aria-label="เส้นทางหน้า" className="hidden min-w-0 lg:flex items-center gap-1.5 text-xs text-muted-foreground">
         {breadcrumbs.map((b, i) => {
           const isLast = i === breadcrumbs.length - 1;

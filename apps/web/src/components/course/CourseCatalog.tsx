@@ -1,4 +1,6 @@
 "use client";
+import { BrandSignal } from "@/components/brand/BrandActivity";
+import { useBrandPulse } from "@/components/brand/BrandActivity";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { LayoutGrid, List, RotateCcw, Search, SearchX } from "lucide-react";
 import { Button, EmptyState, InputGroup, SegmentedControl, Select } from "@/components/ui";
@@ -26,6 +28,7 @@ function readViewMode(): ViewMode {
 type TypeFilter = "all" | CourseType;
 
 export function CourseCatalog({ courses, initialQuery, initialType = "all" }: { courses: Course[]; initialQuery: string; initialType?: TypeFilter }) {
+  const pulse = useBrandPulse();
   const [query, setQuery] = useState(initialQuery);
   const [type, setType] = useState<TypeFilter>(initialType);
   const [filter, setFilter] = useState<Filter>("all");
@@ -72,9 +75,12 @@ export function CourseCatalog({ courses, initialQuery, initialType = "all" }: { 
     <div className="grid gap-5">
       <div className="flex flex-wrap items-center gap-3">
         <InputGroup
-          prefix={<Search className="h-4 w-4" />}
+          prefix={query.trim() ? <BrandSignal state="searching" className="size-4" /> : <Search className="h-4 w-4" />}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (e.target.value.trim()) pulse({ state: "searching" });
+          }}
           placeholder="ค้นหาชื่อหลักสูตร ผู้สอน หรือหัวข้อ…"
           aria-label="ค้นหาหลักสูตร"
           className="w-full sm:w-72"

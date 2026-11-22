@@ -463,7 +463,7 @@ export function SaveBar({ open, onSave, onCancel, saving, count, message, saveLa
         </p>
         <Kbd className="hidden sm:inline-flex">⌘S</Kbd>
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={saving}>{cancelLabel}</Button>
-        <Button type="button" size="sm" onClick={onSave} loading={saving}>{saveLabel}</Button>
+        <Button type="button" size="sm" onClick={onSave} loadingState="saving" loading={saving}>{saveLabel}</Button>
       </div>
     </div>
   );

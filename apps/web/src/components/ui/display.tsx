@@ -1,4 +1,6 @@
 "use client";
+import { BrandSignal } from "@/components/brand/BrandActivity";
+import type { BrandState } from "@/components/brand/states";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -47,12 +49,12 @@ const alertIcons = {
   destructive: <path d="M12 8v4M12 16h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z" />,
 };
 
-export function Alert({ variant = "default", title, children }: { variant?: keyof typeof alertVariants; title: string; children?: React.ReactNode }) {
+export function Alert({ variant = "default", title, children, brandState }: { brandState?: BrandState; variant?: keyof typeof alertVariants; title: string; children?: React.ReactNode }) {
   return (
     <div role="alert" className={cn("flex animate-slide-up gap-3 rounded-lg border bg-card p-4", alertVariants[variant])}>
-      <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {brandState ? <BrandSignal state={brandState} broadcast className="size-5" /> : <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         {alertIcons[variant]}
-      </svg>
+      </svg>}
       <div className="grid gap-1">
         <h5 className="text-sm font-medium leading-none">{title}</h5>
         {children && <p className="text-sm text-muted-foreground">{children}</p>}

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="ur st-enroll-success" viewBox="0 0 64 64" fill="none">
+  <style>
+.st-enroll-success .spark { transform-origin: 32px 32px; animation: burstSpark 1.6s ease-out 1; }
+.st-enroll-success .chk { stroke-dasharray: 36; animation: drawCheckLoop 1.6s ease-out 1; }
+@keyframes burstSpark {
+0% { transform: scale(0.6); opacity: 0; }
+40% { transform: scale(1.12); opacity: 1; }
+100% { transform: scale(1.28); opacity: 0; }
+    }
+@keyframes drawCheckLoop { 0% { stroke-dashoffset: 36; } 45%, 100% { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce), print { * { animation: none !important; } }
+</style>
+  <defs>
+    <linearGradient id="bg-ur" x1="6" y1="4" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22C55E"/>
+      <stop offset="100%" stop-color="#15803D"/>
+    </linearGradient>
+    <linearGradient id="g-ur" x1="42" y1="22" x2="54" y2="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#D4A03D"/>
+      <stop offset="100%" stop-color="#FDE08D"/>
+    </linearGradient>
+  </defs>
+  <g class="sq-group">
+    <rect class="sq" x="4" y="4" width="56" height="56" rx="17" fill="url(#bg-ur)"/>
+    <rect x="5" y="5" width="54" height="54" rx="16" stroke="rgba(255,255,255,0.26)" stroke-width="1.4"/>
+  </g>
+  <g class="spark" stroke="#FDE08D" stroke-width="3" stroke-linecap="round">
+    <line x1="32" y1="2" x2="32" y2="8"/>
+    <line x1="58" y1="12" x2="53" y2="16"/>
+    <line x1="6" y1="12" x2="11" y2="16"/>
+  </g>
+  <path class="chk" d="M 19 33 L 28.5 42.5 L 46 23" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

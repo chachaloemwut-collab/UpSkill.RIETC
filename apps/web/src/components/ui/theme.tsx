@@ -1,4 +1,5 @@
 "use client";
+import { useBrandPulse } from "@/components/brand/BrandActivity";
 import * as React from "react";
 import { flushSync } from "react-dom";
 import { cn } from "@/lib/utils";
@@ -119,6 +120,7 @@ export function useThemeSettings() {
 
 /** Holds light/dark mode, color theme and radius; applies them to <html> and remembers them in localStorage. */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const pulse = useBrandPulse();
   const settings = React.useSyncExternalStore(themeStore.subscribe, themeStore.get, () => DEFAULT_THEME);
 
   const value = React.useMemo<ThemeCtx>(() => {
@@ -134,13 +136,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
     return {
       settings,
-      setDark: (dark, from) => withReveal(() => commit({ dark }), from),
+      setDark: (dark, from) => withReveal(() => {
+        if (themeStore.get().dark !== dark) pulse({ state: "hero-reveal", word: "night-theme-flip" });
+        commit({ dark });
+      }, from),
       setColor: (color, from) => withReveal(() => commit({ color }), from),
       setRadius: (radius) => commit({ radius }),
       setDensity: (density) => commit({ density }),
       setFontScale: (fontScale) => commit({ fontScale }),
     };
-  }, [settings]);
+  }, [settings, pulse]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

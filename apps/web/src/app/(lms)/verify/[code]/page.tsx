@@ -1,7 +1,8 @@
+import { BrandSignal } from "@/components/brand/BrandActivity";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
-import { CircleHelp, Clock, ShieldX } from "lucide-react";
+import { Clock } from "lucide-react";
 import { hitRateLimit, RATE_LIMITS } from "@upskill/infra/rate-limit";
 import { Card, buttonClass } from "@/components/ui";
 import { VerificationTrustCard } from "@/components/certificate/VerificationTrustCard";
@@ -21,10 +22,10 @@ export default async function VerifyPage({ params }: { params: Promise<{ code: s
   const r = await verifyPublicCertificate(code);
 
   if (r.status === "not_found")
-    return <Notice tone="muted" icon={<CircleHelp className="h-7 w-7" />} title="ไม่พบวุฒิบัตร" body="รหัสวุฒิบัตรไม่ถูกต้องหรือไม่มีอยู่ในระบบ" />;
+    return <Notice tone="muted" icon={<BrandSignal state="cert-invalid" broadcast className="size-10" />} title="ไม่พบวุฒิบัตร" body="รหัสวุฒิบัตรไม่ถูกต้องหรือไม่มีอยู่ในระบบ" />;
   if (r.status === "tampered")
     return (
-      <Notice tone="destructive" icon={<ShieldX className="h-7 w-7" />} title="ไม่สามารถยืนยันความถูกต้องได้" body="ข้อมูลวุฒิบัตรไม่ตรงกับลายเซ็นดิจิทัล กรุณาติดต่อผู้ดูแลระบบ" />
+      <Notice tone="destructive" icon={<BrandSignal state="cert-invalid" broadcast className="size-10" />} title="ไม่สามารถยืนยันความถูกต้องได้" body="ข้อมูลวุฒิบัตรไม่ตรงกับลายเซ็นดิจิทัล กรุณาติดต่อผู้ดูแลระบบ" />
     );
 
   return <VerificationTrustCard data={r} />;

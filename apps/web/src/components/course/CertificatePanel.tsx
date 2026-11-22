@@ -60,7 +60,7 @@ export function LockLegalNameForm({ className, defaultTh, defaultEn }: { classNa
           </Field>
         </div>
         <Checkbox name="confirm" required label="ข้าพเจ้ายืนยันว่าชื่อ-นามสกุลนี้ถูกต้อง และรับทราบว่าจะแก้ไขชื่อในวุฒิบัตรไม่ได้อีก" />
-        <Button type="submit" loading={busy} className="justify-self-start">
+        <Button type="submit" loading={busy} loadingState="saving" className="justify-self-start">
           <Lock className="h-4 w-4" /> ยืนยันและล็อกชื่อ
         </Button>
       </form>
@@ -118,7 +118,7 @@ export function IssueCertificateButton({ courseId, nameTh, nameEn }: { courseId:
           </button>
         ))}
       </div>
-      <Button size="lg" loading={busy} onClick={issue} className="justify-self-start">
+      <Button size="lg" loading={busy} loadingState="saving" onClick={issue} className="justify-self-start">
         <Award className="h-4 w-4" /> ออกวุฒิบัตร
       </Button>
     </Card>
@@ -130,29 +130,33 @@ export function DownloadCertificateButton({ code, variant = "default", size = "m
   const toast = useToast();
   const [play, replay] = usePlay();
   const [state, setState] = useState<"idle" | "working" | "rendering">("idle");
-  async function download(attempt = 0): Promise<void> {
+  async function download() {
     setState("working");
-    const res = await fetch(`/api/certificates/${code}/download`, { credentials: "same-origin", cache: "no-store" });
-    if (res.status === 202) {
-      setState("rendering");
-      if (attempt < 12) {
-        await new Promise((r) => setTimeout(r, 5000));
-        return download(attempt + 1);
+    try {
+      for (let attempt = 0; attempt <= 12; attempt++) {
+        const res = await fetch(`/api/certificates/${code}/download`, { credentials: "same-origin", cache: "no-store" });
+        if (res.status === 202) {
+          setState("rendering");
+          if (attempt < 12) await new Promise((resolve) => setTimeout(resolve, 5000));
+          continue;
+        }
+        if (!res.ok || !res.headers.get("content-type")?.startsWith("application/pdf")) break;
+        const url = URL.createObjectURL(await res.blob());
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${code}.pdf`;
+        link.click();
+        URL.revokeObjectURL(url);
+        replay();
+        toast({ brandState: "pdf-ready", title: "ไฟล์ PDF พร้อมดาวน์โหลดแล้ว", variant: "success" });
+        return;
       }
-    }
-    if (!res.ok || res.status === 202) {
+    } catch {
+      // Network and file-read failures share the retry message below.
+    } finally {
       setState("idle");
-      toast({ title: "ดาวน์โหลดไม่สำเร็จ", description: "กรุณาลองใหม่ภายหลัง", variant: "destructive" });
-      return;
     }
-    const url = URL.createObjectURL(await res.blob());
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${code}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
-    replay();
-    setState("idle");
+    toast({ title: "ดาวน์โหลดไม่สำเร็จ", description: "กรุณาลองใหม่ภายหลัง", variant: "destructive" });
   }
   return (
     <Button
@@ -160,6 +164,7 @@ export function DownloadCertificateButton({ code, variant = "default", size = "m
       size={size}
       onClick={() => void download()}
       loading={state !== "idle"}
+      loadingState={state === "rendering" ? "pdf-generating" : "page-loading"}
       {...(compact ? { "aria-label": state === "rendering" ? "กำลังสร้างไฟล์ PDF" : "ดาวน์โหลด PDF", title: "ดาวน์โหลด PDF", className: "h-8 px-2" } : {})}
     >
       {state === "idle" && <DownloadIcon play={play} />}
@@ -186,12 +191,17 @@ export function CertificateViewerCard({
   const [zoomOpen, setZoomOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const copyLink = () => {
+  const copyLink = async () => {
     if (typeof window !== "undefined") {
       const url = `${window.location.origin}/verify/${code}`;
-      navigator.clipboard.writeText(url);
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        toast({ title: "คัดลอกไม่สำเร็จ", variant: "destructive" });
+        return;
+      }
       setCopied(true);
-      toast({ title: "คัดลอกลิงก์ตรวจสอบแล้ว", variant: "success" });
+      toast({ brandState: "sharing", title: "คัดลอกลิงก์ตรวจสอบแล้ว", variant: "success" });
       setTimeout(() => setCopied(false), 2000);
     }
   };

@@ -333,7 +333,7 @@ function PublishSection({
       ) : course.visibility === "enrollment_closed" ? (
         <div className="grid gap-2">
           <Alert title="ปิดรับสมัครใหม่แล้ว">ผู้เรียนที่ลงทะเบียนไว้แล้วยังเข้าเรียนและรับวุฒิบัตรได้ตามปกติ</Alert>
-          <Button loading={a.busy} onClick={() => set("published")}>
+          <Button loadingState="saving" loading={a.busy} onClick={() => set("published")}>
             <Rocket className="h-4 w-4" /> เปิดรับสมัครอีกครั้ง
           </Button>
           <Button variant="ghost" disabled={a.busy} onClick={() => set("draft")}>
@@ -346,7 +346,7 @@ function PublishSection({
       ) : (
         <div className="grid gap-2">
           {course.visibility !== "published" && (
-            <Button loading={a.busy} onClick={() => set("published")}>
+            <Button loadingState="saving" loading={a.busy} onClick={() => set("published")}>
               <Rocket className="h-4 w-4" /> เผยแพร่หลักสูตร
             </Button>
           )}
@@ -697,7 +697,7 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
             </div>
           </div>
 
-          <Button type="submit" loading={a.busy} className="justify-self-start font-medium">
+          <Button type="submit" loadingState="saving" loading={a.busy} className="justify-self-start font-medium">
             บันทึกการตั้งค่าทั้งหมด
           </Button>
         </form>
@@ -1030,7 +1030,7 @@ function LessonsSection({
                           className="w-40 bg-background text-sm"
                         />
                       )}
-                      <Button type="submit" size="sm" loading={a.busy}>
+                      <Button type="submit" size="sm" loadingState="saving" loading={a.busy}>
                         บันทึกการเปลี่ยน
                       </Button>
                       <Button
@@ -1110,7 +1110,7 @@ function LessonsSection({
                 ))}
               </ul>
             )}
-            <Button type="submit" loading={batchBusy} className="justify-self-start">
+            <Button type="submit" loadingState="saving" loading={batchBusy} className="justify-self-start">
               <Plus className="h-4 w-4" /> เพิ่มทั้งหมด
             </Button>
           </form>
@@ -1194,7 +1194,7 @@ function LessonsSection({
             </select>
           </div>
 
-          <Button type="submit" loading={a.busy} className="justify-self-start font-medium">
+          <Button type="submit" loadingState="saving" loading={a.busy} className="justify-self-start font-medium">
             <Plus className="h-4 w-4" /> เพิ่มบทเรียน
           </Button>
         </form>}
@@ -1549,7 +1549,7 @@ function QuizSection({
             </div>
           </fieldset>
 
-          <Button type="submit" loading={a.busy} className="justify-self-start font-medium">
+          <Button type="submit" loadingState="saving" loading={a.busy} className="justify-self-start font-medium">
             <Plus className="h-4 w-4" /> เพิ่มข้อสอบลงในหลักสูตร
           </Button>
         </form>

@@ -30,7 +30,7 @@ export function EmailPreferencesForm({ defaults }: { defaults: { courseUpdatesEn
         <Checkbox name="weekly_summary" defaultChecked={defaults.weeklySummaryEnabled} label="สรุปสถานะการเรียนรายสัปดาห์" />
         <Field label="ภาษาของอีเมล"><Select name="preferred_locale" defaultValue={defaults.preferredLocale}><option value="th">ภาษาไทย</option><option value="en">English</option></Select></Field>
         <p className="text-xs text-muted-foreground">อีเมลยืนยันบัญชี ความปลอดภัย รายการลงทะเบียน ผลการประเมิน และสถานะเอกสารรับรองเป็นอีเมลตามรายการ จึงไม่ปิดจากหน้านี้</p>
-        <Button type="submit" loading={busy} className="justify-self-start">บันทึก</Button>
+        <Button type="submit" loadingState="saving" loading={busy} className="justify-self-start">บันทึก</Button>
       </form>
     </Card>
   );

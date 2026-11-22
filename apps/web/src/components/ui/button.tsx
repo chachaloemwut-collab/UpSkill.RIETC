@@ -1,4 +1,6 @@
 "use client";
+import { BrandSignal } from "@/components/brand/BrandActivity";
+import type { BrandState } from "@/components/brand/states";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -8,18 +10,20 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   variant?: keyof typeof variants;
   size?: keyof typeof sizes;
   loading?: boolean;
+  loadingState?: BrandState;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "default", size = "md", loading, disabled, children, ...props }, ref) => (
+  ({ className, variant = "default", size = "md", loading, loadingState, type = "button", disabled, children, ...props }, ref) => (
     <button
       ref={ref}
-      type="button"
+      type={type}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={buttonClass(variant, size, className)}
       {...props}
     >
-      {loading && <Spinner className="h-3.5 w-3.5" />}
+      {loading && <BrandSignal state={loadingState ?? (type === "submit" ? "saving" : "page-loading")} broadcast className="size-4" />}
       {children}
     </button>
   )
@@ -27,10 +31,5 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = "Button";
 
 export function Spinner({ className }: { className?: string }) {
-  return (
-    <svg className={cn("h-4 w-4 animate-spin", className)} viewBox="0 0 24 24" fill="none" aria-label="Loading">
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity=".2" strokeWidth="3" />
-      <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
+  return <span role="status" aria-label="กำลังโหลด"><BrandSignal state="page-loading" className={cn("size-4", className)} /></span>;
 }

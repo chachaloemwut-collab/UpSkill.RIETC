@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { RouteLoading } from "@/components/brand/RouteLoading";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/common/PageHeader";
 import { CourseCatalog } from "@/components/course/CourseCatalog";
@@ -8,6 +10,14 @@ export const dynamic = "force-dynamic";
 
 export default async function CoursesPage({ searchParams }: { searchParams: Promise<{ q?: string; type?: string }> }) {
   const { q, type } = await searchParams;
+  return (
+    <Suspense fallback={<RouteLoading word="dot-juggling">กำลังเตรียมข้อมูลหลักสูตร</RouteLoading>}>
+      <CatalogResults query={q} courseType={type} />
+    </Suspense>
+  );
+}
+
+async function CatalogResults({ query: q, courseType: type }: { query: string | undefined; courseType: string | undefined }) {
   const courses = await listPublishedCourses();
   return (
     <>

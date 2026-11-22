@@ -1,4 +1,5 @@
 "use client";
+import { BrandSignal } from "@/components/brand/BrandActivity";
 import { CERTIFICATE_TITLE } from "@upskill/core/certificate-patterns";
 import Link from "next/link";
 import { useState } from "react";
@@ -14,7 +15,6 @@ import {
   Hash,
   Printer,
   ShieldAlert,
-  ShieldCheck,
   Sparkles,
   Target,
   UserRound,
@@ -62,7 +62,7 @@ export function DigitalSeal({ valid }: { valid: boolean }) {
         <div className="flex flex-col items-center justify-center text-center">
           {valid ? (
             <>
-              <ShieldCheck className="h-8 w-8 sm:h-10 sm:w-10 drop-shadow-xs" />
+              <BrandSignal state="cert-valid" broadcast className="size-10" />
               <span className="mt-1 font-mono text-[9px] font-bold tracking-widest uppercase">
                 ED25519
               </span>
@@ -92,20 +92,30 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
   const valid = data.status === "valid";
   const expired = data.status === "expired";
 
-  const copyUrl = () => {
+  const copyUrl = async () => {
     if (typeof window !== "undefined") {
-      navigator.clipboard.writeText(window.location.href);
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+      } catch {
+        toast({ title: "คัดลอกไม่สำเร็จ", variant: "destructive" });
+        return;
+      }
       setCopied(true);
-      toast({ title: "คัดลอกลิงก์ตรวจสอบแล้ว", variant: "success" });
+      toast({ brandState: "sharing", title: "คัดลอกลิงก์ตรวจสอบแล้ว", variant: "success" });
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const copyCode = () => {
+  const copyCode = async () => {
     if (typeof window !== "undefined") {
-      navigator.clipboard.writeText(data.code);
+      try {
+        await navigator.clipboard.writeText(data.code);
+      } catch {
+        toast({ title: "คัดลอกไม่สำเร็จ", variant: "destructive" });
+        return;
+      }
       setCopiedHash(true);
-      toast({ title: "คัดลอกรหัสวุฒิบัตรแล้ว", variant: "success" });
+      toast({ brandState: "sharing", title: "คัดลอกรหัสวุฒิบัตรแล้ว", variant: "success" });
       setTimeout(() => setCopiedHash(false), 2000);
     }
   };
@@ -178,7 +188,7 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
             </div>
             <p className="mt-1 text-xs sm:text-sm text-amber-800/90 dark:text-amber-200/90">
               {data.testNotice ??
-                "วุฒิบัตรฉบับนี้ออกเพื่อการทดสอบทางเทคนิคของระบบ UpSkill.RIETC สำหรับบัญชีผู้พัฒนา โดยไม่มีผลรับรองการเรียนหรือการสอบผ่านจริง"}
+                "วุฒิบัตรฉบับนี้ออกเพื่อการทดสอบทางเทคนิคของระบบ UpskillReskill.RIETC สำหรับบัญชีผู้พัฒนา โดยไม่มีผลรับรองการเรียนหรือการสอบผ่านจริง"}
             </p>
           </div>
         )}
@@ -198,7 +208,7 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
             <div>
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1.5">
                 <Badge variant={valid ? "success" : expired ? "warning" : "destructive"} className="text-xs font-semibold">
-                  {valid ? "✓ ตรวจสอบแล้ว ถูกต้อง 100%" : expired ? "หมดอายุการรับรอง" : "ถูกเพิกถอน"}
+                  {valid ? "ตรวจสอบลายมือชื่อดิจิทัลแล้ว" : expired ? "หมดอายุการรับรอง" : "ถูกเพิกถอน"}
                 </Badge>
                 {data.isDevelopmentTest && (
                   <Badge variant="warning" className="text-xs font-semibold">

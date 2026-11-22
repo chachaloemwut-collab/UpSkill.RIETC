@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="ur st-pdf-generating" viewBox="0 0 64 64" fill="none">
+  <style>
+.st-pdf-generating .l1 { stroke-dasharray: 20; animation: drawDoc1 1.6s ease-in-out infinite; }
+.st-pdf-generating .l2 { stroke-dasharray: 20; animation: drawDoc2 1.6s ease-in-out infinite; }
+.st-pdf-generating .l3 { stroke-dasharray: 14; animation: drawDoc3 1.6s ease-in-out infinite; }
+@keyframes drawDoc1 { 0% { stroke-dashoffset: 20; } 30%, 100% { stroke-dashoffset: 0; } }
+@keyframes drawDoc2 { 0%, 20% { stroke-dashoffset: 20; } 55%, 100% { stroke-dashoffset: 0; } }
+@keyframes drawDoc3 { 0%, 40% { stroke-dashoffset: 14; } 75%, 100% { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce), print { * { animation: none !important; } }
+</style>
+  <defs>
+    <linearGradient id="bg-ur" x1="6" y1="4" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#16345B"/>
+    </linearGradient>
+    <linearGradient id="g-ur" x1="42" y1="22" x2="54" y2="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#D4A03D"/>
+      <stop offset="100%" stop-color="#FDE08D"/>
+    </linearGradient>
+  </defs>
+  <g class="sq-group">
+    <rect class="sq" x="4" y="4" width="56" height="56" rx="17" fill="url(#bg-ur)"/>
+    <rect x="5" y="5" width="54" height="54" rx="16" stroke="rgba(255,255,255,0.26)" stroke-width="1.4"/>
+  </g>
+  <rect x="18" y="14" width="28" height="36" rx="5" fill="#FFFFFF" fill-opacity="0.16" stroke="#FFFFFF" stroke-width="2.8"/>
+  <line class="l1" x1="24" y1="24" x2="40" y2="24" stroke="#FDE08D" stroke-width="3.2" stroke-linecap="round"/>
+  <line class="l2" x1="24" y1="32" x2="40" y2="32" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round"/>
+  <line class="l3" x1="24" y1="40" x2="34" y2="40" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round"/>
+</svg>

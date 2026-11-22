@@ -7,6 +7,8 @@
  * - linear mode: credit only content contiguous with the furthest point watched (no skipping ahead)
  * - free_complete mode: seek anywhere; every part must still be watched in real time to complete
  */
+import type { BrandState } from "@/components/brand/states";
+import { BrandSignal } from "@/components/brand/BrandActivity";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -521,13 +523,18 @@ export function LessonPlayer({
     if (countdown === 0 && nextAction) router.push(nextAction.href);
   }, [countdown, nextAction, router]);
 
-  const handleCopyVideoLink = () => {
+  const handleCopyVideoLink = async () => {
     if (!isPublic) {
       toast({ title: "ไม่อนุญาตให้คัดลอกลิงก์", description: "วิดีโอนี้เป็นแบบไม่สาธารณะเพื่อการเรียนรู้เฉพาะในระบบ", variant: "destructive" });
       return;
     }
-    void navigator.clipboard.writeText(`https://www.youtube.com/watch?v=${videoId}`);
-    toast({ title: "คัดลอกลิงก์วิดีโอแล้ว", description: "คัดลอกลิงก์ YouTube ไปยังคลิปบอร์ดแล้ว", variant: "success" });
+    try {
+      await navigator.clipboard.writeText(`https://www.youtube.com/watch?v=${videoId}`);
+    } catch {
+      toast({ title: "คัดลอกไม่สำเร็จ", variant: "destructive" });
+      return;
+    }
+    toast({ brandState: "sharing", title: "คัดลอกลิงก์วิดีโอแล้ว", description: "คัดลอกลิงก์ YouTube ไปยังคลิปบอร์ดแล้ว", variant: "success" });
   };
 
   const iconButton = "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white/80 transition-[background-color,scale] hover:bg-white/10 hover:text-white active:scale-90";
@@ -595,7 +602,7 @@ export function LessonPlayer({
                 ) : confirming ? (
                   /* H05-3: waiting for the finalization heartbeat — do NOT prematurely tell the learner they failed */
                   <>
-                    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+                    <BrandSignal state="syncing" className="mx-auto size-10" />
                     <p className="font-semibold">กำลังยืนยันผล…</p>
                     <p className="text-sm text-muted-foreground">รอสักครู่</p>
                   </>
@@ -910,13 +917,14 @@ function StatusBar({
     broken: "วิดีโอนี้ไม่พร้อมใช้งาน ระบบแจ้งผู้สอนแล้ว",
     completed: confirming ? "กำลังยืนยันผลการดู…" : "ดูคลิปนี้ครบตามเกณฑ์แล้ว",
   };
+  const activity: Partial<Record<Status["kind"], BrandState>> = {
+    buffering: "video-loading", recording: "watching-active", offline: "offline", completed: confirming ? "syncing" : "lesson-complete",
+  };
+  const signal = activity[status.kind];
   return (
     <div aria-live="polite" className="flex items-center justify-between gap-3 border-b bg-card px-4 py-2.5 text-xs text-foreground lg:border-b-0 lg:border-t">
       <div className="flex min-w-0 items-center gap-2.5">
-        <span className="relative flex h-2.5 w-2.5 shrink-0">
-          {status.kind === "recording" && <span className="absolute inset-0 animate-ping rounded-full bg-success opacity-75" />}
-          <span className={cn("relative h-2.5 w-2.5 rounded-full", STATUS_TONE[status.kind])} />
-        </span>
+        {signal ? <BrandSignal state={signal} broadcast /> : <span className={cn("size-2.5 shrink-0 rounded-full", STATUS_TONE[status.kind])} />}
         <span className="truncate font-medium">{text[status.kind]}</span>
       </div>
       {status.kind === "superseded" && (

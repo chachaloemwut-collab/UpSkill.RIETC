@@ -19,6 +19,7 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
   }
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
+    if (res.status === 503) window.dispatchEvent(new Event("rietc:service-unavailable"));
     const code = typeof data.error === "string" ? data.error : "INTERNAL";
     const headerRetry = res.headers.get("retry-after");
     const retryAfter = typeof data.retryAfter === "number" ? data.retryAfter : (headerRetry ? parseInt(headerRetry, 10) : undefined);

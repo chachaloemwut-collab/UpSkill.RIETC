@@ -14,7 +14,7 @@ export function LessonVideoShareButton({
   const [copied, setCopied] = useState(false);
   const toast = useToast();
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!isPublic) {
       toast({
         title: "ไม่อนุญาตให้คัดลอกลิงก์",
@@ -24,10 +24,16 @@ export function LessonVideoShareButton({
       return;
     }
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    void navigator.clipboard.writeText(url);
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      toast({ title: "คัดลอกไม่สำเร็จ", variant: "destructive" });
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast({
+      brandState: "sharing",
       title: "คัดลอกลิงก์วิดีโอแล้ว",
       description: "คัดลอกลิงก์ YouTube ไปยังคลิปบอร์ดแล้ว",
       variant: "success",

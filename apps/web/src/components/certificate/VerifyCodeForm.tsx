@@ -21,7 +21,7 @@ export function VerifyCodeForm({ autoFocus = true }: { autoFocus?: boolean }) {
       <Field label="รหัสวุฒิบัตร">
         <Input name="code" required placeholder="CERT-2026-XXXX-XXXX-XXXX" className="h-11 font-mono uppercase tracking-wider" autoFocus={autoFocus} />
       </Field>
-      <Button type="submit" size="lg" loading={busy}>
+      <Button type="submit" size="lg" loading={busy} loadingState="cert-verifying">
         <Search className="h-4 w-4" /> ตรวจสอบ
       </Button>
     </form>

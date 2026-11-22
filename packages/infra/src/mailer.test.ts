@@ -34,6 +34,8 @@ describe("email templates", () => {
   it.each(jobs)("renders $template in Thai and English", (job) => {
     for (const locale of ["th", "en"] as const) {
       const rendered = renderEmail({ ...job, locale } as EmailJob);
+      expect(rendered.text).toContain("UpskillReskill.RIETC");
+      expect(rendered.html.replace(/<[^>]+>/g, "")).toContain("UpskillReskill.RIETC");
       expect(rendered.subject.length).toBeGreaterThan(0);
       expect(rendered.text).not.toContain("undefined");
       expect(rendered.html).not.toContain("undefined");

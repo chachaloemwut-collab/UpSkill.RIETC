@@ -45,7 +45,7 @@ function SceneOverlay({ scene }: { scene: Scene | null }) {
     <div role="status" aria-live="polite" className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <Backdrop closing={!scene} />
       <div className={cn("relative flex w-full max-w-xs flex-col items-center gap-4 rounded-2xl border bg-background px-8 py-10 text-center shadow-2xl", scene ? "animate-zoom-in" : "animate-zoom-out")}>
-        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-muted text-foreground [&>svg]:h-14 [&>svg]:w-14">{s.icon}</div>
+        <div className="flex min-h-14 max-w-full items-center justify-center text-foreground [&>svg]:h-14 [&>svg]:w-14">{s.icon}</div>
         <div>
           <p className="font-semibold">{s.title}</p>
           {s.subtitle && <p className="mt-1 text-sm text-muted-foreground">{s.subtitle}</p>}
