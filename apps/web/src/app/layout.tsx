@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import localFont from "next/font/local";
 import { InAppBrowserGate } from "@/components/InAppBrowserGate";
+import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import { Providers } from "@/components/providers";
 import { THEME_INIT_SCRIPT } from "@/components/ui/theme-script";
 import { detectOutdatedBrowser } from "@upskill/core/user-agent";
@@ -48,7 +49,9 @@ export const metadata: Metadata = {
   title: { default: "UpskillReskill.RIETC — เรียนออนไลน์พร้อมวุฒิบัตร", template: "%s · UpskillReskill.RIETC" },
   applicationName: "UpskillReskill.RIETC",
   description: "เรียนออนไลน์จาก YouTube บันทึกเวลาเรียนจริง และรับวุฒิบัตรที่ตรวจสอบได้",
-  icons: { icon: "/favicon.svg" },
+  icons: { icon: "/favicon.svg", apple: "/icons/apple-touch-icon.png" },
+  // iPhone/iPad "Add to Home Screen" opens full screen with this title
+  appleWebApp: { capable: true, title: "UpSkill RIETC", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
@@ -85,6 +88,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         )}
         <Providers>
           <InAppBrowserGate />
+          <ServiceWorkerRegistrar />
           {children}
         </Providers>
       </body>
