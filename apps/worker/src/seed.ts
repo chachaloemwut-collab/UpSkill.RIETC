@@ -85,7 +85,7 @@ if (!(await db.selectFrom("courses").select("id").where("slug", "=", slug).execu
         instructor_id: instructorId,
         title: "หลักสูตรตัวอย่าง: การเล่าเรื่องด้วยแอนิเมชัน",
         slug,
-        description: "หลักสูตรตัวอย่างสำหรับทดสอบ Pre-test การเรียนวิดีโอ แบบทดสอบระหว่างอบรม และ Post-test ก่อนรับใบรับรอง",
+        description: "หลักสูตรตัวอย่างสำหรับทดสอบ Pre-test การเรียนวิดีโอ แบบทดสอบระหว่างอบรม และ Post-test ก่อนรับวุฒิบัตร",
         visibility: "published",
         published_at: new Date(),
         is_verified_course: true,
