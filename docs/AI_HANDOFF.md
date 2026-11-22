@@ -268,3 +268,7 @@
 ## 2026-11-22T17:02Z · ChatGPT · #67 / PR #68
 
 ฐาน 805158a บน feat/protected-certificate-artwork. Added protected branding, per-record watermark, current course design for re-renders, separate artwork metadata and print from the authenticated PDF. Migrated and regenerated types on Local. Registered documents rendered without notifications, signed fields and revocation verified, all outputs A4 landscape, one page. Existing unrelated files left in storage. No production changes. #66 keyboard and CI passed. Review and CI via PR #68.
+
+## 2026-11-22T17:12Z · ChatGPT · #69 / PR #70
+
+Branch feat/college-public-homepage, parent 12a3c94. Scope: LandingPage, LandingNav and scoped CSS. Existing section order and actions retained; public documents labeled as samples. Local preview on 127.0.0.1:3188. Browser checks in Chromium and WebKit at 320, 390, 800 and 1440 px. Local build, typecheck, lint and tests passed. No production change. Review #70 after #68 and #66.
