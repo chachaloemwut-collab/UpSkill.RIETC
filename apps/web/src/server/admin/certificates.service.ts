@@ -5,6 +5,8 @@ import { HttpError } from "../http";
 import { issueCertificate } from "../certificates/issue.service";
 
 const PAGE_SIZE = 50;
+/** The admin table filters, sorts and pages in the browser: load up to this many rows, newest first */
+export const ADMIN_TABLE_LIMIT = 5000;
 
 export type AdminCertificateStatus = "valid" | "expired" | "revoked";
 
@@ -23,11 +25,13 @@ export async function listCertificatesAdmin(input: {
   courseId?: string | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
+  /** Load every row up to ADMIN_TABLE_LIMIT for the client-side table (page/pageSize ignored) */
+  all?: boolean;
 }) {
   const { db } = ctx();
   const q = (input.query ?? "").trim();
   const page = Math.max(1, Math.floor(input.page || 1));
-  const pageSize = input.pageSize ? Math.min(100, Math.max(10, input.pageSize)) : PAGE_SIZE;
+  const pageSize = input.all ? ADMIN_TABLE_LIMIT : input.pageSize ? Math.min(100, Math.max(10, input.pageSize)) : PAGE_SIZE;
 
   // Counts by category
   const counts = await db
@@ -101,7 +105,7 @@ export async function listCertificatesAdmin(input: {
   const certificates = await query
     .orderBy("cert.issued_at", "desc")
     .limit(pageSize)
-    .offset((page - 1) * pageSize)
+    .offset(input.all ? 0 : (page - 1) * pageSize)
     .execute();
 
   return {

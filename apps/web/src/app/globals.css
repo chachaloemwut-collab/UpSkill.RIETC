@@ -383,7 +383,8 @@
    * (long Thai titles, emails, tables) and pushes the whole page wider than a phone screen. Make that single column
    * fill the container and shrink instead. Any grid-cols-* / grid-flow-col utility (utilities layer) still wins.
    */
-  .grid:not([class*="grid-cols-"]):not([class*="grid-flow-col"]) { grid-template-columns: minmax(0, 1fr); }
+  /* Not inside table cells: an auto-layout table sizes its columns from min-content, which this rule would make 0. */
+  .grid:not([class*="grid-cols-"]):not([class*="grid-flow-col"]):not(td *, th *) { grid-template-columns: minmax(0, 1fr); }
   /*
    * Typography rule (owner, 2026-11-22): content and document text — paragraphs, tables, forms, applications,
    * descriptions — is Sarabun (body default, font-reading). Prompt is only for headings and for menus and controls:
