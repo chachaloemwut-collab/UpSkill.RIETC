@@ -7,6 +7,9 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { ChangePasswordForm } from "@/components/account/ChangePasswordForm";
 import { EmailPreferencesForm } from "@/components/account/EmailPreferencesForm";
 import { DataRights } from "@/components/account/DataRights";
+import { listMyDevices } from "@/server/auth/device-sessions";
+import { ContactEditor } from "@/components/account/ContactEditor";
+import { DisconnectDevice } from "@/components/account/DisconnectDevice";
 import { ApiTokens } from "@/components/account/ApiTokens";
 import { LockLegalNameForm } from "@/components/course/CertificatePanel";
 import { UserEmailsManager } from "@/components/account/UserEmailsManager";
@@ -34,6 +37,8 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const google = await db.selectFrom("user_oauth_accounts").select(["provider_email"]).where("user_id", "=", viewer.id).where("provider", "=", "google").executeTakeFirst();
   const emailPreferences = await emailPreferenceSummary(viewer.id);
   const instructorInvitation = me.role === "member" ? await getMyPendingInvitation(me.email) : null;
+  const contact = await db.selectFrom("user_profiles").select(["phone", "address_line as addressLine", "subdistrict", "district", "province", "postal_code as postalCode"]).where("user_id", "=", viewer.id).executeTakeFirst();
+  const devices = await listMyDevices(viewer);
   const userEmails = await listUserEmails(viewer.id);
 
   return (
@@ -53,7 +58,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </div>
       )}
 
-      <div className="grid gap-6">
+      <div id="account-index" className="account-index grid gap-6">
         <Card className="flex flex-wrap items-center gap-4 p-6">
           <Avatar name={viewer.name} size={64} className="text-lg" />
           <div className="min-w-0 flex-1">
@@ -74,19 +79,20 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </div>
         </Card>
 
-        <Section icon={<Mail className="h-4 w-4" />} title="อีเมลของบัญชี" description="จัดการอีเมลหลักและอีเมลสำรองสำหรับเข้าสู่ระบบและรับการแจ้งเตือน (ต้องมีอย่างน้อยหนึ่งอีเมลเสมอ)">
+        <Section icon={<Mail className="h-4 w-4" />} id="emails" title="อีเมลของบัญชี" description="จัดการอีเมลหลักและอีเมลสำรองสำหรับเข้าสู่ระบบและรับการแจ้งเตือน (ต้องมีอย่างน้อยหนึ่งอีเมลเสมอ)">
           <UserEmailsManager initialEmails={userEmails} />
         </Section>
 
-        <Section icon={<IdCard className="h-4 w-4" />} title="ข้อมูลผู้เรียน" description="ชื่อ-นามสกุล ไทย/อังกฤษ เลขประจำตัวประชาชน วันเกิด เบอร์โทรศัพท์ และที่อยู่">
+        <Section icon={<IdCard className="h-4 w-4" />} id="profile" title="ข้อมูลผู้เรียน" description="ชื่อ-นามสกุล ไทย/อังกฤษ เลขประจำตัวประชาชน วันเกิด เบอร์โทรศัพท์ และที่อยู่">
           <Card className="flex flex-wrap items-center gap-3 p-5">
             {viewer.hasProfile ? <Badge variant="success">กรอกครบแล้ว</Badge> : <Badge variant="warning">ยังไม่ได้กรอก</Badge>}
             <span className="flex-1 text-sm text-muted-foreground">จัดเก็บตามประกาศความเป็นส่วนตัว (PDPA) เลขประจำตัวประชาชนถูกเข้ารหัส</span>
+            {contact && <ContactEditor contact={contact} />}
             <Link href="/me/profile" className={buttonClass(viewer.hasProfile ? "outline" : "default", "sm")}>{viewer.hasProfile ? "แก้ไขข้อมูล" : "กรอกข้อมูล"}</Link>
           </Card>
         </Section>
 
-        <Section icon={<UserRound className="h-4 w-4" />} title="ชื่อบนวุฒิบัตร" description="ชื่อจริงตามบัตรประชาชน ใช้พิมพ์บนวุฒิบัตรทุกใบ">
+        <Section icon={<UserRound className="h-4 w-4" />} id="credential" title="ชื่อบนวุฒิบัตร" description="ชื่อจริงตามบัตรประชาชน ใช้พิมพ์บนวุฒิบัตรทุกใบ">
           {me.legal_name_locked_at ? (
             <Card className="grid gap-3 p-5">
               <dl className="grid gap-3 sm:grid-cols-2">
@@ -110,7 +116,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
         <Section
           icon={<KeyRound className="h-4 w-4" />}
-          title={me.password_hash ? "เปลี่ยนรหัสผ่าน" : "ตั้งรหัสผ่าน"}
+          id="password" title={me.password_hash ? "เปลี่ยนรหัสผ่าน" : "ตั้งรหัสผ่าน"}
           description={me.password_hash ? "เมื่อเปลี่ยนรหัสผ่าน อุปกรณ์อื่นจะถูกออกจากระบบ" : "บัญชีนี้เข้าสู่ระบบด้วย Google ตั้งรหัสผ่านเพื่อเข้าสู่ระบบด้วยอีเมลได้ด้วย"}
         >
           <Card className="p-5">
@@ -118,14 +124,21 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </Card>
         </Section>
 
+        <Section id="devices" icon={<KeyRound className="h-4 w-4" />} title="อุปกรณ์ที่เข้าสู่ระบบ" description="ตรวจสอบการใช้งานล่าสุดและออกจากระบบเฉพาะอุปกรณ์ที่เลือก">
+          <Card className="divide-y px-4">{devices.map(device => <div key={device.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div className="min-w-0"><p className="break-words text-sm">{device.user_agent?.match(/iPhone|iPad|Android|Windows|Macintosh|Linux/i)?.[0] ?? "อุปกรณ์"} · {device.user_agent?.match(/Edg|Firefox|Chrome|Safari/i)?.[0] ?? "เบราว์เซอร์"}</p><p className="text-xs text-muted-foreground">ใช้งานล่าสุด {formatDateTimeTh(device.last_seen_at)}</p></div>
+            {device.id === viewer.sessionId ? <Badge>อุปกรณ์ปัจจุบัน</Badge> : <DisconnectDevice path={`/api/user/sessions/${device.id}`} />}
+          </div>)}</Card>
+        </Section>
+
         {!me.is_system_owner && (
-          <Section icon={<Bell className="h-4 w-4" />} title="การแจ้งเตือนทางอีเมล" description="กำหนดการแจ้งเตือนเสริมที่ต้องการรับ">
+          <Section icon={<Bell className="h-4 w-4" />} id="notifications" title="การแจ้งเตือนทางอีเมล" description="กำหนดการแจ้งเตือนเสริมที่ต้องการรับ">
             <EmailPreferencesForm defaults={emailPreferences} />
           </Section>
         )}
 
         {(await isGoogleEnabled()) && (
-          <Section icon={<Link2 className="h-4 w-4" />} title="บัญชีที่เชื่อมต่อ" description="ใช้เข้าสู่ระบบ และยืนยันตัวตนเมื่อลืมรหัสผ่าน">
+          <Section icon={<Link2 className="h-4 w-4" />} id="connections" title="บัญชีที่เชื่อมต่อ" description="ใช้เข้าสู่ระบบ และยืนยันตัวตนเมื่อลืมรหัสผ่าน">
             <Card className="flex flex-wrap items-center gap-3 p-5">
               <span className="flex h-9 w-9 items-center justify-center rounded-md border font-semibold">G</span>
               <div className="mr-auto">
@@ -142,16 +155,15 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             </Card>
           </Section>
         )}
-        <Section icon={<Database className="h-5 w-5" />} title="ข้อมูลและความเป็นส่วนตัว" description="ดาวน์โหลดข้อมูลของคุณ หรือขอลบบัญชีตามสิทธิของเจ้าของข้อมูล (พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล)">
+        <Section icon={<Database className="h-5 w-5" />} id="privacy" title="ข้อมูลและความเป็นส่วนตัว" description="จัดการข้อมูลส่วนบุคคลของบัญชีนี้">
           <Card className="p-6">
             <p className="mb-4 text-sm text-muted-foreground">
-              คุณดาวน์โหลดข้อมูลส่วนบุคคลที่ระบบเก็บไว้ได้ และขอลบบัญชีได้ตลอด การลบบัญชีจะลบข้อมูลที่ระบุตัวตน
-              แต่คงวุฒิบัตรและบันทึกการตรวจสอบที่จำเป็นต่อการยืนยันเอกสารไว้
+              {me.is_system_owner ? "คุณดาวน์โหลดข้อมูลส่วนบุคคลได้ บัญชีเจ้าของระบบสงวนไว้สำหรับดูแลระบบ" : "คุณดาวน์โหลดข้อมูลส่วนบุคคลและขอลบบัญชีได้ ระบบจะลบข้อมูลที่ระบุตัวตนและเก็บวุฒิบัตรกับบันทึกที่จำเป็นต่อการยืนยันเอกสาร"}
             </p>
-            <DataRights />
+            <DataRights allowDelete={!me.is_system_owner} />
           </Card>
         </Section>
-        <Section icon={<KeyRound className="h-5 w-5" />} title="API token (MCP)" description="สร้าง token ส่วนตัวสำหรับเชื่อม AI เช่น Cursor หรือ Claude Desktop ผ่าน MCP ตามสิทธิ์บัญชีของคุณ">
+        <Section icon={<KeyRound className="h-5 w-5" />} id="tokens" title="API token (MCP)" description="สร้าง token ส่วนตัวสำหรับเชื่อม AI เช่น Cursor หรือ Claude Desktop ผ่าน MCP ตามสิทธิ์บัญชีของคุณ">
           <Card className="p-6">
             <ApiTokens />
           </Card>
@@ -165,9 +177,11 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   );
 }
 
-function Section({ icon, title, description, children }: { icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) {
+function Section({ id, icon, title, description, children }: { id: string; icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) {
   return (
-    <section className="grid gap-4 lg:grid-cols-[240px_1fr]">
+    <><a className="account-task" href={`#${id}`}>{icon}<span>{title}</span><span aria-hidden>›</span></a>
+    <section id={id} className="account-screen grid gap-4 lg:grid-cols-[240px_1fr]">
+      <a href="#account-index" className="account-return">‹ ตั้งค่าบัญชี</a>
       <div>
         <h2 className="flex items-center gap-2 font-semibold">
           {icon} {title}
@@ -175,6 +189,6 @@ function Section({ icon, title, description, children }: { icon: React.ReactNode
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </div>
       <div className="min-w-0">{children}</div>
-    </section>
+    </section></>
   );
 }

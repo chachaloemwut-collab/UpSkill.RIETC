@@ -81,7 +81,7 @@ export function AppShell({
   };
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
+    <div className="portal-shell flex min-h-screen bg-muted/30">
       <aside
         className={cn(
           "sticky top-0 hidden h-screen shrink-0 flex-col border-r bg-background transition-[width] duration-500 ease-spring-smooth md:flex",
@@ -95,10 +95,10 @@ export function AppShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
-          <Button variant="ghost" size="icon" className="md:hidden" aria-label="เปิดเมนู" onClick={() => setMobile(true)}>
+          <Button variant="ghost" size="icon" className="app-menu-trigger md:hidden" aria-label="เปิดเมนู" onClick={() => setMobile(true)}>
             <MenuToggleIcon open={isMobile} />
           </Button>
-          <Button variant="ghost" size="icon" className="hidden md:inline-flex" aria-label={collapsed ? "ขยายแถบเมนู" : "ย่อแถบเมนู"} onClick={toggle}>
+          <Button variant="ghost" size="icon" className="app-sidebar-trigger hidden md:inline-flex" aria-label={collapsed ? "ขยายแถบเมนู" : "ย่อแถบเมนู"} onClick={toggle}>
             <PanelLeftIcon />
           </Button>
           {header}

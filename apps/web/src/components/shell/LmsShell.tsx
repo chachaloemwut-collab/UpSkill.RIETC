@@ -193,7 +193,7 @@ export function LmsShell({ user, children }: { user: ShellUser | null; children:
         bottomBar={
           !hideBottomNav ? (
             <nav
-              aria-label="เมนูหลักสำหรับมือถือ"
+              data-app-dock aria-label="เมนูหลักสำหรับมือถือ"
               className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-background/95 px-2 py-1.5 backdrop-blur-md pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:hidden"
             >
               <Link
@@ -227,14 +227,14 @@ export function LmsShell({ user, children }: { user: ShellUser | null; children:
                 <span>คอร์สฉัน</span>
               </Link>
               <Link
-                href={user ? "/certificates" : "/verify"}
+                href={user ? "/me" : "/verify"}
                 className={cn(
                   "flex flex-col items-center gap-0.5 rounded-lg px-2.5 py-1 text-[10px] text-muted-foreground transition hover:text-foreground",
-                  (pathname === "/certificates" || pathname.startsWith("/verify")) && "font-semibold text-primary"
+                  (pathname.startsWith("/me") || pathname.startsWith("/verify")) && "font-semibold text-primary"
                 )}
               >
-                <Award className="h-4 w-4" />
-                <span>วุฒิบัตร</span>
+                {user ? <Settings className="h-4 w-4" /> : <Award className="h-4 w-4" />}
+                <span>{user ? "บัญชี" : "ตรวจสอบ"}</span>
               </Link>
               <button
                 type="button"

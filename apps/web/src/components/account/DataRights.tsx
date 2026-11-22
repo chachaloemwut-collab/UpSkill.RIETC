@@ -7,7 +7,7 @@ import { Button, buttonClass } from "@/components/ui";
 import { useConfirm } from "@/components/common/ConfirmProvider";
 
 /** PDPA data-subject rights: export own data and request erasure. */
-export function DataRights() {
+export function DataRights({ allowDelete = true }: { allowDelete?: boolean }) {
   const router = useRouter();
   const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
@@ -33,9 +33,9 @@ export function DataRights() {
       <a href="/api/user/data-export" className={buttonClass("outline", "sm")}>
         <Download className="h-4 w-4" /> ดาวน์โหลดข้อมูลของฉัน
       </a>
-      <Button variant="destructive" size="sm" loading={busy} onClick={doDelete}>
+      {allowDelete && <Button variant="destructive" size="sm" loading={busy} onClick={doDelete}>
         <Trash2 className="h-4 w-4" /> ลบบัญชี
-      </Button>
+      </Button>}
     </div>
   );
 }

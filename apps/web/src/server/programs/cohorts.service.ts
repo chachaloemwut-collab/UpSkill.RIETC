@@ -132,6 +132,22 @@ export async function createCohort(user: CurrentUser, programId: string, input: 
   return c;
 }
 
+/** Only an unused draft may be removed. Locking the parent serializes publication and new references. */
+export async function deleteDraftCohort(user: CurrentUser, cohortId: string, ip: string) {
+  assertAdmin(user);
+  return ctx().db.transaction().execute(async trx => {
+    const cohort = await loadCohort(trx, cohortId, true);
+    if (cohort.status !== "draft") throw new HttpError(409, "NOT_DRAFT", "ลบได้เฉพาะรอบฉบับร่าง");
+    for (const table of ["cohort_registrations", "cohort_watches", "enrollments", "certificates", "announcements"] as const) {
+      const linked = await trx.selectFrom(table).select("cohort_id").where("cohort_id", "=", cohortId).limit(1).executeTakeFirst();
+      if (linked) throw new HttpError(409, "COHORT_IN_USE", "รอบนี้มีข้อมูลอ้างอิงอยู่ จึงลบไม่ได้");
+    }
+    await trx.deleteFrom("program_cohorts").where("id", "=", cohortId).execute();
+    await audit(trx, { action: "cohort.deleted", userId: user.id, entityType: "cohort", entityId: cohortId, ip, details: { programId: cohort.program_id } });
+    return { programId: cohort.program_id };
+  });
+}
+
 export async function updateCohort(user: CurrentUser, cohortId: string, input: CohortInput) {
   assertAdmin(user);
   checkDates(input);
@@ -141,7 +157,7 @@ export async function updateCohort(user: CurrentUser, cohortId: string, input: C
     .execute(async (trx) => {
       const c = await loadCohort(trx, cohortId, true);
       if (c.status === "cancelled") throw new HttpError(409, "COHORT_CANCELLED");
-      if (input.clientUpdatedAt && Math.abs(input.clientUpdatedAt.getTime() - new Date(c.updated_at).getTime()) > 500) {
+      if (input.clientUpdatedAt && input.clientUpdatedAt.getTime() !== new Date(c.updated_at).getTime()) {
         throw new HttpError(409, "CONFLICT", "ข้อมูลนี้ถูกแก้ไขโดยผู้ใช้คนอื่นแล้ว กรุณาโหลดหน้าใหม่เพื่อดูข้อมูลล่าสุด");
       }
       if (input.capacity !== null) {

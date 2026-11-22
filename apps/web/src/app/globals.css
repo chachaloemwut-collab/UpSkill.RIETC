@@ -424,3 +424,24 @@
   }
 }
 
+
+.member-directory, .app-launcher, .public-app-home, .account-task, .account-return { display: none; }
+@media (max-width: 767px), (pointer: coarse) and (max-width: 1100px), (display-mode: standalone) {
+  .app-launcher, .public-app-home { display: block; }
+  .public-app-home { max-width: 42rem; margin-inline: auto; padding: max(1.25rem,env(safe-area-inset-top)) 1.25rem max(2rem,env(safe-area-inset-bottom)); }
+  .public-web-home, .directory-table { display: none; }
+  .member-directory { display: block; }
+  .portal-shell > aside, .portal-shell .app-sidebar-trigger { display: none; }
+  .portal-shell .app-menu-trigger { display: inline-flex; }
+  .portal-shell > div > header { padding-top: env(safe-area-inset-top); height: calc(3.5rem + env(safe-area-inset-top)); }
+  .portal-shell [data-app-dock] { display: flex; }
+  .portal-shell [data-app-dock] :is(a,button) { min-height: 44px; justify-content: center; }
+  .portal-shell:has([data-app-dock]) main { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+  .account-index { gap: .5rem; }
+  .account-task { display: flex; align-items: center; gap: .8rem; min-height: 3.25rem; padding: .8rem 1rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); }
+  .account-task > :last-child { margin-left: auto; }
+  .account-screen { display: none; scroll-margin-top: 5rem; }
+  .account-screen:target { display: grid; grid-template-columns: minmax(0,1fr); }
+  .account-index:has(.account-screen:target) > :not(:target) { display: none; }
+  .account-return { display: inline-flex; align-items: center; min-height: 44px; color: hsl(var(--primary)); }
+}

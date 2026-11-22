@@ -61,6 +61,7 @@ export async function exportUserData(user: CurrentUser): Promise<Record<string, 
 }
 
 export async function deleteOwnAccount(user: CurrentUser, meta: { ip: string }): Promise<void> {
+  if (user.isSystemOwner) throw new HttpError(403, "PROTECTED_OWNER", "บัญชีเจ้าของระบบต้องคงอยู่เพื่อดูแลระบบ");
   const { db } = ctx();
   await db.transaction().execute(async (trx) => {
     const r = await trx

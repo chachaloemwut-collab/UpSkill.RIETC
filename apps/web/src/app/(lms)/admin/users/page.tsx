@@ -43,15 +43,15 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         <form action="/admin/users" method="get" className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-56 flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input name="q" defaultValue={sp.q ?? ""} placeholder="ค้นหาอีเมลหรือชื่อ…" className="w-full pl-9" />
+            <Input aria-label="ค้นหาสมาชิก" name="q" defaultValue={sp.q ?? ""} placeholder="ค้นหาอีเมลหรือชื่อ…" className="w-full pl-9" />
           </div>
-          <select name="role" defaultValue={sp.role ?? ""} className="h-10 rounded-lg border bg-background px-3 text-sm">
+          <select aria-label="บทบาทสมาชิก" name="role" defaultValue={sp.role ?? ""} className="h-10 rounded-lg border bg-background px-3 text-sm">
             <option value="">ทุกบทบาท</option>
             <option value="member">ผู้เรียน</option>
             <option value="instructor">ผู้สอน</option>
             <option value="admin">ผู้ดูแลระบบ</option>
           </select>
-          <select name="status" defaultValue={sp.status ?? ""} className="h-10 rounded-lg border bg-background px-3 text-sm">
+          <select aria-label="สถานะสมาชิก" name="status" defaultValue={sp.status ?? ""} className="h-10 rounded-lg border bg-background px-3 text-sm">
             <option value="">ทุกสถานะ</option>
             <option value="active">ใช้งาน</option>
             <option value="suspended">ระงับชั่วคราว</option>
@@ -70,7 +70,12 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       </Card>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="member-directory divide-y">{data.users.map(u => <Link key={u.id} href={`/admin/users/${u.id}`} className="grid gap-1 p-4">
+          <strong className="break-words text-base">{u.legal_full_name_th ?? u.legal_full_name_en ?? u.username ?? u.email}</strong>
+          <span className="break-all text-sm text-muted-foreground">{u.email}</span>
+          <span className="flex flex-wrap gap-2"><Badge variant="secondary">{ROLE_LABEL[u.role] ?? u.role}</Badge><Badge variant={u.deleted_at ? "destructive" : STATUS_LABEL[u.status]?.variant}>{u.deleted_at ? "ลบบัญชีแล้ว" : STATUS_LABEL[u.status]?.label}</Badge></span>
+        </Link>)}{!data.users.length && <p className="p-4">ไม่พบสมาชิกตามเงื่อนไข</p>}</div>
+        <div className="directory-table overflow-x-auto">
           <table className="min-w-[640px] w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">

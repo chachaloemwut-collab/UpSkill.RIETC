@@ -5,8 +5,8 @@ import { z } from "zod";
 export const isoDate = z.iso.datetime({ offset: true }).transform((s) => new Date(s));
 
 const ruleField = z.strictObject({
-  key: z.string().max(40),
-  label: z.string().max(120),
+  key: z.string().trim().min(1).max(40),
+  label: z.string().trim().min(1).max(120),
   type: z.enum(["text", "textarea", "select", "date", "number"]),
   required: z.boolean(),
   options: z.array(z.string().max(120)).max(20).optional(),
@@ -21,7 +21,20 @@ export const EligibilityBody = z.strictObject({
   requireLegalName: z.boolean().default(false),
   prerequisiteCourseIds: z.array(z.uuid()).max(20).default([]),
   prerequisiteMode: z.enum(["any", "all"]).default("all"),
-  applicationForm: z.array(ruleField).max(10).default([]),
+  applicationForm: z.array(ruleField).max(10).superRefine((fields, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, field] of fields.entries()) {
+      if (seen.has(field.key)) ctx.addIssue({ code: "custom", path: [index, "key"], message: "รหัสคำถามซ้ำ" });
+      seen.add(field.key);
+      if (field.type === "select" && !field.options?.some(value => value.trim())) {
+        ctx.addIssue({ code: "custom", path: [index, "options"], message: "กรุณาระบุตัวเลือก" });
+      }
+      const condition = field.showIf;
+      if (condition && !fields.some(parent => parent.key !== field.key && parent.key === condition.field && parent.type === "select" && parent.options?.includes(condition.value))) {
+        ctx.addIssue({ code: "custom", path: [index, "showIf"], message: "กรุณาตรวจสอบคำถามและตัวเลือกที่ใช้อ้างอิง" });
+      }
+    }
+  }).default([]),
 });
 
 export const CohortBody = z.strictObject({

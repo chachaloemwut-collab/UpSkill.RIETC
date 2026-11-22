@@ -84,7 +84,7 @@ export async function listUsersAdmin(input: { query?: string; role?: string; sta
       "u.legal_full_name_th", "u.legal_full_name_en", "u.legal_name_locked_at", "u.is_system_owner",
       sql<number>`(select count(*)::int from enrollments e where e.user_id = u.id)`.as("enrollments"),
       sql<number>`(select count(*)::int from certificates c where c.user_id = u.id)`.as("certificates"),
-      sql<string | null>`(select to_char(max(created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from user_sessions s where s.user_id = u.id)`.as("last_active_at"),
+      sql<string | null>`(select to_char(max(last_seen_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from user_sessions s where s.user_id = u.id)`.as("last_active_at"),
     ])
     .$if(Boolean(role), (x) => x.where("u.role", "=", role!))
     .$if(Boolean(status), (x) => x.where("u.status", "=", status!))
@@ -131,7 +131,7 @@ export async function exportUsersAdmin(input: { query?: string; role?: string; s
         "u.legal_full_name_th", "u.legal_full_name_en", "u.created_at", "u.email_verified_at",
         sql<number>`(select count(*)::int from enrollments e where e.user_id = u.id)`.as("enrollments"),
         sql<number>`(select count(*)::int from certificates c where c.user_id = u.id)`.as("certificates"),
-        sql<string | null>`(select to_char(max(created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from user_sessions s where s.user_id = u.id)`.as("last_active_at"),
+        sql<string | null>`(select to_char(max(last_seen_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from user_sessions s where s.user_id = u.id)`.as("last_active_at"),
       ])
       .$if(Boolean(role), (x) => x.where("u.role", "=", role!))
       .$if(Boolean(status), (x) => x.where("u.status", "=", status!))
@@ -206,7 +206,8 @@ export async function getUserDetailAdmin(userId: string) {
       .execute(),
     db
       .selectFrom("user_sessions")
-      .select(["id", "created_at", "last_seen_at", "expires_at", "idle_expires_at", "revoked_at", "revoked_reason"])
+      .select(["id", "created_at", "last_seen_at", "revoked_at", "revoked_reason"])
+      .select(sql<boolean>`least(expires_at, idle_expires_at) <= now()`.as("expired"))
       .where("user_id", "=", userId)
       .orderBy("created_at", "desc")
       .limit(20)
