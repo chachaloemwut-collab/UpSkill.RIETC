@@ -306,7 +306,7 @@ function TopBar({
   const router = useRouter();
   return (
     <>
-      {/* Phones: compact "URSkill" (no room for the full name beside the actions); unfolds on hover/focus */}
+      {/* The phone toolbar reserves space for its actions with the square UR mark. */}
       <BrandLogo mode="mark" className="md:hidden" />
       <nav aria-label="เส้นทางหน้า" className="hidden min-w-0 lg:flex items-center gap-1.5 text-xs text-muted-foreground">
         {breadcrumbs.map((b, i) => {

@@ -188,7 +188,7 @@ export function VerificationTrustCard({ data }: { data: VerificationData }) {
             </div>
             <p className="mt-1 text-xs sm:text-sm text-amber-800/90 dark:text-amber-200/90">
               {data.testNotice ??
-                "วุฒิบัตรฉบับนี้ออกเพื่อการทดสอบทางเทคนิคของระบบ UpSkill.RIETC สำหรับบัญชีผู้พัฒนา โดยไม่มีผลรับรองการเรียนหรือการสอบผ่านจริง"}
+                "วุฒิบัตรฉบับนี้ออกเพื่อการทดสอบทางเทคนิคของระบบ UpskillReskill.RIETC สำหรับบัญชีผู้พัฒนา โดยไม่มีผลรับรองการเรียนหรือการสอบผ่านจริง"}
             </p>
           </div>
         )}

@@ -166,7 +166,7 @@ export async function ensureDeveloperTestCertificate(db: Database, env: Env): Pr
   const code = generateCertificateCode(issuedAt.getUTCFullYear());
   const recipientName = normalizeName(user.legal_full_name_th ?? user.legal_full_name_en ?? "เฉลิมวุฒิ ชา");
   const courseTitle = normalizeName(course.title);
-  const instructorName = normalizeName(course.credential_signer_name ?? "ทีมพัฒนา UpSkill.RIETC (TEST)");
+  const instructorName = normalizeName(course.credential_signer_name ?? "ทีมพัฒนา UpskillReskill.RIETC (TEST)");
   const visualDigest = computeVisualDigest(recipientName, courseTitle, code);
 
   const payload: CertificatePayload = {
