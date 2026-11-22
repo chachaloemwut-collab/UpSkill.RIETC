@@ -41,7 +41,7 @@ export function ProfileForm({ defaults, exists, namesLocked }: { defaults: Profi
       {error && <Alert variant="destructive" title={error} />}
       <ProfileFields defaults={defaults} errors={errors} namesLocked={namesLocked} />
       {!exists && <PdpaNotice error={consentError} />}
-      <div><Button type="submit" loading={busy}><Save className="h-4 w-4" /> บันทึกข้อมูล</Button></div>
+      <div><Button type="submit" loadingState="saving" loading={busy}><Save className="h-4 w-4" /> บันทึกข้อมูล</Button></div>
     </form>
   );
 }

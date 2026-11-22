@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="ur st-video-loading" viewBox="0 0 64 64" fill="none">
+  <style>
+.st-video-loading .play-tri { transform-origin: 32px 32px; animation: pulseScale 1.2s ease-in-out infinite; }
+.st-video-loading .vid-ring { transform-origin: 32px 32px; animation: spin360 1.4s linear infinite; }
+@keyframes pulseScale { 0%, 100% { transform: scale(0.92); } 50% { transform: scale(1.12); } }
+@keyframes spin360 { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce), print { * { animation: none !important; } }
+</style>
+  <defs>
+    <linearGradient id="bg-ur" x1="6" y1="4" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#16345B"/>
+    </linearGradient>
+    <linearGradient id="g-ur" x1="42" y1="22" x2="54" y2="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#D4A03D"/>
+      <stop offset="100%" stop-color="#FDE08D"/>
+    </linearGradient>
+  </defs>
+  <g class="sq-group">
+    <rect class="sq" x="4" y="4" width="56" height="56" rx="17" fill="url(#bg-ur)"/>
+    <rect x="5" y="5" width="54" height="54" rx="16" stroke="rgba(255,255,255,0.26)" stroke-width="1.4"/>
+  </g>
+  <circle class="vid-ring" cx="32" cy="32" r="21" fill="none" stroke="#FDE08D" stroke-width="3.2" stroke-dasharray="36 96" stroke-linecap="round"/>
+  <polygon class="play-tri" points="27,22 43,32 27,42" fill="#FFFFFF"/>
+</svg>

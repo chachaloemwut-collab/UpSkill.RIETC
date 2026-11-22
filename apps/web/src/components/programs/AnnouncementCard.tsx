@@ -1,3 +1,4 @@
+import { BrandSignal } from "@/components/brand/BrandActivity";
 import Link from "next/link";
 import { CalendarDays, MapPin, Pin } from "lucide-react";
 import { Badge } from "@/components/ui";
@@ -15,11 +16,12 @@ export interface AnnouncementCardData {
   is_pinned: boolean;
 }
 
-export function AnnouncementCard({ a }: { a: AnnouncementCardData }) {
+export function AnnouncementCard({ a, latest = false }: { a: AnnouncementCardData; latest?: boolean }) {
   return (
     <Link href={`/announcements/${a.slug}`} className="group flex flex-col gap-2 rounded-xl border bg-card p-5 transition-shadow hover:shadow-md">
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Badge variant={a.kind === "event" ? "success" : a.kind === "notice" ? "warning" : "secondary"}>{ANNOUNCEMENT_KIND[a.kind] ?? a.kind}</Badge>
+        {latest && <span className="inline-flex items-center gap-1"><BrandSignal state="notification" /> ประกาศล่าสุด</span>}
         {a.is_pinned && <span className="inline-flex items-center gap-1"><Pin className="h-3 w-3" /> ปักหมุด</span>}
         <span className="ml-auto">{formatDateTh(a.publish_at)}</span>
       </div>

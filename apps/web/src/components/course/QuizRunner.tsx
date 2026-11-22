@@ -1,4 +1,5 @@
 "use client";
+import { BrandSignal } from "@/components/brand/BrandActivity";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Award, Bookmark, ChevronLeft, ChevronRight, Flag, LayoutList, RotateCcw, Shuffle, Timer } from "lucide-react";
@@ -172,6 +173,7 @@ export function QuizRunner({
         </div>
         <div>
           <h2 className="text-xl font-semibold">
+            <BrandSignal state={result.passed || result.courseCompleted ? "quiz-passed" : "quiz-retry"} broadcast className="mx-auto mb-2 size-9" />
             {result.courseCompleted ? "ยินดีด้วย คุณเรียนจบหลักสูตรแล้ว!" : result.late ? "ส่งคำตอบเกินเวลาที่กำหนด" : result.passed ? "ตอบถูกทั้งหมด" : "บันทึกคำตอบแล้ว"}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">คะแนนแบบทดสอบคลิปนี้ {result.scorePercentage.toFixed(0)}%</p>
@@ -212,6 +214,7 @@ export function QuizRunner({
         </div>
         <div>
           <h2 className="text-xl font-semibold">
+            {assessmentKind !== "pre" && <BrandSignal state={result.passed ? "quiz-passed" : "quiz-retry"} broadcast className="mx-auto mb-2 size-9" />}
             {assessmentKind === "pre"
               ? "ประเมินก่อนเรียนเรียบร้อยแล้ว"
               : result.passed
@@ -428,6 +431,7 @@ export function QuizRunner({
                   variant="default"
                   size="sm"
                   disabled={remaining === 0}
+                  loading={busy} loadingState="quiz-submitting"
                   onClick={() => (answered < total ? setConfirming(true) : void submit())}
                 >
                   ส่งคำตอบ ({answered}/{total})
@@ -508,7 +512,7 @@ export function QuizRunner({
         <Button
           size="lg"
           className="w-full mt-2 shadow-sm"
-          loading={busy}
+          loading={busy} loadingState="quiz-submitting"
           disabled={remaining === 0}
           onClick={() => (answered < total ? setConfirming(true) : void submit())}
         >
@@ -578,7 +582,7 @@ export function QuizRunner({
           <Button
             size="md"
             className="mt-4 w-full justify-center shadow-xs"
-            loading={busy}
+            loading={busy} loadingState="quiz-submitting"
             disabled={remaining === 0}
             onClick={() => (answered < total ? setConfirming(true) : void submit())}
           >

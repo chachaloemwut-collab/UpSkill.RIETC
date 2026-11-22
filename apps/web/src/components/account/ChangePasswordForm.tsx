@@ -65,11 +65,11 @@ export function ChangePasswordForm({ hasPassword, canEmailReset = false }: { has
         </Field>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" loading={busy}>
+        <Button type="submit" loadingState="saving" loading={busy}>
           {hasPassword ? "เปลี่ยนรหัสผ่าน" : "ตั้งรหัสผ่าน"}
         </Button>
         {canEmailReset && (
-          <Button type="button" variant="ghost" loading={sending} onClick={() => void emailMeALink()}>
+          <Button type="button" variant="ghost" loadingState="verify-email" loading={sending} onClick={() => void emailMeALink()}>
             <MailCheck className="h-4 w-4" /> {hasPassword ? "ลืมรหัสผ่านปัจจุบัน? ส่งลิงก์ทางอีเมล" : "ส่งลิงก์ตั้งรหัสผ่านทางอีเมล"}
           </Button>
         )}

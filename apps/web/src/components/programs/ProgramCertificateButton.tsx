@@ -32,7 +32,7 @@ export function ProgramCertificateButton({ programId }: { programId: string }) {
   }
 
   return (
-    <Button size="sm" loading={busy} onClick={issue}>
+    <Button size="sm" loadingState="saving" loading={busy} onClick={issue}>
       <Award className="h-4 w-4" /> รับวุฒิบัตร
     </Button>
   );

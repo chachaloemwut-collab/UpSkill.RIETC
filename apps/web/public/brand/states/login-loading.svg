@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="ur st-login-loading" viewBox="0 0 64 64" fill="none">
+  <style>
+.st-login-loading .orbit { transform-origin: 32px 32px; animation: spin360 0.95s linear infinite; }
+@keyframes spin360 { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce), print { * { animation: none !important; } }
+</style>
+  <defs>
+    <linearGradient id="bg-ur" x1="6" y1="4" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#16345B"/>
+    </linearGradient>
+    <linearGradient id="g-ur" x1="42" y1="22" x2="54" y2="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#D4A03D"/>
+      <stop offset="100%" stop-color="#FDE08D"/>
+    </linearGradient>
+  </defs>
+  <g class="sq-group">
+    <rect class="sq" x="4" y="4" width="56" height="56" rx="17" fill="url(#bg-ur)"/>
+    <rect x="5" y="5" width="54" height="54" rx="16" stroke="rgba(255,255,255,0.26)" stroke-width="1.4"/>
+    <path d="M 14 25 V 38 C 14 42.4 17.2 45 21 45 C 24.8 45 28 42.4 28 38 V 25" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 35 45 V 25 H 42 C 45.6 25 48 27.1 48 30 C 48 32.9 45.6 35 42 35 H 35 M 41.8 35 L 48.2 45" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g class="orbit">
+    <circle cx="32" cy="32" r="30" fill="none" stroke="#60A5FA" stroke-width="3.4" stroke-dasharray="42 146" stroke-linecap="round"/>
+    <circle cx="54" cy="12" r="4" fill="#F6C453"/>
+  </g>
+</svg>

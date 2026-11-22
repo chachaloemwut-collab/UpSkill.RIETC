@@ -1,4 +1,5 @@
 "use client";
+import { BrandSignal } from "@/components/brand/BrandActivity";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -8,7 +9,7 @@ import { validateProfile, type ProfileErrors } from "@upskill/core/profile";
 import { ElectronicSignatureNotice, PROFILE_PART_FIELDS, PdpaNotice, ProfileFields, readProfile, type ProfilePart } from "@/components/account/ProfileFields";
 import { ApplicationSheet, type ApplicationSheetData } from "@/components/account/ApplicationSheet";
 import { errorMessage } from "@/lib/errors";
-import { Alert, Button, CheckDrawIcon, Field, Input, LoginIcon, PasswordInput, Separator, buttonClass, useActionScene, useToast } from "@/components/ui";
+import { Alert, Button, CheckDrawIcon, Field, Input, PasswordInput, Separator, buttonClass, useActionScene, useToast } from "@/components/ui";
 
 function useSubmit() {
   const [busy, setBusy] = useState(false);
@@ -99,6 +100,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
   const [error, setError] = useState<string | null>(initialError ? errorMessage(initialError) : null);
   const [countdown, setCountdown] = useState<number | null>(null);
   // Set after a wrong password: offers the reset link for exactly the account the user typed
+  const [authError, setAuthError] = useState(Boolean(initialError));
   const [forgotFor, setForgotFor] = useState<string | null>(null);
 
   useEffect(() => {
@@ -126,7 +128,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
       const mustChange = r.data.redirectTo.startsWith("/reset-password");
       await runScene(
         {
-          icon: <LoginIcon play={1} />,
+          icon: <BrandSignal state="login-success" full />,
           title: mustChange ? "กรุณาตั้งรหัสผ่านใหม่" : "เข้าสู่ระบบสำเร็จ",
           subtitle: mustChange ? "คุณใช้รหัสผ่านชั่วคราว ต้องตั้งรหัสของตนเองก่อนใช้งาน" : r.data.redirectTo === "/admin" ? "กำลังพาไปยังระบบจัดการ" : "กำลังพาไปยังแดชบอร์ด",
         },
@@ -137,6 +139,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
       return;
     }
     s.setBusy(false);
+    setAuthError(r.status > 0 && r.status < 500);
     if (r.code === "RATE_LIMITED") {
       const sec = r.retryAfter && r.retryAfter > 0 ? r.retryAfter : 60;
       setCountdown(sec);
@@ -164,6 +167,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
         {error && (
           <Alert
             variant="destructive"
+            {...(authError ? { brandState: "login-error" as const } : {})}
             title={
               countdown && countdown > 0
                 ? `ทำรายการบ่อยเกินไป กรุณารออีก ${countdown} วินาทีแล้วลองใหม่`
@@ -185,10 +189,11 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
             variant="outline"
             className="w-full"
             onClick={async () => {
-              await api("/api/auth/resend-verification", { body: { email: unverifiedEmail } });
+              const response = await api("/api/auth/resend-verification", { body: { email: unverifiedEmail } });
               setError(null);
+              if (!response.ok) { setError(response.message); return; }
               setUnverifiedEmail(null);
-              toast({ title: "ส่งลิงก์ยืนยันใหม่แล้ว", description: "กรุณาตรวจสอบกล่องอีเมลของคุณ", variant: "success" });
+              toast({ brandState: "verify-email", title: "ส่งลิงก์ยืนยันใหม่แล้ว", description: "กรุณาตรวจสอบกล่องอีเมลของคุณ", variant: "success" });
             }}
           >
             <MailCheck className="h-4 w-4" /> ส่งลิงก์ยืนยันอีเมลอีกครั้ง
@@ -211,7 +216,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
         <Button
           type="submit"
           size="lg"
-          loading={s.busy}
+          loading={s.busy} loadingState="login-loading"
           disabled={Boolean(countdown && countdown > 0)}
           className="w-full"
         >
@@ -453,7 +458,7 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
           )}
           {/* Distinct keys: reusing one DOM button would turn the "Next" click into a submit of the last step */}
           {last ? (
-            <Button key="submit" type="submit" size="lg" loading={s.busy} className="flex-1">
+            <Button key="submit" type="submit" size="lg" loading={s.busy} loadingState="register" className="flex-1">
               สมัครสมาชิก
             </Button>
           ) : (
@@ -519,7 +524,7 @@ export function ForgotPasswordForm({ googleEnabled, initialIdentifier }: { googl
       <div className="grid gap-5">
         <div className="grid justify-items-center gap-3 rounded-lg border bg-card p-6 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-success/10 text-success">
-            <MailCheck className="h-6 w-6" />
+            <BrandSignal state="verify-email" broadcast className="size-10" />
           </span>
           <div>
             <p className="font-semibold">ตรวจสอบอีเมลของคุณ</p>
@@ -535,7 +540,7 @@ export function ForgotPasswordForm({ googleEnabled, initialIdentifier }: { googl
         </ol>
         {s.error && <Alert variant="destructive" title={s.error} />}
         <div className="grid gap-2 sm:grid-cols-2">
-          <Button variant="outline" size="lg" loading={s.busy} disabled={wait > 0} onClick={() => void send(sentTo)}>
+          <Button variant="outline" size="lg" loading={s.busy} loadingState="verify-email" disabled={wait > 0} onClick={() => void send(sentTo)}>
             {wait > 0 ? `ส่งอีกครั้งได้ใน ${wait} วินาที` : "ส่งอีเมลอีกครั้ง"}
           </Button>
           <Button variant="ghost" size="lg" onClick={() => { setSentTo(null); s.setError(null); }}>
@@ -571,7 +576,7 @@ export function ForgotPasswordForm({ googleEnabled, initialIdentifier }: { googl
             className="h-11"
           />
         </Field>
-        <Button type="submit" size="lg" loading={s.busy} disabled={wait > 0} className="w-full">
+        <Button type="submit" size="lg" loading={s.busy} loadingState="verify-email" disabled={wait > 0} className="w-full">
           <MailCheck className="h-4 w-4" /> ส่งลิงก์ตั้งรหัสผ่านใหม่
         </Button>
         <p className="text-xs text-muted-foreground">ลิงก์จะส่งไปที่อีเมลของบัญชี ใช้ได้ 1 ชั่วโมง รหัสผ่านเดิมยังใช้ได้จนกว่าคุณจะตั้งรหัสใหม่</p>
@@ -628,7 +633,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <Field label="ยืนยันรหัสผ่านใหม่" error={mismatch ? "รหัสผ่านทั้งสองช่องไม่ตรงกัน" : undefined}>
         <PasswordInput name="confirm" autoComplete="new-password" minLength={12} required className="h-11" />
       </Field>
-      <Button type="submit" size="lg" loading={s.busy} className="w-full">
+      <Button type="submit" size="lg" loading={s.busy} loadingState="saving" className="w-full">
         ตั้งรหัสผ่านใหม่
       </Button>
     </form>
@@ -669,7 +674,7 @@ export function VerifyEmailButton({ token }: { token: string }) {
       <Button
         size="lg"
         className="w-full"
-        loading={s.busy}
+        loading={s.busy} loadingState="verify-email"
         onClick={async () => {
           s.setBusy(true);
           const r = await api("/api/auth/verify-email", { body: { token } });

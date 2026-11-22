@@ -1,4 +1,6 @@
 "use client";
+import { BrandSignal } from "@/components/brand/BrandActivity";
+import type { BrandState } from "@/components/brand/states";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
@@ -9,6 +11,7 @@ interface Toast {
   description?: string;
   variant?: "default" | "success" | "destructive";
   leaving?: boolean;
+  brandState?: BrandState;
 }
 
 const noop = () => () => {};
@@ -43,7 +46,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 t.variant === "destructive" && "border-destructive/30"
               )}
             >
-              <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full bg-foreground", t.variant === "success" && "bg-success", t.variant === "destructive" && "bg-destructive")} />
+              {t.brandState ? <BrandSignal state={t.brandState} broadcast className="size-6" /> : <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full bg-foreground", t.variant === "success" && "bg-success", t.variant === "destructive" && "bg-destructive")} />}
               <div className="grid flex-1 gap-0.5">
                 <p className="text-sm font-medium">{t.title}</p>
                 {t.description && <p className="text-sm text-muted-foreground">{t.description}</p>}

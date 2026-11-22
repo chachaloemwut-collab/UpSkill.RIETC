@@ -10,6 +10,8 @@ export const dynamic = "force-dynamic";
 
 export default async function AnnouncementsPage() {
   const items = await listPublicAnnouncements();
+  const latest = items.reduce<(typeof items)[number] | undefined>((newest, item) =>
+    !newest || item.publish_at > newest.publish_at ? item : newest, undefined);
   return (
     <>
       <PageHeader title="ประกาศและกิจกรรม" description="ข่าวสาร กิจกรรมที่กำลังจะเกิดขึ้น และประกาศรอบอบรม" />
@@ -17,7 +19,7 @@ export default async function AnnouncementsPage() {
         <EmptyState icon={<Megaphone className="h-5 w-5" />} title="ยังไม่มีประกาศ" />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {items.map((a) => <AnnouncementCard key={a.id} a={a} />)}
+          {items.map((a) => <AnnouncementCard key={a.id} a={a} latest={a.id === latest?.id} />)}
         </div>
       )}
     </>

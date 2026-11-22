@@ -51,7 +51,7 @@ export function CreateCourseDialog() {
             <Button variant="outline" onClick={() => setOpen(false)}>
               ยกเลิก
             </Button>
-            <Button type="submit" loading={busy}>
+            <Button type="submit" loadingState="saving" loading={busy}>
               สร้างและแก้ไขต่อ
             </Button>
           </div>

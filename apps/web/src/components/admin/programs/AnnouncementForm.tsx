@@ -127,7 +127,7 @@ export function AnnouncementForm({ defaults, programs, cohorts }: {
         <Field label="หยุดแสดงประกาศ" hint="เว้นว่าง = แสดงตลอด"><Input type="datetime-local" name="expiresAt" defaultValue={toBangkokInput(defaults.expires_at)} /></Field>
       </div>
       <Checkbox name="isPinned" defaultChecked={defaults.is_pinned} label="ปักหมุดไว้ด้านบน และแสดงบนหน้าแรก" />
-      <div><Button type="submit" loading={busy}><Save className="h-4 w-4" /> บันทึก</Button></div>
+      <div><Button type="submit" loadingState="saving" loading={busy}><Save className="h-4 w-4" /> บันทึก</Button></div>
     </form>
   );
 }
@@ -142,7 +142,7 @@ export function AnnouncementActions({ id, visibility, broadcastAt }: { id: strin
     const r = await api<Record<string, unknown>>(path, init);
     setBusy(false);
     if (r.ok) {
-      toast({ title: done(r.data), variant: "success" });
+      toast({ ...(path.endsWith("/broadcast") ? { brandState: "notification" as const } : {}), title: done(r.data), variant: "success" });
       if (after) after();
       else router.refresh();
     } else toast({ title: "ทำรายการไม่สำเร็จ", description: r.message, variant: "destructive" });
@@ -150,7 +150,7 @@ export function AnnouncementActions({ id, visibility, broadcastAt }: { id: strin
   const setVis = (v: string, label: string) => void call(`/api/admin/announcements/${id}/visibility`, { method: "PATCH", body: { visibility: v } }, () => label);
   return (
     <>
-      {visibility !== "published" && <Button loading={busy} onClick={() => setVis("published", "เผยแพร่ประกาศแล้ว")}><Globe className="h-4 w-4" /> เผยแพร่</Button>}
+      {visibility !== "published" && <Button loadingState="saving" loading={busy} onClick={() => setVis("published", "เผยแพร่ประกาศแล้ว")}><Globe className="h-4 w-4" /> เผยแพร่</Button>}
       {visibility === "published" && <Button variant="outline" disabled={busy} onClick={() => setVis("draft", "ถอยเป็นฉบับร่างแล้ว")}><EyeOff className="h-4 w-4" /> ถอยเป็นฉบับร่าง</Button>}
       {visibility !== "archived" && <Button variant="outline" disabled={busy} onClick={() => setVis("archived", "เก็บเข้าคลังแล้ว")}><Archive className="h-4 w-4" /> เก็บเข้าคลัง</Button>}
       {visibility === "published" && !broadcastAt && <Button variant="outline" disabled={busy} onClick={() => setConfirm("broadcast")}><Mail className="h-4 w-4" /> ส่งอีเมลประชาสัมพันธ์</Button>}

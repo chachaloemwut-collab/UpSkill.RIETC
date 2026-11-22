@@ -240,7 +240,7 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
       </fieldset>
 
       <div className="flex justify-end">
-        <Button type="submit" loading={busy}><Save className="h-4 w-4" /> {submitLabel}</Button>
+        <Button type="submit" loadingState="saving" loading={busy}><Save className="h-4 w-4" /> {submitLabel}</Button>
       </div>
     </form>
   );
@@ -319,7 +319,7 @@ export function ShiftDatesButton({ cohortId }: { cohortId: string }) {
           {valid && <p className="text-sm text-muted-foreground">วันทั้งหมดจะ{n > 0 ? "เลื่อนไปข้างหน้า" : "ย้อนกลับ"} {Math.abs(n)} วัน</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>ยกเลิก</Button>
-            <Button loading={busy} disabled={!valid} onClick={() => void shift()}>ยืนยัน</Button>
+            <Button loadingState="saving" loading={busy} disabled={!valid} onClick={() => void shift()}>ยืนยัน</Button>
           </div>
         </div>
       </Dialog>
@@ -344,7 +344,7 @@ export function CohortStatusActions({ cohortId, status }: { cohortId: string; st
   if (status === "cancelled") return null;
   return (
     <>
-      {status === "draft" && <Button loading={busy} onClick={() => void act("publish")}><Globe className="h-4 w-4" /> เผยแพร่รอบ</Button>}
+      {status === "draft" && <Button loadingState="saving" loading={busy} onClick={() => void act("publish")}><Globe className="h-4 w-4" /> เผยแพร่รอบ</Button>}
       <Button variant="outline" className="text-destructive" disabled={busy} onClick={() => setConfirmCancel(true)}><Ban className="h-4 w-4" /> ยกเลิกรอบ</Button>
       <AlertDialog
         open={confirmCancel}

@@ -4,10 +4,11 @@
  * contact details are pre-filled and editable for this application, and the same core rules as the server
  * validate every field before sending.
  */
+import { BrandSignal } from "@/components/brand/BrandActivity";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { CheckCircle2, ClipboardList, FileUp, Paperclip, Printer, X } from "lucide-react";
+import { ClipboardList, FileUp, Paperclip, Printer, X } from "lucide-react";
 import {
   APPLICATION_FILE_MAX_BYTES,
   EDUCATION_LEVELS,
@@ -217,7 +218,7 @@ export function CourseApplicationForm({
   if (done)
     return (
       <Card className="grid justify-items-center gap-4 p-8 text-center">
-        <CheckCircle2 className="h-12 w-12 text-success" />
+        <BrandSignal state={done.status === "approved" ? "enroll-success" : "saving"} broadcast className="size-12" />
         <div>
           <p className="text-lg font-semibold">ส่งใบสมัครเรียบร้อย</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -408,7 +409,7 @@ export function CourseApplicationForm({
         <ElectronicSignatureNotice />
       </Section>
 
-      <Button type="submit" size="lg" loading={busy} className="w-full">
+      <Button type="submit" size="lg" loadingState="enrolling" loading={busy} className="w-full">
         ส่งใบสมัคร{settings.requireApproval ? "" : "และลงทะเบียนเรียน"}
       </Button>
     </form>

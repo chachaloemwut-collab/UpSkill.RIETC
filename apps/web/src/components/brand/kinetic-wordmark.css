@@ -1,0 +1,651 @@
+.ur-kw {
+  --speed: 1.75;
+  --up: #16345b;
+  --re: #2563eb;
+  --dot: #d4a03d;
+  --rietc: #475569;
+  --gold: #d4a03d;
+  --green: #16a34a;
+  --amber: #d97706;
+  --primary: #2563eb;
+  --red: #dc2626;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  user-select: none;
+  perspective: 700px;
+  --fs: 0.94rem;
+  --icon: 30px;
+}
+.ur-kw.ur-big {
+  --fs: clamp(1.1rem, 2.4vw, 1.75rem);
+  --icon: 44px;
+  gap: 16px;
+}
+
+.ur-kw-badge {
+  width: var(--icon);
+  height: var(--icon);
+  flex-shrink: 0;
+  position: relative;
+  transform-origin: center;
+}
+
+.ur-kw-word {
+  font-family: var(--font-prompt), sans-serif;
+  font-size: var(--fs);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: baseline;
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+.ur-ch {
+  display: inline-block;
+  position: relative;
+  transform-origin: center bottom;
+
+}
+.ur-ch.up { font-weight: 700; color: var(--up); }
+.ur-ch.re { font-weight: 700; color: var(--re); }
+.ur-ch.dot { font-weight: 700; color: var(--dot); padding: 0 1px; transform-origin: center; }
+.ur-ch.rietc { font-weight: 500; font-size: 0.87em; letter-spacing: 0.03em; color: var(--rietc); }
+
+/* Decorative floating actors inside wordmark */
+.ur-actor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* ========================================================
+   30 COMPLEX CUTE KINETIC CHOREOGRAPHIES
+   ======================================================== */
+
+/* 01. pixar-dot-hop: จุดทองกระโดดเหยียบหัวตัวอักษรทีละตัว ตัวโดนเหยียบยุบแล้วเด้งคืน */
+.ur-k-pixar-dot-hop .ur-actor-ball {
+  width: 0.34em; height: 0.34em; border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #FDE08D, #D4A03D);
+  box-shadow: 0 3px 8px rgba(212,160,61,0.5);
+  left: 0; top: -0.35em;
+  animation: ur-pixarBall calc(3.2s / var(--speed)) linear var(--ur-cycles, 1);
+}
+.ur-k-pixar-dot-hop .ur-ch.up, .ur-k-pixar-dot-hop .ur-ch.re {
+  animation: ur-pixarSquish calc(3.2s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.14s / var(--speed));
+}
+.ur-k-pixar-dot-hop .ur-ch.dot {
+  animation: ur-dotHideArrive calc(3.2s / var(--speed)) ease-out var(--ur-cycles, 1);
+}
+.ur-k-pixar-dot-hop .ur-ch.rietc {
+  animation: ur-rietcPopUp calc(3.2s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+  animation-delay: calc((var(--i) - 15) * 0.05s / var(--speed));
+}
+
+/* 02. accordion-unfold: U และ R แยกตัวคลี่หีบเพลงดึง pskill / eskill ออกมา */
+.ur-k-accordion-unfold .ur-ch.mid {
+  animation: ur-accordionMid calc(2.8s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+  transform-origin: left center;
+}
+.ur-k-accordion-unfold .ur-ch.anchor {
+  animation: ur-anchorPull calc(2.8s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+}
+.ur-k-accordion-unfold .ur-ch.rietc {
+  animation: ur-flipInY calc(2.8s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+  animation-delay: calc((var(--i) - 14) * 0.06s / var(--speed));
+}
+
+/* 03. domino-nudge: ไอคอน UR ชน U ทำให้ตัวอักษรล้มคลื่นโดมิโนสปริง */
+.ur-k-domino-nudge .ur-kw-badge {
+  animation: ur-badgeNudge calc(2.4s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+}
+.ur-k-domino-nudge .ur-ch {
+  animation: ur-dominoWave calc(2.4s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+  animation-delay: calc(0.18s + var(--i) * 0.045s / var(--speed));
+}
+
+/* 04. typewriter-ribbon: เคอร์เซอร์ทองวิ่งพิมพ์ทีละตัวแบบ Elastic Pop */
+.ur-k-typewriter-ribbon .ur-ch {
+  animation: ur-elasticType calc(3.2s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.075s / var(--speed));
+}
+.ur-k-typewriter-ribbon .ur-actor-cursor {
+  width: 3px; height: 1.05em; border-radius: 3px;
+  background: linear-gradient(180deg, #2563EB, #D4A03D);
+  top: 0; left: 0;
+  animation: ur-cursorGlide calc(3.2s / var(--speed)) steps(20, end) var(--ur-cycles, 1);
+}
+
+/* 05. night-theme-flip: ตัวอักษรพลิก 3D เป็นคลื่นพร้อมจุดทองหมุนประกาย */
+.ur-k-night-theme-flip .ur-ch {
+  animation: ur-flip3DX calc(2.8s / var(--speed)) cubic-bezier(0.34,1.4,0.64,1) var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.055s / var(--speed));
+}
+.ur-k-night-theme-flip .ur-kw-badge {
+  animation: ur-flip3DY calc(2.8s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+}
+
+/* 06. mexican-wave-jump: กระโดดยืด–หด Squash & Stretch พร้อมเงาใต้ตัวอักษร */
+.ur-k-mexican-wave-jump .ur-ch {
+  animation: ur-cuteJump calc(1.9s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.065s / var(--speed));
+}
+
+/* 07. dot-juggling: จุดทองถูกโยนโค้งพาราโบลาระหว่าง U กับ R */
+.ur-k-dot-juggling .ur-actor-ball {
+  width: 0.34em; height: 0.34em; border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #FDE08D, #D4A03D);
+  left: 0.3em; top: -0.15em;
+  animation: ur-juggleArc calc(1.8s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+}
+.ur-k-dot-juggling .ur-ch.anchor {
+  animation: ur-tossBump calc(1.8s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+}
+.ur-k-dot-juggling .ur-ch.re.anchor { animation-delay: calc(0.9s / var(--speed)); }
+.ur-k-dot-juggling .ur-ch.rietc {
+  animation: ur-cheerSway calc(1.8s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.05s / var(--speed));
+}
+
+/* 08. magnetic-sync: Upskill กับ Reskill ดึงดูดเข้า–ออกผ่านจุดศูนย์กลางสีทอง */
+.ur-k-magnetic-sync .ur-ch.up { animation: ur-magLeft calc(2s / var(--speed)) cubic-bezier(0.45,0,0.55,1) var(--ur-cycles, 1); }
+.ur-k-magnetic-sync .ur-ch.re { animation: ur-magRight calc(2s / var(--speed)) cubic-bezier(0.45,0,0.55,1) var(--ur-cycles, 1); }
+.ur-k-magnetic-sync .ur-ch.dot { animation: ur-magCore calc(2s / var(--speed)) ease-in-out var(--ur-cycles, 1); }
+.ur-k-magnetic-sync .ur-ch.rietc { animation: ur-magRightSoft calc(2s / var(--speed)) ease-in-out var(--ur-cycles, 1); }
+
+/* 09. sleepy-offline: ตัวอักษรคอตกเอนง่วงนอน + ฟอง Zzz ลอยขึ้นจากจุดทอง */
+.ur-k-sleepy-offline .ur-ch {
+  opacity: 0.62;
+  animation: ur-sleepySlouch calc(2.8s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.05s / var(--speed));
+}
+.ur-k-sleepy-offline .ur-actor-zzz {
+  font-family: var(--font-prompt), sans-serif; font-size: 0.48em; font-weight: 700;
+  color: var(--primary); right: 24%; top: -0.65em;
+  animation: ur-floatZzz calc(2.4s / var(--speed)) ease-out var(--ur-cycles, 1);
+}
+
+/* 10. crane-maintenance: ตัว R ถูกยกขึ้นซ่อมบำรุง ตัวข้างเคียงขยับหลบ */
+.ur-k-crane-maintenance .ur-ch[data-c="R"] {
+  animation: ur-craneLift calc(2.6s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+}
+.ur-k-crane-maintenance .ur-ch.up { animation: ur-leanAwayL calc(2.6s / var(--speed)) ease-in-out var(--ur-cycles, 1); }
+.ur-k-crane-maintenance .ur-ch.re:not([data-c="R"]) { animation: ur-leanAwayR calc(2.6s / var(--speed)) ease-in-out var(--ur-cycles, 1); }
+.ur-k-crane-maintenance .ur-ch.dot { animation: ur-sirenBlink calc(1s / var(--speed)) ease-in-out var(--ur-cycles, 1); }
+
+/* 11. keyhole-unlock: ตัวอักษรหดเข้าหาจุดทองที่หมุนปลดล็อก แล้วดีดเปิดบานออก */
+.ur-k-keyhole-unlock .ur-ch.up { animation: ur-lockPullL calc(2.4s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1); }
+.ur-k-keyhole-unlock .ur-ch.re { animation: ur-lockPullM calc(2.4s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1); }
+.ur-k-keyhole-unlock .ur-ch.dot { animation: ur-keySpin calc(2.4s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1); }
+.ur-k-keyhole-unlock .ur-ch.rietc { animation: ur-lockPullR calc(2.4s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1); }
+
+/* 12. login-celebrate: กระโดดดีใจพร้อมกัน + ประกายสายรุ้งสีเขียวทอง */
+.ur-k-login-celebrate .ur-ch {
+  animation: ur-joyBounce calc(1.6s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.04s / var(--speed));
+}
+.ur-k-login-celebrate .ur-ch.dot { color: var(--green); }
+.ur-k-login-celebrate .ur-kw-badge { animation: ur-badgeHappy calc(1.6s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1); }
+
+/* 13. confused-wobble: ตัวอักษรเอียงคอทำหน้างงสลับซ้ายขวา + จุดทองเด้งเป็น ? */
+.ur-k-confused-wobble .ur-ch {
+  animation: ur-headTilt calc(2.2s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.03s / var(--speed));
+}
+.ur-k-confused-wobble .ur-actor-q {
+  font-family: var(--font-prompt), sans-serif; font-size: 0.6em; font-weight: 700;
+  color: var(--amber); left: 64%; top: -0.75em;
+  animation: ur-qPop calc(2.2s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+}
+
+/* 14. wave-goodbye: โบกมือเอียงแล้วพับเก็บทีละตัวกลับเข้ากรอบ UR */
+.ur-k-wave-goodbye .ur-ch {
+  animation: ur-byeFold calc(2.8s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc((19 - var(--i)) * 0.05s / var(--speed));
+}
+.ur-k-wave-goodbye .ur-kw-badge { animation: ur-badgeWave calc(2.8s / var(--speed)) ease-in-out var(--ur-cycles, 1); }
+
+/* 15. register-sprout: ตัวอักษรงอกยืดจากพื้นเหมือนต้นอ่อนผลิบาน */
+.ur-k-register-sprout .ur-ch {
+  animation: ur-sproutGrow calc(2.4s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.05s / var(--speed));
+}
+
+/* 16. magnifying-walk: แว่นขยายวิ่งผ่าน ตัวอักษรใต้เลนส์ขยายใหญ่เด้งขึ้นจริง */
+.ur-k-magnifying-walk .ur-ch {
+  animation: ur-lensZoom calc(2.8s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.11s / var(--speed));
+}
+.ur-k-magnifying-walk .ur-actor-lens {
+  width: 1.15em; height: 1.15em; border-radius: 50%;
+  border: 2.5px solid var(--gold);
+  background: rgba(96,165,250,0.16);
+  top: -0.08em; left: 0;
+  animation: ur-lensGlide calc(2.8s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+}
+
+/* 17. ticket-fold: คำหลักย่นเหมือนตั๋วอบรมถูกประทับตรา */
+.ur-k-ticket-fold .ur-kw-word { animation: ur-ticketCompress calc(2.2s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1); }
+.ur-k-ticket-fold .ur-ch.dot { animation: ur-stampDrop calc(2.2s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1); }
+
+/* 18. confetti-burst: จุดทองระเบิดพลุกระดาษจิ๋ว 6 เม็ด + ตัวอักษรเต้นโยก */
+.ur-k-confetti-burst .ur-ch {
+  animation: ur-partyDance calc(1.5s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.06s / var(--speed));
+}
+.ur-k-confetti-burst .ur-actor-conf {
+  left: 66%; top: 0.1em; width: 6px; height: 6px; border-radius: 2px;
+  box-shadow: 0 0 0 0 #2563EB, 0 0 0 0 #D4A03D, 0 0 0 0 #16A34A, 0 0 0 0 #EC4899, 0 0 0 0 #60A5FA, 0 0 0 0 #F59E0B;
+  animation: ur-confettiPop calc(1.5s / var(--speed)) ease-out var(--ur-cycles, 1);
+}
+
+/* 19. queue-march: ตัวอักษรเดินย่ำเท้าต่อคิวน่ารัก + จุดทองกลิ้งไปมา */
+.ur-k-queue-march .ur-ch {
+  animation: ur-queueStep calc(1.6s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.08s / var(--speed));
+}
+.ur-k-queue-march .ur-ch.dot { animation: ur-dotRoll calc(1.6s / var(--speed)) ease-in-out var(--ur-cycles, 1); }
+
+/* 20. envelope-zip: ตัวอักษรพับเข้าซองแล้วพุ่งส่งเฉียงขึ้นขวา */
+.ur-k-envelope-zip .ur-kw-word { animation: ur-zipSend calc(2.5s / var(--speed)) cubic-bezier(0.34,1.3,0.64,1) var(--ur-cycles, 1); }
+.ur-k-envelope-zip .ur-kw-badge { animation: ur-badgeRecoil calc(2.5s / var(--speed)) ease-in-out var(--ur-cycles, 1); }
+
+/* 21. equalizer-play: ตัวอักษรยืด–หดความสูงเป็นจังหวะ Equalizer */
+.ur-k-equalizer-play .ur-ch {
+  animation: ur-eqBar calc(1.2s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.07s / var(--speed));
+}
+
+/* 22. heartbeat-study: คลื่นชีพจรสีเขียวมินต์วิ่งไล่ตัวอักษรทุก 2 วินาที */
+.ur-k-heartbeat-study .ur-ch {
+  animation: ur-heartWave calc(2.2s / var(--speed)) ease-out var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.055s / var(--speed));
+}
+
+/* 23. staircase-levelup: ตัวอักษรยกเรียงเป็นขั้นบันไดไต่ระดับขึ้น */
+.ur-k-staircase-levelup .ur-ch {
+  animation: ur-stairClimb calc(2.6s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.045s / var(--speed));
+}
+
+/* 24. quiz-thinking: ฟิสิกส์ลูกตุ้มนิวตัน ตัวแรกกับตัวสุดท้ายแกว่งส่งแรงข้ามคำ */
+.ur-k-quiz-thinking .ur-ch:first-child { transform-origin: top center; animation: ur-newtonL calc(1.8s / var(--speed)) ease-in-out var(--ur-cycles, 1); }
+.ur-k-quiz-thinking .ur-ch:last-child { transform-origin: top center; animation: ur-newtonR calc(1.8s / var(--speed)) ease-in-out var(--ur-cycles, 1); }
+.ur-k-quiz-thinking .ur-ch:not(:first-child):not(:last-child) {
+  animation: ur-newtonMid calc(1.8s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+}
+
+/* 25. trophy-crown: มงกุฎทองตกลงมาสวมตัว R ของ Reskill พร้อมแสงทองกวาด */
+.ur-k-trophy-crown .ur-actor-crown {
+  font-size: 0.65em; left: 37%; top: -0.82em;
+  animation: ur-crownDrop calc(2.4s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+}
+.ur-k-trophy-crown .ur-ch.re {
+  animation: ur-goldSweepText calc(2.4s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc((var(--i) - 7) * 0.07s / var(--speed));
+}
+
+/* 26. laser-xray-verify: ลำแสงสแกนแนวตั้งกวาด ตัวที่โดนสแกนเรืองแสงฟ้าและยกตัว */
+.ur-k-laser-xray-verify .ur-actor-laser {
+  width: 4px; height: 1.55em; border-radius: 4px;
+  background: linear-gradient(180deg, transparent, #60A5FA, #FDE08D, #60A5FA, transparent);
+  box-shadow: 0 0 12px #60A5FA;
+  top: -0.25em; left: 0;
+  animation: ur-laserSweepX calc(2.4s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+}
+.ur-k-laser-xray-verify .ur-ch {
+  animation: ur-xrayPop calc(2.4s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.085s / var(--speed));
+}
+
+/* 27. wax-seal-verified: ตัวอักษรยืนตรงภูมิฐาน + จุดทองขยายกดประทับตราครั่ง */
+.ur-k-wax-seal-verified .ur-ch.dot {
+  animation: ur-waxStamp calc(2.4s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1);
+}
+.ur-k-wax-seal-verified .ur-ch:not(.dot) {
+  animation: ur-proudSettle calc(2.4s / var(--speed)) ease-out var(--ur-cycles, 1);
+}
+
+/* 28. pdf-origami-print: ตัวอักษรไหลพิมพ์ออกจากด้านบนเหมือนกระดาษ PDF */
+.ur-k-pdf-origami-print .ur-kw-word { overflow: hidden; padding: 2px 0; }
+.ur-k-pdf-origami-print .ur-ch {
+  animation: ur-printRoll calc(2.4s / var(--speed)) cubic-bezier(0.22,1,0.36,1) var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.04s / var(--speed));
+}
+
+/* 29. share-paperplane: เครื่องบินกระดาษจิ๋วบินโฉบเหนือคำ ตัวอักษรปลิวเอนตามลม */
+.ur-k-share-paperplane .ur-actor-plane {
+  font-size: 0.72em; left: -0.5em; top: -0.65em; color: var(--gold);
+  animation: ur-planeSwoop calc(2.4s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+}
+.ur-k-share-paperplane .ur-ch {
+  animation: ur-windGust calc(2.4s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc(var(--i) * 0.07s / var(--speed));
+}
+
+/* 30. bell-giggle: ไอคอน UR แกว่งกระดิ่ง + RIETC หัวเราะคิกคัก + จุดทองกระโดด */
+.ur-k-bell-giggle .ur-kw-badge { transform-origin: top center; animation: ur-bellRing calc(1.9s / var(--speed)) ease-in-out var(--ur-cycles, 1); }
+.ur-k-bell-giggle .ur-ch.dot { animation: ur-dotGiggle calc(1.9s / var(--speed)) cubic-bezier(0.34,1.56,0.64,1) var(--ur-cycles, 1); }
+.ur-k-bell-giggle .ur-ch.rietc {
+  animation: ur-letterGiggle calc(1.9s / var(--speed)) ease-in-out var(--ur-cycles, 1);
+  animation-delay: calc((var(--i) - 14) * 0.06s / var(--speed));
+}
+
+/* ========================================================
+   KEYFRAMES LIBRARY
+   ======================================================== */
+@keyframes ur-pixarBall {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  10%  { transform: translate(1.2em, -0.7em) scale(0.9, 1.15); }
+  20%  { transform: translate(2.4em, 0.08em) scale(1.25, 0.75); }
+  30%  { transform: translate(3.6em, -0.75em) scale(0.9, 1.15); }
+  40%  { transform: translate(4.8em, 0.08em) scale(1.25, 0.75); }
+  50%  { transform: translate(6.0em, -0.75em) scale(0.9, 1.15); }
+  60%  { transform: translate(7.1em, 0.08em) scale(1.25, 0.75); }
+  72%  { transform: translate(7.8em, -0.55em) scale(0.95, 1.1); opacity: 1; }
+  80%  { transform: translate(8.05em, 0.65em) scale(1.2, 0.8); opacity: 0; }
+  100% { transform: translate(8.05em, 0.65em) scale(1); opacity: 0; }
+}
+@keyframes ur-pixarSquish {
+  0%, 16%, 100% { transform: scale(1, 1); }
+  8% { transform: scale(1.22, 0.72) translateY(0.08em); }
+  13% { transform: scale(0.92, 1.12) translateY(-0.06em); }
+}
+@keyframes ur-dotHideArrive {
+  0%, 76% { opacity: 0; transform: scale(0); }
+  84% { opacity: 1; transform: scale(1.4); }
+  92%, 100% { opacity: 1; transform: scale(1); }
+}
+@keyframes ur-rietcPopUp {
+  0%, 75% { opacity: 0.25; transform: translateY(6px); }
+  88%, 100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes ur-accordionMid {
+  0%, 15% { max-width: 0; opacity: 0; transform: scaleX(0); }
+  42%, 85% { max-width: 1.2em; opacity: 1; transform: scaleX(1); }
+  100% { max-width: 0; opacity: 0; transform: scaleX(0); }
+}
+@keyframes ur-anchorPull {
+  0%, 15% { transform: scale(1.12); }
+  42%, 85% { transform: scale(1); }
+  100% { transform: scale(1.12); }
+}
+@keyframes ur-flipInY {
+  0%, 35% { opacity: 0; transform: rotateY(-90deg); }
+  55%, 88% { opacity: 1; transform: rotateY(0deg); }
+  100% { opacity: 0; transform: rotateY(90deg); }
+}
+@keyframes ur-badgeNudge {
+  0%, 40%, 100% { transform: translateX(0) rotate(0deg); }
+  14% { transform: translateX(-5px) rotate(-10deg); }
+  24% { transform: translateX(7px) rotate(12deg); }
+}
+@keyframes ur-dominoWave {
+  0%, 45%, 100% { transform: rotate(0deg) translateY(0); }
+  18% { transform: rotate(20deg) translateX(2px); }
+  32% { transform: rotate(-8deg) translateY(-2px); }
+}
+@keyframes ur-elasticType {
+  0%, 6% { opacity: 0; transform: scale(0.2) translateY(8px); }
+  18%, 82% { opacity: 1; transform: scale(1) translateY(0); }
+  95%, 100% { opacity: 0; transform: scale(0.8); }
+}
+@keyframes ur-cursorGlide {
+  0% { transform: translateX(0); opacity: 1; }
+  55% { transform: translateX(11.4em); opacity: 1; }
+  75%, 100% { transform: translateX(11.4em); opacity: 0; }
+}
+@keyframes ur-flip3DX {
+  0%, 50%, 100% { transform: rotateX(0deg); }
+  25% { transform: rotateX(360deg) scale(1.08); }
+}
+@keyframes ur-flip3DY {
+  0%, 50%, 100% { transform: rotateY(0deg); }
+  25% { transform: rotateY(180deg); }
+}
+@keyframes ur-cuteJump {
+  0%, 55%, 100% { transform: translateY(0) scale(1, 1); }
+  12% { transform: translateY(2px) scale(1.18, 0.8); }
+  28% { transform: translateY(-0.48em) scale(0.88, 1.18); }
+  44% { transform: translateY(1px) scale(1.12, 0.88); }
+}
+@keyframes ur-juggleArc {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  25%  { transform: translate(2.1em, -0.95em) scale(1.15); }
+  50%  { transform: translate(4.2em, 0) scale(1.2, 0.8); }
+  75%  { transform: translate(2.1em, -0.95em) scale(1.15); }
+  100% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+@keyframes ur-tossBump {
+  0%, 25%, 100% { transform: translateY(0) scale(1); }
+  8% { transform: translateY(3px) scale(1.15, 0.84); }
+  16% { transform: translateY(-4px) scale(0.92, 1.12); }
+}
+@keyframes ur-cheerSway {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+@keyframes ur-magLeft { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+@keyframes ur-magRight { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-4px); } }
+@keyframes ur-magRightSoft { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-2px); } }
+@keyframes ur-magCore { 0%, 100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.6) rotate(180deg); } }
+@keyframes ur-sleepySlouch {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  50% { transform: rotate(11deg) translateY(3px) scaleY(0.92); }
+}
+@keyframes ur-floatZzz {
+  0% { opacity: 0; transform: translate(0, 4px) scale(0.7); }
+  40% { opacity: 1; transform: translate(4px, -4px) scale(1); }
+  100% { opacity: 0; transform: translate(10px, -14px) scale(1.15); }
+}
+@keyframes ur-craneLift {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  35%, 65% { transform: translateY(-0.38em) rotate(-8deg); }
+}
+@keyframes ur-leanAwayL { 0%, 100% { transform: translateX(0); } 35%, 65% { transform: translateX(-2px); } }
+@keyframes ur-leanAwayR { 0%, 100% { transform: translateX(0); } 35%, 65% { transform: translateX(2px); } }
+@keyframes ur-sirenBlink { 0%, 100% { opacity: 0.35; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.45); } }
+@keyframes ur-lockPullL {
+  0%, 100% { transform: translateX(0); }
+  35% { transform: translateX(6px) scaleX(0.92); }
+  55% { transform: translateX(-4px) scaleX(1.04); }
+}
+@keyframes ur-lockPullM {
+  0%, 100% { transform: translateX(0); }
+  35% { transform: translateX(3px) scaleX(0.94); }
+  55% { transform: translateX(-2px) scaleX(1.04); }
+}
+@keyframes ur-lockPullR {
+  0%, 100% { transform: translateX(0); }
+  35% { transform: translateX(-6px); }
+  55% { transform: translateX(4px); }
+}
+@keyframes ur-keySpin {
+  0%, 20% { transform: scale(1) rotate(0deg); }
+  40% { transform: scale(1.65) rotate(180deg); color: var(--green); }
+  60%, 100% { transform: scale(1) rotate(360deg); }
+}
+@keyframes ur-joyBounce {
+  0%, 60%, 100% { transform: translateY(0) scale(1); }
+  20% { transform: translateY(-0.36em) scale(1.08); }
+  40% { transform: translateY(0) scale(1.12, 0.88); }
+}
+@keyframes ur-badgeHappy {
+  0%, 60%, 100% { transform: scale(1) rotate(0deg); }
+  22% { transform: scale(1.12) rotate(-8deg); }
+  40% { transform: scale(1.08) rotate(8deg); }
+}
+@keyframes ur-headTilt {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-10deg) translateY(-1px); }
+  42% { transform: rotate(10deg) translateY(1px); }
+}
+@keyframes ur-qPop {
+  0%, 15% { opacity: 0; transform: translateY(6px) scale(0.4) rotate(-15deg); }
+  35%, 70% { opacity: 1; transform: translateY(0) scale(1.1) rotate(8deg); }
+  100% { opacity: 0; transform: translateY(-4px) scale(0.8); }
+}
+@keyframes ur-byeFold {
+  0%, 25% { opacity: 1; transform: rotate(0deg) translateX(0); }
+  42% { opacity: 1; transform: rotate(14deg) translateY(-3px); }
+  72%, 86% { opacity: 0; transform: translateX(-20px) scale(0.5); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes ur-badgeWave {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-14deg); }
+  45% { transform: rotate(10deg); }
+  60% { transform: rotate(-8deg); }
+}
+@keyframes ur-sproutGrow {
+  0%, 12% { opacity: 0; transform: scaleY(0.1) scaleX(1.3); }
+  38% { opacity: 1; transform: scaleY(1.2) scaleX(0.9); }
+  55%, 88% { opacity: 1; transform: scaleY(1) scaleX(1); }
+  100% { opacity: 0; transform: scaleY(0.1); }
+}
+@keyframes ur-lensZoom {
+  0%, 28%, 100% { transform: scale(1) translateY(0); }
+  14% { transform: scale(1.38) translateY(-0.1em); color: var(--primary); }
+}
+@keyframes ur-lensGlide {
+  0% { transform: translateX(-0.3em); opacity: 0; }
+  12%, 85% { opacity: 1; }
+  92% { transform: translateX(10.6em); opacity: 0; }
+  100% { transform: translateX(10.6em); opacity: 0; }
+}
+@keyframes ur-ticketCompress {
+  0%, 100% { letter-spacing: -0.02em; transform: scaleX(1); }
+  35% { letter-spacing: -0.09em; transform: scaleX(0.88) scaleY(1.06); }
+  55% { letter-spacing: 0.01em; transform: scaleX(1.03) scaleY(0.97); }
+}
+@keyframes ur-stampDrop {
+  0%, 20% { transform: translateY(-0.7em) scale(1.6); }
+  38% { transform: translateY(0) scale(1.3, 0.7); }
+  55%, 100% { transform: translateY(0) scale(1); }
+}
+@keyframes ur-partyDance {
+  0%, 100% { transform: rotate(-5deg) translateY(0); }
+  50% { transform: rotate(5deg) translateY(-0.16em); }
+}
+@keyframes ur-confettiPop {
+  0% { opacity: 0; box-shadow: 0 0 0 0 #2563EB, 0 0 0 0 #D4A03D, 0 0 0 0 #16A34A, 0 0 0 0 #EC4899, 0 0 0 0 #60A5FA, 0 0 0 0 #F59E0B; }
+  25% { opacity: 1; }
+  100% { opacity: 0; box-shadow: -22px -24px 0 0 #2563EB, 22px -26px 0 0 #D4A03D, -30px -6px 0 0 #16A34A, 28px -8px 0 0 #EC4899, -8px -32px 0 0 #60A5FA, 10px -30px 0 0 #F59E0B; }
+}
+@keyframes ur-queueStep {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-0.14em) rotate(4deg); }
+}
+@keyframes ur-dotRoll {
+  0%, 100% { transform: translateX(-2px) rotate(0deg); }
+  50% { transform: translateX(3px) rotate(180deg); }
+}
+@keyframes ur-zipSend {
+  0%, 18% { transform: scale(1) translate(0, 0); opacity: 1; }
+  45% { transform: scale(0.72, 0.85) translate(8px, -4px) skewX(-10deg); opacity: 0.9; }
+  68% { transform: scale(0.3) translate(70px, -28px); opacity: 0; }
+  72% { transform: scale(0.6) translate(-18px, 6px); opacity: 0; }
+  92%, 100% { transform: scale(1) translate(0, 0); opacity: 1; }
+}
+@keyframes ur-badgeRecoil {
+  0%, 40%, 100% { transform: translateX(0); }
+  52% { transform: translateX(-5px) rotate(-6deg); }
+}
+@keyframes ur-eqBar {
+  0%, 100% { transform: scaleY(0.84); }
+  50% { transform: scaleY(1.24); }
+}
+@keyframes ur-heartWave {
+  0%, 28%, 100% { transform: translateY(0) scale(1); }
+  12% { transform: translateY(-0.22em) scale(1.12); color: var(--green); }
+}
+@keyframes ur-stairClimb {
+  0%, 100% { transform: translateY(0); }
+  40%, 65% { transform: translateY(calc((var(--i) - 9) * -0.028em)); }
+}
+@keyframes ur-newtonL {
+  0%, 50%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(28deg) translateX(-4px); }
+}
+@keyframes ur-newtonR {
+  0%, 50%, 100% { transform: rotate(0deg); }
+  75% { transform: rotate(-28deg) translateX(4px); }
+}
+@keyframes ur-newtonMid {
+  0%, 45%, 55%, 100% { transform: translateX(0); }
+  50% { transform: translateX(1.5px); }
+}
+@keyframes ur-crownDrop {
+  0%, 12% { opacity: 0; transform: translateY(-16px) rotate(-18deg) scale(0.6); }
+  32% { opacity: 1; transform: translateY(2px) rotate(6deg) scale(1.15); }
+  48%, 85% { opacity: 1; transform: translateY(0) rotate(-6deg) scale(1); }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+@keyframes ur-goldSweepText {
+  0%, 35%, 100% { color: var(--re); transform: translateY(0); }
+  55% { color: var(--gold); transform: translateY(-3px) scale(1.1); }
+}
+@keyframes ur-laserSweepX {
+  0% { transform: translateX(-0.3em); opacity: 0; }
+  10%, 88% { opacity: 1; }
+  95% { transform: translateX(11.2em); opacity: 0; }
+  100% { transform: translateX(11.2em); opacity: 0; }
+}
+@keyframes ur-xrayPop {
+  0%, 24%, 100% { transform: translateY(0); text-shadow: none; }
+  12% { transform: translateY(-3px) scale(1.12); text-shadow: 0 0 10px rgba(96,165,250,0.85); }
+}
+@keyframes ur-waxStamp {
+  0%, 20% { transform: scale(1); }
+  38% { transform: scale(2.2); color: var(--green); }
+  52% { transform: scale(1.45); color: var(--gold); }
+  75%, 100% { transform: scale(1); }
+}
+@keyframes ur-proudSettle {
+  0%, 36%, 100% { transform: scale(1); }
+  46% { transform: scale(1.03); }
+}
+@keyframes ur-printRoll {
+  0%, 12% { opacity: 0; transform: translateY(-1.2em); }
+  36%, 84% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(0.8em); }
+}
+@keyframes ur-planeSwoop {
+  0% { transform: translate(0, 0.3em) rotate(-18deg) scale(0.7); opacity: 0; }
+  15% { opacity: 1; }
+  50% { transform: translate(5.5em, -0.35em) rotate(8deg) scale(1.15); opacity: 1; }
+  88% { transform: translate(11.8em, -0.75em) rotate(-14deg) scale(0.9); opacity: 0; }
+  100% { transform: translate(11.8em, -0.75em); opacity: 0; }
+}
+@keyframes ur-windGust {
+  0%, 30%, 100% { transform: skewX(0deg) translateY(0); }
+  15% { transform: skewX(-16deg) translateY(-4px); }
+}
+@keyframes ur-bellRing {
+  0%, 55%, 100% { transform: rotate(0deg); }
+  12% { transform: rotate(14deg); }
+  24% { transform: rotate(-14deg); }
+  36% { transform: rotate(9deg); }
+  46% { transform: rotate(-6deg); }
+}
+@keyframes ur-dotGiggle {
+  0%, 55%, 100% { transform: translateY(0) scale(1); }
+  20% { transform: translateY(-0.35em) scale(1.35); color: var(--red); }
+  38% { transform: translateY(0) scale(0.9); }
+}
+@keyframes ur-letterGiggle {
+  0%, 55%, 100% { transform: translateY(0) rotate(0deg); }
+  18% { transform: translateY(-3px) rotate(-6deg); }
+  36% { transform: translateY(1px) rotate(6deg); }
+}
+
+
+.dark .ur-kw, .ur-kw.ur-inverted { --up: #f8fafc; --re: #93c5fd; --dot: #fde08d; --rietc: #cbd5e1; --gold: #fde08d; }
+.ur-kw .ur-actor { opacity: 0; }
+@media (prefers-reduced-motion: reduce), print {
+  .ur-kw *, .ur-kw *::after, .ur-kw *::before { animation: none !important; }
+  .ur-kw .ur-actor { display: none; }
+}

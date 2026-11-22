@@ -14,7 +14,8 @@ import {
   UserPlus,
 } from "lucide-react";
 import { AnimatedNumber, EmptyState, Reveal, SpotlightCard, buttonClass } from "@/components/ui";
-import { BRAND_NAME, BrandLogo } from "@/components/brand/BrandLogo";
+import { BRAND_NAME } from "@/components/brand/states";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { CertificatePreview } from "@/components/certificate/CertificatePreview";
 import { VerifyCodeForm } from "@/components/certificate/VerifyCodeForm";
 import { listPublishedCourses, publicStats } from "@/server/courses/courses.service";
@@ -353,7 +354,7 @@ export async function LandingPage() {
       <footer className="border-t">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
           <div className="grid content-start gap-3">
-            <BrandLogo mode="hover" />
+            <BrandLogo mode="unfold" />
             <p className="max-w-xs font-reading text-sm text-muted-foreground">ระบบเรียนออนไลน์ที่บันทึกเวลาเรียนจริง และออกเอกสารรับรองที่ตรวจสอบได้</p>
           </div>
           <FooterColumn

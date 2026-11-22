@@ -51,7 +51,7 @@ export const metadata: Metadata = {
   description: "เรียนออนไลน์จาก YouTube บันทึกเวลาเรียนจริง และรับวุฒิบัตรที่ตรวจสอบได้",
   icons: { icon: "/favicon.svg", apple: "/icons/apple-touch-icon.png" },
   // iPhone/iPad "Add to Home Screen" opens full screen with this title
-  appleWebApp: { capable: true, title: "UpSkill RIETC", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "UpskillReskill.RIETC", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
