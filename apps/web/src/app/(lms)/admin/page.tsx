@@ -5,6 +5,8 @@ import { Award, BadgeCheck, Ban, BookOpen, CalendarCheck, ClipboardList, Flag, G
 import { Badge, Card, EmptyState, Table, Tabs, TabsContent, TabsList, TabsTrigger, buttonClass } from "@/components/ui";
 import { AdminCreateCourseDialog } from "@/components/admin/CourseOwnerActions";
 import { AdminInvitations } from "@/components/admin/AdminInvitations";
+import { PartnerClientsManager } from "@/components/admin/PartnerClientsManager";
+import { listPartnerClients } from "@/server/partner/partner.service";
 import { listInstructors } from "@/server/courses/instructor.service";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
@@ -25,6 +27,7 @@ export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") redirect("/");
   const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings, googleSettings, instructors, courseDefaults, automationFlags, automationBacklog, certificateDisplay] = await Promise.all([adminOverview(), getEmailSettingsView(), getGoogleOAuthSettingsView(), listInstructors(), getCourseDefaults(), getAutomationFlags(), getAutomationBacklog(), getCertificateDisplay()]);
+  const partnerClients = await listPartnerClients();
 
   return (
     <>
@@ -57,6 +60,7 @@ export default async function AdminPage() {
           <TabsTrigger value="invitations">เชิญผู้สอน</TabsTrigger>
           <TabsTrigger value="certs">วุฒิบัตร</TabsTrigger>
           <TabsTrigger value="email">อีเมลและ Google ({stats.emailPending}/{stats.emailFailed})</TabsTrigger>
+          <TabsTrigger value="partners">ระบบภายนอก (API)</TabsTrigger>
           <TabsTrigger value="settings">ตั้งค่าระบบ</TabsTrigger>
         </TabsList>
 
@@ -217,6 +221,9 @@ export default async function AdminPage() {
             <div className="border-b px-5 py-4"><h3 className="font-semibold">อีเมลที่ถูกระงับ</h3><p className="text-xs text-muted-foreground">เกิดจาก hard bounce, complaint หรือการระงับโดยผู้ดูแล</p></div>
             {suppressions.length ? <Table><thead><tr><th>อีเมล</th><th>เหตุผล</th><th>เมื่อ</th><th /></tr></thead><tbody>{suppressions.map((item) => <tr key={item.email}><td>{item.email}</td><td>{item.reason}</td><td>{formatDateTimeTh(item.created_at)}</td><td className="text-right"><RemoveSuppressionButton email={item.email} /></td></tr>)}</tbody></Table> : <p className="p-5 text-sm text-muted-foreground">ไม่มีอีเมลที่ถูกระงับ</p>}
           </Card>
+        </TabsContent>
+        <TabsContent value="partners" className="mt-4">
+          <PartnerClientsManager clients={partnerClients} />
         </TabsContent>
         <TabsContent value="settings" className="mt-4 grid gap-6">
           <Card className="max-w-2xl">
