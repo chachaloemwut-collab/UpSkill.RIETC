@@ -384,6 +384,14 @@
    * fill the container and shrink instead. Any grid-cols-* / grid-flow-col utility (utilities layer) still wins.
    */
   .grid:not([class*="grid-cols-"]):not([class*="grid-flow-col"]) { grid-template-columns: minmax(0, 1fr); }
+  /*
+   * Typography rule (owner, 2026-11-22): content and document text — paragraphs, tables, forms, applications,
+   * descriptions — is Sarabun (body default, font-reading). Prompt is only for headings and for menus and controls:
+   * navigation, top bar, tabs, menu items and buttons. A font-* utility on an element still wins.
+   */
+  h1, h2, h3, h4, nav, button, [role="tab"], [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"] {
+    font-family: var(--font-sans);
+  }
 }
 
 @keyframes grow-x { from { transform: scaleX(0); } }
