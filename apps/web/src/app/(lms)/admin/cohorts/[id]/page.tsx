@@ -49,7 +49,7 @@ export default async function AdminCohortPage({ params }: { params: Promise<{ id
       )}
       {cohort.status === "cancelled" && <div className="mb-4"><Alert variant="destructive" title="รอบนี้ถูกยกเลิกแล้ว" /></div>}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard index={0} label="ที่นั่งที่ใช้" value={taken} unit={cohort.capacity === null ? "คน (ไม่จำกัด)" : `/ ${cohort.capacity}`} icon={<Users />} />
         <StatCard index={1} label="อนุมัติแล้ว" value={count("approved")} unit="คน" icon={<UserCheck />} />
         <StatCard index={2} label="รอพิจารณา" value={count("pending")} unit="คน" icon={<Clock3 />} />

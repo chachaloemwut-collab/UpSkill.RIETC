@@ -14,7 +14,7 @@ export const buttonSizes = {
   sm: "h-9 px-3 text-sm",
   md: "h-10 px-4 text-sm",
   lg: "h-11 px-6 text-base",
-  icon: "h-10 w-10",
+  icon: "h-10 w-10 shrink-0",
 };
 
 export function buttonClass(variant: keyof typeof buttonVariants = "default", size: keyof typeof buttonSizes = "md", className?: string) {

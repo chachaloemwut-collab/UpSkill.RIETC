@@ -33,7 +33,7 @@ export default async function InstructorPage() {
         {isAdmin ? <AdminCreateCourseDialog instructors={instructors} selfId={user.id} /> : <CreateCourseDialog />}
       </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard index={0} label="หลักสูตรทั้งหมด" value={courses.length} unit="หลักสูตร" hint={`เผยแพร่ ${courses.filter((c) => c.visibility === "published").length} หลักสูตร`} icon={<Presentation />} />
         <StatCard index={1} label="ผู้เรียนทั้งหมด" value={learners} unit="คน" icon={<Users />} />
         <StatCard index={2} label="เรียนจบแล้ว" value={graduates} unit="คน" hint={learners ? `${Math.round((graduates / learners) * 100)}% ของผู้เรียน` : undefined} icon={<CheckCircle2 />} />

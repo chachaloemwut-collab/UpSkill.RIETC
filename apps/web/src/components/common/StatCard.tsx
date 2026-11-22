@@ -36,21 +36,21 @@ export function StatCard({
 }) {
   return (
     <Card
-      className="animate-slide-up p-5 transition-[translate,box-shadow] duration-300 [animation-fill-mode:both] hover:-translate-y-0.5 hover:shadow-md"
+      className="min-w-0 animate-slide-up p-4 transition-[translate,box-shadow] duration-300 [animation-fill-mode:both] hover:-translate-y-0.5 hover:shadow-md sm:p-5"
       style={{ animationDelay: `${index * 60}ms` }}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+        <p className="min-w-0 text-[13px] font-medium leading-snug text-muted-foreground sm:text-sm">{label}</p>
         <span
           className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-105 [&>svg]:h-4 [&>svg]:w-4",
+            "hidden h-8 w-8 shrink-0 sm:flex items-center justify-center rounded-lg transition-transform group-hover:scale-105 [&>svg]:h-4 [&>svg]:w-4",
             tone ? TONE_STYLES[tone] : "bg-muted text-muted-foreground"
           )}
         >
           {icon}
         </span>
       </div>
-      <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
+      <p className="mt-2 text-xl font-bold sm:text-2xl tracking-tight tabular-nums">
         <AnimatedNumber value={value} duration={800} format={(n) => Math.round(n).toLocaleString("th-TH")} />
         {unit && <span className="ml-1 text-sm font-normal text-muted-foreground">{unit}</span>}
       </p>

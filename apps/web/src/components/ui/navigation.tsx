@@ -19,7 +19,7 @@ export function TabsList({ children, className }: { children: React.ReactNode; c
   const ref = React.useRef<HTMLDivElement>(null);
   const rect = useIndicator(ref, "[aria-selected=true]", value);
   return (
-    <div ref={ref} role="tablist" className={cn("relative inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground", className)}>
+    <div ref={ref} role="tablist" className={cn("relative inline-flex h-11 max-w-full items-center overflow-x-auto rounded-lg bg-muted p-1 text-muted-foreground [scrollbar-width:none] sm:h-9", className)}>
       <Indicator rect={rect} className="bg-background shadow-xs" />
       {children}
     </div>
@@ -34,7 +34,7 @@ export function TabsTrigger({ value, children }: { value: string; children: Reac
       aria-selected={active}
       onClick={() => ctx.setValue(value)}
       className={cn(
-        "relative z-10 inline-flex h-7 items-center rounded-md px-3 text-sm font-medium transition-[color,transform,translate,scale,rotate] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "relative z-10 inline-flex h-9 shrink-0 items-center whitespace-nowrap sm:h-7 rounded-md px-3 text-sm font-medium transition-[color,transform,translate,scale,rotate] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         active ? "text-foreground" : "hover:text-foreground"
       )}
     >

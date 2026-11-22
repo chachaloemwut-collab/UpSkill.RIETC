@@ -304,7 +304,7 @@ function TopBar({
     <>
       {/* Phones: compact "URSkill" (no room for the full name beside the actions); unfolds on hover/focus */}
       <BrandLogo mode="hover" className="md:hidden" />
-      <nav aria-label="Breadcrumbs" className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
+      <nav aria-label="เส้นทางหน้า" className="hidden min-w-0 lg:flex items-center gap-1.5 text-xs text-muted-foreground">
         {breadcrumbs.map((b, i) => {
           const isLast = i === breadcrumbs.length - 1;
           return (
@@ -328,21 +328,23 @@ function TopBar({
         type="button"
         onClick={onOpenCommand}
         aria-label="ค้นหาหรือพิมพ์คำสั่ง (Cmd+K)"
-        className="flex h-9 items-center gap-2 rounded-md border border-input bg-background/60 px-2.5 text-xs text-muted-foreground transition hover:border-foreground/30 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-56"
+        className="flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-md border border-input bg-background/60 text-xs sm:h-9 sm:w-auto sm:justify-start sm:px-2.5 text-muted-foreground transition hover:border-foreground/30 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:w-56"
       >
         <Search className="h-3.5 w-3.5 shrink-0" />
-        <span className="flex-1 text-left hidden sm:inline truncate">ค้นหาหรือพิมพ์คำสั่ง…</span>
-        <span className="flex-1 text-left sm:hidden truncate">ค้นหา…</span>
-        <Kbd className="hidden sm:inline-flex text-[10px]">⌘K</Kbd>
+        <span className="flex-1 text-left hidden lg:inline truncate">ค้นหาหรือพิมพ์คำสั่ง…</span>
+        <span className="hidden flex-1 truncate text-left sm:inline lg:hidden">ค้นหา…</span>
+        <Kbd className="hidden lg:inline-flex text-[10px]">⌘K</Kbd>
       </button>
 
-      <ThemeCustomizer />
+      <span className="hidden sm:contents">
+        <ThemeCustomizer />
+      </span>
       <ThemeToggle />
       {user ? (
         <DropdownMenu
           align="end"
           trigger={
-            <button type="button" aria-label="บัญชีของฉัน" className="rounded-full transition-[scale] hover:scale-105 active:scale-95">
+            <button type="button" aria-label="บัญชีของฉัน" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-[scale] hover:scale-105 active:scale-95">
               <Avatar name={user.name} size={32} />
             </button>
           }
