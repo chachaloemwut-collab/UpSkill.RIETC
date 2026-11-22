@@ -44,6 +44,14 @@ describe("sign-up with the member profile", () => {
     expect((await register({}, { birthDate: `${new Date().getFullYear() - 15}-01-01` })).json.error).toBe("PROFILE_INVALID");
   });
 
+  it("signs up a minor with the guardian's full name and the applicant's confirmation only", async () => {
+    const minor = { birthDate: `${new Date().getFullYear() - 16}-05-05`, titleTh: "นางสาว", titleEn: "Miss" };
+    expect((await register({}, { ...minor, guardianName: "นางสมศรี ใจดี" })).json.error).toBe("PROFILE_INVALID"); // not confirmed
+    expect((await register({}, { ...minor, guardianName: "สมศรี", guardianConsent: true })).json.error).toBe("PROFILE_INVALID"); // no surname
+    const ok = await register({}, { ...minor, guardianName: "นางสมศรี ใจดี", guardianConsent: true });
+    expect(ok.status).toBe(200);
+  });
+
   it("creates the account with the profile, stores the ID encrypted, and composes the certificate names", async () => {
     const r = await new Client().req("/api/auth/register", {
       body: { email, password, profile: profileBody({ nationalId, titleTh: "นางสาว", firstNameTh: "สมหญิง", lastNameTh: "ใจงาม", titleEn: "Ms.", firstNameEn: "Somying", lastNameEn: "Jaingam", phone: "+66 89 765 4321" }), pdpaConsent: true },

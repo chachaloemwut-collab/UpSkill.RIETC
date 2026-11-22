@@ -194,11 +194,12 @@ export function validateApplication(
 
   let guardian: ApplicationValues["guardian"] = null;
   if (ctx.minor) {
+    // Guardian: full name and the applicant's confirmation only. Relation and phone are optional extras.
     const g = { name: str(input.guardian?.name, 255), relation: str(input.guardian?.relation, 60), phone: digits(str(input.guardian?.phone, 20)) };
-    if (g.name.length < 3) e["guardian.name"] = "กรอกชื่อ-นามสกุลผู้ปกครอง";
-    if (!(GUARDIAN_RELATIONS as readonly string[]).includes(g.relation)) e["guardian.relation"] = "เลือกความสัมพันธ์";
-    if (!PHONE_RE.test(g.phone)) e["guardian.phone"] = "เบอร์โทรศัพท์ผู้ปกครองไม่ถูกต้อง";
-    if (input.guardian?.consent !== true) e["guardian.consent"] = "ผู้ปกครองต้องรับรองและให้ความยินยอม";
+    if (!/^\S+(\s+\S+)+$/.test(g.name) || g.name.length < 3) e["guardian.name"] = "กรอกชื่อและนามสกุลของผู้ปกครอง เช่น นางสมศรี ใจดี";
+    if (g.relation && !(GUARDIAN_RELATIONS as readonly string[]).includes(g.relation)) g.relation = "";
+    if (g.phone && !PHONE_RE.test(g.phone)) e["guardian.phone"] = "เบอร์โทรศัพท์ผู้ปกครองไม่ถูกต้อง";
+    if (input.guardian?.consent !== true) e["guardian.consent"] = "ติ๊กยืนยันว่าได้รับอนุญาตจากผู้ปกครองแล้ว";
     guardian = g;
   }
 

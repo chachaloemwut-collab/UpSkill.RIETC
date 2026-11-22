@@ -57,6 +57,10 @@ describe("validateApplication", () => {
     expect(validateApplication(DEFAULT_APPLICATION_SETTINGS, base, { ...ctx, minor: true }).errors["guardian.consent"]).toBeDefined();
     const g = { name: "สมศรี ใจดี", relation: "มารดา", phone: "0899999999", consent: true };
     expect(validateApplication(DEFAULT_APPLICATION_SETTINGS, { ...base, guardian: g }, { ...ctx, minor: true }).errors).toEqual({});
+    // name + confirmation is enough; a single word is not a full name
+    const nameOnly = { name: "นางสมศรี ใจดี", relation: "", phone: "", consent: true };
+    expect(validateApplication(DEFAULT_APPLICATION_SETTINGS, { ...base, guardian: nameOnly }, { ...ctx, minor: true }).errors).toEqual({});
+    expect(validateApplication(DEFAULT_APPLICATION_SETTINGS, { ...base, guardian: { ...nameOnly, name: "สมศรี" } }, { ...ctx, minor: true }).errors["guardian.name"]).toBeDefined();
   });
 
   it("ignores sections that are switched off", () => {
