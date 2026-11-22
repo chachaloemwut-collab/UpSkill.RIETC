@@ -18,6 +18,9 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 FROM deps AS build
 COPY packages packages
 COPY apps/web apps/web
+# Release label shown on the account page (set by the deploy workflow; "dev" for local builds)
+ARG APP_VERSION=dev
+ENV NEXT_PUBLIC_APP_VERSION=$APP_VERSION
 RUN pnpm --filter @upskill/web build
 
 FROM node:24-alpine AS runtime
