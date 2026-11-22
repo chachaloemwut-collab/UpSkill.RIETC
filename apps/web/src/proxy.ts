@@ -17,6 +17,9 @@ export function proxy(request: NextRequest) {
     `font-src 'self'`,
     `frame-src https://www.youtube-nocookie.com https://www.youtube.com`,
     `connect-src 'self'${isDev ? " ws:" : ""}`,
+    // installable app: our own service worker and manifest ('strict-dynamic' above would otherwise ignore 'self')
+    `worker-src 'self'`,
+    `manifest-src 'self'`,
     `form-action 'self' https://accounts.google.com`,
     `object-src 'none'`,
     `base-uri 'self'`,
