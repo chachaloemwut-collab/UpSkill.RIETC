@@ -126,11 +126,17 @@ export function IssueCertificateButton({ courseId, nameTh, nameEn }: { courseId:
 }
 
 /** `compact` = icon-only (tables), with the label kept as the accessible name/tooltip. */
-export function DownloadCertificateButton({ code, variant = "default", size = "md", compact = false }: { code: string; variant?: "default" | "outline"; size?: "sm" | "md"; compact?: boolean }) {
+export function DownloadCertificateButton({ code, variant = "default", size = "md", compact = false, print = false }: { print?: boolean; code: string; variant?: "default" | "outline"; size?: "sm" | "md"; compact?: boolean }) {
   const toast = useToast();
   const [play, replay] = usePlay();
   const [state, setState] = useState<"idle" | "working" | "rendering">("idle");
   async function download() {
+    const viewer = print ? window.open("about:blank", "_blank") : null;
+    if (print && !viewer) {
+      toast({ title: "โปรดอนุญาตให้เปิดหน้าต่างเอกสาร", variant: "destructive" });
+      return;
+    }
+    if (viewer) { viewer.opener = null; viewer.document.title = "กำลังเตรียมวุฒิบัตร"; viewer.document.body.textContent = "กำลังเตรียมไฟล์สำหรับพิมพ์…"; }
     setState("working");
     try {
       for (let attempt = 0; attempt <= 12; attempt++) {
@@ -142,6 +148,11 @@ export function DownloadCertificateButton({ code, variant = "default", size = "m
         }
         if (!res.ok || !res.headers.get("content-type")?.startsWith("application/pdf")) break;
         const url = URL.createObjectURL(await res.blob());
+        if (viewer) {
+          viewer.location.replace(url);
+          setTimeout(() => URL.revokeObjectURL(url), 120_000);
+          return;
+        }
         const link = document.createElement("a");
         link.href = url;
         link.download = `${code}.pdf`;
@@ -156,6 +167,7 @@ export function DownloadCertificateButton({ code, variant = "default", size = "m
     } finally {
       setState("idle");
     }
+    viewer?.close();
     toast({ title: "ดาวน์โหลดไม่สำเร็จ", description: "กรุณาลองใหม่ภายหลัง", variant: "destructive" });
   }
   return (
@@ -167,8 +179,8 @@ export function DownloadCertificateButton({ code, variant = "default", size = "m
       loadingState={state === "rendering" ? "pdf-generating" : "page-loading"}
       {...(compact ? { "aria-label": state === "rendering" ? "กำลังสร้างไฟล์ PDF" : "ดาวน์โหลด PDF", title: "ดาวน์โหลด PDF", className: "h-8 px-2" } : {})}
     >
-      {state === "idle" && <DownloadIcon play={play} />}
-      {!compact && (state === "rendering" ? "กำลังสร้างไฟล์ PDF…" : "ดาวน์โหลด PDF")}
+      {state === "idle" && (print ? <Printer className="h-4 w-4" /> : <DownloadIcon play={play} />)}
+      {!compact && (state === "rendering" ? "กำลังสร้างไฟล์ PDF…" : print ? "เปิด PDF สำหรับพิมพ์" : "ดาวน์โหลด PDF")}
     </Button>
   );
 }
@@ -206,12 +218,6 @@ export function CertificateViewerCard({
     }
   };
 
-  const handlePrint = () => {
-    if (typeof window !== "undefined") {
-      window.print();
-    }
-  };
-
   return (
     <>
       <Card className="overflow-hidden shadow-md no-print border-border/80">
@@ -239,7 +245,7 @@ export function CertificateViewerCard({
             <Alert variant="destructive" title="วุฒิบัตรนี้ถูกเพิกถอนแล้ว" />
           ) : (
             <Alert variant="success" title="ออกวุฒิบัตรเรียบร้อยแล้ว">
-              วุฒิบัตรนี้ลงนามด้วยระบบ Ed25519 ดิจิทัล สามารถใช้สมัครงานหรือเทียบโอนหน่วยกิตได้
+              ตรวจสอบข้อมูลการรับรองและสถานะล่าสุดได้จากรหัสเอกสารหรือ QR Code บนไฟล์ PDF
             </Alert>
           )}
 
@@ -255,9 +261,7 @@ export function CertificateViewerCard({
               {copied ? "คัดลอกลิงก์แล้ว" : "คัดลอกลิงก์"}
             </Button>
 
-            <Button variant="outline" onClick={handlePrint} className="gap-1.5">
-              <Printer className="h-4 w-4" /> พิมพ์เอกสาร
-            </Button>
+            {!revokedAt && <DownloadCertificateButton code={code} variant="outline" print />}
 
             <Link href={`/verify/${code}`} className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
               หน้าตรวจสอบสาธารณะ <ExternalLink className="h-3.5 w-3.5" />
@@ -276,9 +280,7 @@ export function CertificateViewerCard({
         <div className="p-2 sm:p-4">
           <CertificatePreview {...preview} />
           <div className="mt-4 flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
-              <Printer className="h-3.5 w-3.5" /> พิมพ์ (A4 Landscape)
-            </Button>
+            {!revokedAt && <DownloadCertificateButton code={code} variant="outline" size="sm" print />}
             <Button size="sm" onClick={() => setZoomOpen(false)}>
               ปิด
             </Button>
@@ -286,10 +288,6 @@ export function CertificateViewerCard({
         </div>
       </Dialog>
 
-      {/* Print: the same artwork at A4 landscape */}
-      <div className="hidden print:block certificate-print-container">
-        <CertificatePreview {...preview} />
-      </div>
     </>
   );
 }

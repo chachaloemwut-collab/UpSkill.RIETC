@@ -23,6 +23,16 @@ const view: CertificateView = {
 const assets = { fontCss: "", qrDataUrl: "data:image/png;base64,AA==", verifyUrl: "https://example.test/verify/UR-2026-AAAA-BBBB", backgroundDataUrl: "" };
 
 describe("certificate artwork", () => {
+  it("keeps the mandatory artwork and document watermark fixed for all four course designs", () => {
+    for (const template of ["standard", "classic", "royal", "minimal"]) {
+      const shared = { ...assets, brandDataUrl: "data:image/svg+xml;base64,MARK", emblemDataUrl: "data:image/png;base64,EMBLEM" };
+      const html = buildCertificateHtml({ ...view, template }, shared);
+      assert.equal(html, buildCertificateHtml({ ...view, template, textAlign: "left" }, shared));
+      assert.ok(html.includes('class="security-mark">UpskillReskill.RIETC · UR-2026-AAAA-BBBB · abcd-1234'));
+      assert.ok(html.includes(shared.brandDataUrl) && html.includes(shared.emblemDataUrl));
+    }
+  });
+
   it("escapes every snapshot field", () => {
     const html = buildCertificateHtml(
       { ...view, recipientName: `<img src=x onerror="x()">`, courseTitle: "a & b", signerTitle: "<b>t</b>", achievement: `"q'`, display: { issuer_name: "<i>" } },

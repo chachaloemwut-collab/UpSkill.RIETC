@@ -23,6 +23,7 @@ export interface CertificatePreviewRecord {
   issuedAt: string | Date;
   expiresAt?: string | Date | null;
   code: string;
+  qrDataUrl?: string;
 }
 
 /**
@@ -31,7 +32,7 @@ export interface CertificatePreviewRecord {
  */
 export function CertificatePreview({
   template,
-  align,
+  backgroundUrl,
   documentType,
   courseTitle,
   signerName,
@@ -42,7 +43,8 @@ export function CertificatePreview({
   className,
 }: {
   template: string;
-  align: string;
+  align?: string;
+  backgroundUrl?: string | null;
   documentType: string;
   /** Kept for callers; the printed title/sentence are the fixed วุฒิบัตร wording (CERTIFICATE_TITLE) */
   documentName?: string;
@@ -57,7 +59,6 @@ export function CertificatePreview({
   className?: string;
 }) {
   const p = certificatePattern(template);
-  const left = align === "left";
   const isTest = documentType === "development_test";
   const issuer = display.issuer_name.trim();
   const showSigner = !!signatureUrl && !!signerName?.trim();
@@ -80,6 +81,15 @@ export function CertificatePreview({
         className="relative aspect-[297/210] w-full overflow-hidden rounded-md shadow-lg ring-1 ring-black/5 print:rounded-none print:shadow-none print:ring-0"
         style={{ background: p.bg, color: p.ink, fontFamily: "var(--font-sarabun), sans-serif", printColorAdjust: "exact" }}
       >
+        {backgroundUrl?.startsWith("https://") && (
+          // eslint-disable-next-line @next/next/no-img-element -- optional course artwork
+          <img src={backgroundUrl} alt="" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover opacity-[.16]" />
+        )}
+        <div aria-hidden className="absolute inset-x-0 top-1/2 -rotate-[18deg] text-center opacity-[.085]" style={{ fontSize: "1.75cqw", letterSpacing: ".18em" }}>{BRAND} · {r.code}</div>
+        <div className="absolute flex items-center font-semibold" style={{ left: "7.4cqw", top: "6.7cqw", fontSize: "0.85cqw", gap: ".65cqw", color: p.frame }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- print brand mark */}
+          <img src="/favicon.svg" alt="" style={{ width: "3cqw", height: "3cqw" }} />{BRAND}
+        </div>
         {/* Frame: outer rule, ornament band, inner gold rule */}
         <div className="absolute" style={{ inset: "2.4cqw", border: `0.38cqw solid ${p.frame}` }} />
         <div className="absolute" style={{ inset: "3.5cqw", backgroundImage: band, padding: "1.2cqw", mask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)", maskComposite: "exclude" }} />
@@ -93,7 +103,7 @@ export function CertificatePreview({
 
         <div
           className="absolute flex flex-col justify-center"
-          style={{ left: "10cqw", right: "10cqw", top: "5.6cqw", bottom: "19.2cqw", textAlign: left ? "left" : "center", alignItems: left ? "flex-start" : "center" }}
+          style={{ left: "10cqw", right: "10cqw", top: "5.6cqw", bottom: "19.2cqw", textAlign: "center", alignItems: "center" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- static emblem, same file the PDF embeds */}
           <img src="/brand/rietc-emblem.png" alt="" style={{ width: "7.6cqw", height: "7.6cqw", objectFit: "contain" }} />
@@ -129,7 +139,10 @@ export function CertificatePreview({
         <div className="absolute" style={{ left: "8.8cqw", right: "8.8cqw", bottom: "8cqw", height: "12cqw" }}>
           <div className="absolute bottom-0 left-0 flex items-end" style={{ gap: "1.2cqw" }}>
             <span className="flex items-center justify-center bg-white" style={{ width: "8.8cqw", height: "8.8cqw", border: `0.1cqw solid ${p.frame}40` }}>
-              <QrCode style={{ width: "7cqw", height: "7cqw", color: p.ink }} />
+              {r.qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- QR generated from this issued record
+                <img src={r.qrDataUrl} alt="รหัสตรวจสอบวุฒิบัตร" style={{ width: "8.3cqw", height: "8.3cqw" }} />
+              ) : <QrCode aria-label="รหัสตัวอย่าง" style={{ width: "7cqw", height: "7cqw", color: p.ink }} />}
             </span>
             <span style={{ fontSize: "1.1cqw", color: p.muted, lineHeight: 1.45 }}>
               <b className="block" style={{ color: p.title, fontFamily: prompt }}>สแกนเพื่อตรวจสอบ</b>

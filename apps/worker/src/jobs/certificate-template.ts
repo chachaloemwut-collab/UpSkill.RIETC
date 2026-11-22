@@ -46,6 +46,7 @@ export interface CertificateView {
 }
 
 export interface CertificateAssets {
+  brandDataUrl?: string;
   /** @font-face rules with data: URLs (families "Prompt" and "Sarabun") */
   fontCss: string;
   /** QR code image as a data: URL */
@@ -181,7 +182,6 @@ function emblem(p: CertificatePalette) {
 export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): string {
   const p = certificatePattern(c.template);
   const isTest = c.documentType === "development_test";
-  const left = c.textAlign === "left";
   const showSigner = !!a.signatureDataUrl && !!c.signerName.trim();
   const issuer = c.display.issuer_name.trim();
   // Fixed วุฒิบัตร wording for every document (old snapshots may say ใบรับรอง/ประกาศนียบัตร or a custom achievement line)
@@ -208,14 +208,16 @@ export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): 
     .test-badge { position: absolute; top: 19mm; right: 22mm; border: 2px dashed #b91c1c; background: rgba(254,242,242,.95); color: #b91c1c; padding: 4px 14px; font-weight: 700; font-size: 11pt; border-radius: 4px; text-align: center; line-height: 1.25; z-index: 10; }
     .test-badge span { font-size: 7.5pt; font-weight: 400; }
 
-    .content { position: absolute; left: 30mm; right: 30mm; top: 17mm; bottom: 57mm; display: flex; flex-direction: column; justify-content: center; align-items: ${left ? "flex-start" : "center"}; text-align: ${left ? "left" : "center"}; }
+    .content { position: absolute; left: 30mm; right: 30mm; top: 17mm; bottom: 57mm; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
     .emblem { width: 23mm; height: 23mm; display: block; object-fit: contain; }
     .issuer { margin-top: 2mm; font-family: "Prompt", sans-serif; font-weight: 600; font-size: 14pt; line-height: 1.25; color: ${p.ink}; }
     .issuer-en { font-family: "Prompt", sans-serif; font-weight: 500; font-size: 6.8pt; letter-spacing: .3em; text-transform: uppercase; color: ${p.muted}; margin-top: .6mm; }
     h1 { font-family: "Prompt", sans-serif; font-weight: 600; font-size: ${titleSize}pt; line-height: 1.2; color: ${p.title}; margin: 2.5mm 0 0; letter-spacing: .02em; }
     .kicker { margin-top: .8mm; font-family: "Prompt", sans-serif; font-weight: 500; font-size: 8.5pt; letter-spacing: .34em; text-transform: uppercase; color: ${p.accent}; }
     .kicker::before, .kicker::after { content: ""; display: inline-block; width: 12mm; height: .3mm; background: ${p.accent}; vertical-align: middle; margin: 0 4mm; opacity: .8; }
-    ${left ? ".kicker::before { display: none; }" : ""}
+    .brand { position: absolute; left: 22mm; top: 20mm; display: flex; align-items: center; gap: 2mm; font: 600 7pt Prompt, sans-serif; color: ${p.frame} }
+    .brand img { width: 9mm; height: 9mm }
+    .security-mark { position: absolute; left: 18mm; right: 18mm; top: 49%; transform: rotate(-18deg); text-align: center; font: 600 10pt Prompt, sans-serif; letter-spacing: .18em; opacity: .085; white-space: nowrap }
     .present { font-size: 13pt; color: ${p.ink}; margin-top: 4mm; }
     .name { font-family: "Prompt", sans-serif; font-weight: 600; font-size: ${nameSize}pt; line-height: 1.3; color: ${p.ink}; margin-top: 1mm; }
     .divider { display: block; margin-top: .8mm; }
@@ -244,6 +246,8 @@ export function buildCertificateHtml(c: CertificateView, a: CertificateAssets): 
   </style></head><body><div class="page">
     ${a.backgroundDataUrl ? `<div class="bgimg" style="background-image: url('${a.backgroundDataUrl}')"></div>` : ""}
     ${frame(p)}
+    <div class="security-mark">${esc(BRAND)} · ${esc(c.code)} · ${esc(c.visualDigest)}</div>
+    <div class="brand">${a.brandDataUrl ? `<img src="${a.brandDataUrl}" alt="">` : ""}${esc(BRAND)}</div>
     ${isTest ? `<div class="watermark">TEST / DEVELOPMENT · สำหรับทดสอบระบบเท่านั้น · มิใช่การสำเร็จการศึกษาจริง</div>` : ""}
     ${isTest ? `<div class="test-badge">TEST / DEVELOPMENT<br><span>สำหรับทดสอบระบบเท่านั้น · มิใช่การสำเร็จการศึกษาจริง</span></div>` : ""}
     <div class="content">

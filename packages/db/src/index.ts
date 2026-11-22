@@ -3,6 +3,7 @@ import pg from "pg";
 // src/generated.ts is produced by `pnpm db:codegen` from the real database (SQL is the source of truth).
 import type { DB } from "./generated.ts";
 
+export { getCertificateArtwork, CERTIFICATE_ARTWORK_VERSION } from "./certificate-artwork.ts";
 export { sql } from "kysely";
 export type { DB, JsonValue } from "./generated.ts";
 export type Database = Kysely<DB>;

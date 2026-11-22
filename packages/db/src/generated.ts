@@ -81,6 +81,11 @@ export interface AuditLogs {
   user_id: string | null;
 }
 
+export interface CertificateArtworkRenders {
+  certificate_id: string;
+  revision: string;
+}
+
 export interface Certificates {
   achievement_snapshot: string | null;
   background_url_snapshot: string | null;
@@ -723,6 +728,7 @@ export interface DB {
   anticheat_events: AnticheatEvents;
   assessment_focus_events: AssessmentFocusEvents;
   audit_logs: AuditLogs;
+  certificate_artwork_renders: CertificateArtworkRenders;
   certificates: Certificates;
   checkpoint_attempts: CheckpointAttempts;
   cohort_registrations: CohortRegistrations;

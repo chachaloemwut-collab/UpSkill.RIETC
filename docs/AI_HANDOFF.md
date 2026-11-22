@@ -264,3 +264,7 @@
 - ผล E2E ของสาขาดูใน Checks ของ PR #66 ไม่มีการ deploy หรือเปลี่ยนข้อมูลบัญชีผู้ดูแล ผู้รับช่วงรีวิวการวางตราและการเคลื่อนไหวก่อน merge
 
 - เพิ่มชื่อเต็มแบบนิ่งในอีเมลระบบทั้งไทยและอังกฤษ ตรวจครบ 30 ภาพและ 30 ท่าด้วย Chromium และ WebKit บน localhost ใช้ข้อมูลจำลองสำหรับทดสอบอีเมล
+
+## 2026-11-22T17:02Z · ChatGPT · #67 / PR #68
+
+ฐาน 805158a บน feat/protected-certificate-artwork. Added protected branding, per-record watermark, current course design for re-renders, separate artwork metadata and print from the authenticated PDF. Migrated and regenerated types on Local. Registered documents rendered without notifications, signed fields and revocation verified, all outputs A4 landscape, one page. Existing unrelated files left in storage. No production changes. #66 keyboard and CI passed. Review and CI via PR #68.
