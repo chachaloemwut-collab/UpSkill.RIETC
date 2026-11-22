@@ -42,6 +42,24 @@ describe("self-service", () => {
     );
     expect(n).toBe(0);
   });
+
+  it("a signed-in user who forgot the current password can mail themselves a link", async () => {
+    const member = new Client();
+    await member.login(email, `first password ${run}`);
+    const r = await member.req("/api/user/password/reset-link", { body: {} });
+    expect(r.status).toBe(200);
+    expect(r.json.email).toBe(email);
+    expect((await new Client().req("/api/user/password/reset-link", { body: {} })).status).toBe(401);
+  });
+
+  it("the reset page says a dead link is dead before asking for a password", async () => {
+    const link = await waitForEmailLink(email, "/reset-password");
+    const live = await new Client().req(new URL(link).pathname + new URL(link).search);
+    expect(live.text).toContain('name="confirm"');
+    const dead = await new Client().req(`/reset-password?token=${randomBytes(32).toString("base64url")}`);
+    expect(dead.text).toContain("ลิงก์นี้หมดอายุหรือถูกใช้ไปแล้ว");
+    expect(dead.text).not.toContain('name="confirm"');
+  });
 });
 
 describe("admin tools", () => {
