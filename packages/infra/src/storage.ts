@@ -3,7 +3,8 @@
 //   - "s3":    S3-compatible private bucket (AWS S3, MinIO, Cloudflare R2, DigitalOcean Spaces, …)
 // The web streams the PDF from this backend after its own auth/IDOR checks, so no public
 // signed URL is exposed — the S3 credentials stay server-side.
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { CERTIFICATE_CODE_RE } from "@upskill/core";
@@ -28,7 +29,14 @@ export function localCertificateStorage(dir: string): CertificateStorage {
   return {
     async save(code, pdf) {
       await mkdir(path.resolve(dir), { recursive: true });
-      await writeFile(fileFor(code), pdf, { mode: 0o600 });
+      const target = fileFor(code);
+      const temporary = `${target}.${randomUUID()}.tmp`;
+      try {
+        await writeFile(temporary, pdf, { mode: 0o600, flag: "wx" });
+        await rename(temporary, target);
+      } finally {
+        await rm(temporary, { force: true });
+      }
     },
     async read(code) {
       try {

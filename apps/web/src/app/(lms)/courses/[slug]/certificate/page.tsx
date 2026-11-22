@@ -1,3 +1,5 @@
+import QRCode from "qrcode";
+import { getCertificateArtwork } from "@upskill/db";
 import { CERTIFICATE_TITLE } from "@upskill/core/certificate-patterns";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -35,6 +37,8 @@ export default async function CertificatePage({ params }: { params: Promise<{ sl
       ])
     : [null, null];
 
+  const artwork = snap ? await getCertificateArtwork(ctx().db, snap) : null;
+
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
@@ -56,7 +60,8 @@ export default async function CertificatePage({ params }: { params: Promise<{ sl
           revokedAt={cert.revoked_at ? String(cert.revoked_at) : null}
           credentialName={CERTIFICATE_TITLE}
           preview={{
-            template: snap.template_snapshot,
+            template: artwork?.template ?? snap.template_snapshot,
+            backgroundUrl: artwork?.backgroundUrl,
             align: snap.text_align_snapshot,
             documentType: snap.document_type_snapshot,
             documentName: snap.document_name_snapshot,
@@ -72,6 +77,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ sl
               issuedAt: new Date(snap.issued_at).toISOString(),
               expiresAt: snap.expires_at ? new Date(snap.expires_at).toISOString() : null,
               code: snap.certificate_code,
+              qrDataUrl: await QRCode.toDataURL(`${ctx().env.APP_ORIGIN}/verify/${encodeURIComponent(snap.certificate_code)}`, { margin: 1, width: 240 }),
             },
           }}
         />

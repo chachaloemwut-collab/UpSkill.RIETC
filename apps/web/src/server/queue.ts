@@ -4,7 +4,7 @@ import { ctx } from "./context";
 
 // Heavy or slow work (PDF rendering, YouTube API, SMTP) runs in apps/worker, not in the web request path
 const queues = new Map<string, Queue>();
-function queue(name: "certificate-pdf" | "video-recheck"): Queue {
+function queue(name: "certificate-pdf" | "certificate-artwork" | "video-recheck"): Queue {
   let q = queues.get(name);
   if (!q) {
     q = new Queue(name, { connection: ctx().redis });
@@ -19,6 +19,13 @@ export async function enqueueCertificatePdf(code: string) {
     { code },
     { jobId: `pdf-${code}`, attempts: 5, backoff: { type: "exponential", delay: 5_000 }, removeOnComplete: true },
   );
+}
+
+export async function enqueueArtworkRevision(code: string, revision: string) {
+  await queue("certificate-artwork").add("rerender", { code }, {
+    jobId: `art-${revision}-${code}`, attempts: 3, backoff: { type: "exponential", delay: 5_000 },
+    removeOnComplete: true, removeOnFail: true,
+  });
 }
 
 export async function enqueueVideoRecheck(lessonId: string) {

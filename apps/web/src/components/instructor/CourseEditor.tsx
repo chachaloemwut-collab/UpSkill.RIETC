@@ -400,7 +400,6 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
   const [certSigner, setCertSigner] = useState(course.credential_signer_name ?? "");
   const [certSignerTitle, setCertSignerTitle] = useState(course.credential_signer_title ?? "");
   const [certTemplate, setCertTemplate] = useState(course.credential_template_key);
-  const [certAlign, setCertAlign] = useState(course.credential_text_align);
   const [certValidityDays, setCertValidityDays] = useState(course.credential_validity_days ?? "");
   const [certAchievementEn, setCertAchievementEn] = useState(course.credential_achievement_en ?? "");
   const [certBgUrl, setCertBgUrl] = useState(course.credential_background_url ?? "");
@@ -424,7 +423,6 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
     setCertNameEn(p.credential_name_en ?? "");
     setCertType(p.credential_type);
     setCertTemplate(p.credential_template_key);
-    setCertAlign(p.credential_text_align);
     setCertValidityDays(p.credential_validity_days ?? "");
     setCertSigner(p.credential_signer_name ?? "");
     setCertSignerTitle(p.credential_signer_title ?? "");
@@ -637,16 +635,7 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
                 <option value="minimal">Minimal (โทนสเลทเรียบหรู)</option>
               </Select>
             </Field>
-            <Field label="การจัดวางข้อความ">
-              <Select
-                name="credential_text_align"
-                value={certAlign}
-                onChange={(e) => setCertAlign(e.target.value)}
-              >
-                <option value="center">กึ่งกลาง (Center)</option>
-                <option value="left">ชิดซ้าย (Left)</option>
-              </Select>
-            </Field>
+            <input type="hidden" name="credential_text_align" value="center" />
             <Field label="อายุเอกสาร (วัน)" hint="เว้นว่างหากไม่มีวันหมดอายุ">
               <Input
                 name="credential_validity_days"
@@ -684,7 +673,7 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
               />
             </Field>
             <div className="sm:col-span-2">
-              <Field label="ภาพพื้นหลังหรือลายน้ำ (URL)" hint="HTTPS เท่านั้น จะแสดงจางๆ ใต้เนื้อหา">
+              <Field label="ภาพพื้นหลังหลักสูตร (URL)" hint="ใช้ภาพผ่าน HTTPS ระบบจะแสดงภาพจางใต้ข้อความและลายน้ำประจำฉบับ">
                 <Input
                   name="credential_background_url"
                   type="url"
@@ -713,13 +702,13 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
             </h4>
           </div>
           <Badge variant="outline" className="text-xs uppercase font-mono">
-            {certTemplate} · {certAlign}
+            {certTemplate}
           </Badge>
         </div>
 
         <CertificatePreview
           template={certTemplate}
-          align={certAlign}
+          backgroundUrl={certBgUrl}
           documentType={certType}
           courseTitle={course.title}
           signerName={certSigner}
@@ -729,7 +718,7 @@ function SettingsSection({ base, course, courseDefaults, certificateDisplay, isA
           className="max-w-3xl"
         />
         <p className="text-xs text-muted-foreground">
-          ภาพจำลองใช้สีและการจัดวางเดียวกับไฟล์ PDF จริง (ชื่อผู้เรียนและ QR Code เป็นข้อมูลตัวอย่าง)
+          เมื่อบันทึก กรอบและภาพพื้นหลังจะมีผลกับวุฒิบัตรเดิมและฉบับใหม่ของหลักสูตร ตราวิทยาลัย ตราระบบ ถ้อยคำรับรอง รหัสตรวจสอบ และลายน้ำมีตำแหน่งตายตัว ตัวอย่างนี้ใช้ชื่อและรหัสสมมติ
           {signerPrinted
             ? " · พิมพ์ลายเซ็นและชื่อผู้ลงนามบนเอกสาร"
             : " · ยังไม่พิมพ์ชื่อผู้ลงนาม (ต้องมีลายเซ็นและผู้ดูแลระบบเปิดการแสดงผู้ลงนามของหลักสูตรนี้)"}

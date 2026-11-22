@@ -9,7 +9,7 @@ import type { Database, JsonValue } from "@upskill/db";
 import { logger } from "@upskill/infra/logger";
 
 /** Bump when certificate-template.ts output changes in a way issued documents should receive. */
-export const CERTIFICATE_ARTWORK_VERSION = "2026-11-21-wuttibat";
+import { CERTIFICATE_ARTWORK_VERSION } from "@upskill/db";
 const SETTING_KEY = "certificate_artwork_version";
 
 export async function scheduleCertificateRerender(db: Database, queue: Queue): Promise<number> {

@@ -8,7 +8,7 @@
 import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import QRCode from "qrcode";
-import type { Database } from "@upskill/db";
+import { getCertificateArtwork, type Database } from "@upskill/db";
 import type { Env } from "@upskill/infra/env";
 import { logger } from "@upskill/infra/logger";
 import { createCertificateStorage, createSignatureStorage } from "@upskill/infra/storage";
@@ -33,6 +33,8 @@ async function fontFace(family: string, file: string, weight: number): Promise<s
 export async function renderCertificatePdf(db: Database, env: Env, code: string, opts: { notify?: boolean } = {}) {
   const c = await db.selectFrom("certificates").selectAll().where("certificate_code", "=", code).executeTakeFirstOrThrow();
 
+  const artwork = await getCertificateArtwork(db, c);
+
   // Site-wide layout options (issuing body); a missing row means the defaults
   const displayRow = await db.selectFrom("system_settings").select("value").where("key", "=", "certificate_display").executeTakeFirst();
   const display = parseCertificateDisplay(displayRow?.value);
@@ -48,12 +50,9 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string,
     ])
   ).join("\n");
 
-  const emblemDataUrl = await readFile(EMBLEM)
-    .then((b) => `data:image/png;base64,${b.toString("base64")}`)
-    .catch(() => {
-      logger.warn("college emblem missing (assets/brand/rietc-emblem.png); rendering the drawn medallion");
-      return "";
-    });
+  const emblemDataUrl = `data:image/png;base64,${(await readFile(EMBLEM)).toString("base64")}`;
+  const mark = await readFile(new URL("../../assets/brand/upskill-mark.svg", import.meta.url));
+  const brandDataUrl = `data:image/svg+xml;base64,${mark.toString("base64")}`;
 
   // Signature chosen at issue time (NULL = no signer block). If the file is gone, print no signer rather than fail.
   let signatureDataUrl = "";
@@ -66,9 +65,9 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string,
   // Optional background image: fetched once here (https only, configured by instructors/admins)
   // and embedded as a data URL, so the Playwright context can stay fully network-blocked.
   let backgroundDataUrl = "";
-  if (c.background_url_snapshot) {
+  if (artwork.backgroundUrl) {
     try {
-      const res = await fetch(c.background_url_snapshot, { signal: AbortSignal.timeout(10_000) });
+      const res = await fetch(artwork.backgroundUrl, { signal: AbortSignal.timeout(10_000) });
       if (res.ok) {
         const mime = res.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
         // The mime type comes from a remote header and ends up in a style attribute: allow only a plain token
@@ -93,12 +92,12 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string,
       quizScore: c.quiz_score_snapshot,
       issuedAt: new Date(c.issued_at),
       expiresAt: c.expires_at ? new Date(c.expires_at) : null,
-      template: c.template_snapshot,
+      template: artwork.template,
       textAlign: c.text_align_snapshot,
       visualDigest: c.visual_digest,
       display,
     },
-    { fontCss, qrDataUrl: qr, verifyUrl, backgroundDataUrl, emblemDataUrl, signatureDataUrl },
+    { fontCss, qrDataUrl: qr, verifyUrl, backgroundDataUrl, emblemDataUrl, brandDataUrl, signatureDataUrl },
   );
 
   const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
@@ -108,9 +107,14 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string,
     const page = await context.newPage();
     await page.setContent(html, { waitUntil: "load" });
     const pdf = await page.pdf({ format: "A4", landscape: true, printBackground: true });
-    await createCertificateStorage(env).save(c.certificate_code, pdf);
     const owner = await db.selectFrom("users").select("email").where("id", "=", c.user_id).executeTakeFirstOrThrow();
     await db.transaction().execute(async (trx) => {
+      await trx.selectFrom("certificates").select("id").where("id", "=", c.id).forUpdate().executeTakeFirstOrThrow();
+      const latest = await getCertificateArtwork(trx, c);
+      if (latest.revision !== artwork.revision) throw new Error("Course artwork changed during rendering");
+      await createCertificateStorage(env).save(c.certificate_code, pdf);
+      await trx.insertInto("certificate_artwork_renders").values({ certificate_id: c.id, revision: artwork.revision })
+        .onConflict((oc) => oc.column("certificate_id").doUpdateSet({ revision: artwork.revision })).execute();
       await trx.updateTable("certificates").set({ pdf_ready_at: new Date(), pdf_failed_at: null, pdf_last_error: null }).where("id", "=", c.id).execute();
       if (opts.notify === false) return;
       await addWorkerEmail(

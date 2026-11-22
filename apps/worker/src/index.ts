@@ -77,6 +77,7 @@ const workers = [
       ),
     { connection, concurrency: 1 },
   ),
+  new Worker("certificate-artwork", (job) => renderCertificatePdf(db, env, job.data.code, { notify: false }), { connection, concurrency: 1 }),
   new Worker("email-outbox", () => processEmailOutbox(db, getEmailSender, env.APP_ORIGIN), { connection, concurrency: 1 }),
   new Worker("assignment-reminders", () => enqueueAssignmentReminders(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
   new Worker("weekly-summary", () => enqueueWeeklySummaries(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
