@@ -108,3 +108,15 @@ reset password: เตะทุก session + token ใช้ครั้งเ�
 - [ ] Alert เมื่อ verify ได้ผล `tampered` (หมายถึงมีคนแก้ DB)
 - [ ] Rate limit `/api/auth/*` ครบทุก endpoint (preset อยู่ใน `RATE_LIMITS`)
 - [ ] Backup DB + ทดสอบ restore
+
+## ด่านตรวจอัตโนมัติก่อน merge (`pnpm security:check` รันใน `pnpm lint` และ CI)
+
+- **ห้ามเขียน credential ในโค้ด** ไม่ว่ารหัสผ่าน, secret, API key, private key หรือการเทียบรหัสผ่านกับข้อความตายตัว (เช่น `password === "…"`) ให้อ่านจาก environment (`packages/infra/src/env.ts`) หรือการตั้งค่าที่เข้ารหัสเท่านั้น ข้อยกเว้นมีเฉพาะรหัสของสคริปต์ seed ในเครื่องนักพัฒนาที่ปฏิเสธการรันบน production และต้องมีหมายเหตุ `secrets-check: allow (เหตุผล)` ในบรรทัดนั้น
+- **ทุก API route ต้องมีการตรวจสิทธิ์**
+  - `/api/admin/*` ต้องมี `roles: ["admin"]` ทุก handler
+  - `/api/instructor/*` ต้องมี `roles: ["instructor", "admin"]`
+  - `/api/partner/*` ต้องใช้ `partnerRoute()` (ใช้กุญแจ API ร่วมกับรายการ IP ที่อนุญาต)
+  - route อื่นที่ใช้ `route()` ต้องระบุ `auth:` ชัดเจน
+  - route ที่ตรวจสิทธิ์เองต้องอยู่ในรายการ `SELF_AUTHENTICATED` พร้อมเหตุผล
+- **gitleaks** ใน CI ยังสแกนรูปแบบ token มาตรฐานควบคู่กัน
+- repo นี้เป็น **public** ถ้าเคยมี credential หลุดเข้า git ให้ถือว่ารั่วแล้ว และต้องเปลี่ยนค่าทันที การลบออกจากโค้ดอย่างเดียวไม่พอ

@@ -10,8 +10,10 @@ import {
 import { hashPassword } from "@upskill/infra/password";
 
 const env = getEnv();
+// Creates demo accounts with a password that is public in this repository: never on a real system
+if (env.APP_ENV === "production") throw new Error("complete-krathong-flow is a development seed and must not run in production");
 const db = createDb(env.DATABASE_URL);
-const PASSWORD = "upskill-dev-password";
+const PASSWORD = "upskill-dev-password"; // secrets-check: allow (local demo accounts; the script refuses production)
 
 async function main() {
   console.log("=== Completing Krathong Course & Certificate End-to-End Flow ===");
