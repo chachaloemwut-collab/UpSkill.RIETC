@@ -221,3 +221,36 @@
 - forgot: หน้า "ตรวจสอบอีเมลของคุณ" + ขั้นตอน + ส่งซ้ำหลัง 60 วิ + ทางติดต่อเมื่อเข้าอีเมลไม่ได้ (คำตอบเหมือนกันทุกกรณี ไม่เปิดเผยว่ามีบัญชี)
 - reset: `inspectResetToken` ตรวจก่อนแสดงฟอร์ม → ลิงก์ตายแสดง "ขอลิงก์ใหม่"; /me: `POST /api/user/password/reset-link` (ล็อกอินอยู่แต่ลืมรหัสปัจจุบัน, rate limit ต่อบัญชี, owner ปฏิเสธ)
 - Live check: /login, /forgot-password, /reset-password (ลิงก์ตาย → ข้อความหมดอายุ), /login?reset=1 = 200
+
+## 2026-11-22T16:30:00+00:00 (23:30 Asia/Bangkok) — Claude Code → ส่งต่อให้ ChatGPT (ยังไม่ deploy)
+
+**สถานะ production**: ยังเป็น `58780dc` (ลืมรหัสผ่านทางอีเมล) เว็บใช้งานได้ปกติ
+- release `5431e3f` ล้มฝั่ง hosting (status `failed` 15:56 UTC, `rolled_back_to: null` = ล้มก่อนสลับ) ไฟล์สถานะไม่มีรายละเอียด
+- SFTP ช่วงนั้นตัดการเชื่อมต่อบ่อย ถ้า deploy ซ้ำแล้วยังล้ม ให้ขอผู้ดูแล hosting ดู log ฝั่งเซิร์ฟเวอร์
+
+**merge เข้า main แล้ว แต่ยังไม่ขึ้น production** (main = `c4badaa`)
+| PR | เรื่อง | migration |
+|---|---|---|
+| #58 | ผู้สมัครอายุ < 20 ปีสมัครได้ (เดิมเซิร์ฟเวอร์ปฏิเสธทุกคน), ผู้ปกครอง = ชื่อ-นามสกุล + ติ๊กยืนยัน, ข้อความ "มีผลเสมือนลงลายมือชื่อ", พิมพ์ใบสมัคร (`/me/application`), เลขเวอร์ชันในหน้าบัญชี | `0041_guardian_phone_optional` (ลบ check เดียว) |
+| #59 | ฟอนต์: เนื้อหา/เอกสาร = Sarabun, หัวข้อ/เมนู/ปุ่ม = Prompt | – |
+| #60 | Partner API ค้นผลการอบรมด้วยเลขบัตร (กุญแจ + IP allowlist, ไม่ส่งเลขบัตรออก) คู่มือ `docs/PARTNER_API.md` | `0042_partner_api_clients` (ตารางใหม่) |
+| #61 | ตาราง `/admin/certificates` ตาม template OVEC (`AdvancedDataTable`) + แก้กฎ grid ในช่องตาราง | – |
+| #62 | `pnpm security:check` (อยู่ใน `pnpm lint`): ห้าม credential ในโค้ด, ทุก API route ต้องมีการตรวจสิทธิ์ | – |
+| #63 | PWA: manifest, ไอคอน, service worker (ไม่ cache HTML/API), หน้า offline, CSP `worker-src`/`manifest-src` | – |
+
+**วิธี deploy (ทำเมื่อเจ้าของสั่งเท่านั้น)**
+1. รอ CI ของ commit ล่าสุดบน main ผ่าน
+2. `export PATH="/opt/homebrew/opt/node@24/bin:$PATH" && ./scripts/deploy-jasmine.sh release` (ปล่อย `origin/main`; build image ผ่าน GitHub Actions → อัปโหลด manifest ทาง SFTP → hosting สำรอง DB, migrate, สลับ, health check)
+3. ตรวจผลด้วย `./scripts/deploy-jasmine.sh release-status` แล้วบันทึก release ลงไฟล์นี้
+- ถ้าลูปรอค้าง (lftp ค้าง) ให้ kill เฉพาะ process `lftp` ลูก แล้วดู `release-status`
+- ห้าม deploy ช่วง 23 พ.ย. 2569 17:30–18:30 (ส่งผลงานประกวด) · ห้ามแตะบัญชีเจ้าของระบบ · ล็อกอิน superadmin ตรวจได้ครั้งเดียวหลัง deploy
+
+**งานถัดไปตามแผน**: `docs/DEVELOPMENT_PLAN.md` (L01, C01, U01 ก่อน; ใช้ดีไซน์ OVEC เดิมเท่านั้น ภาพแบบหน้าจอเป็นเค้าโครง)
+
+**ค้างให้เจ้าของตัดสินใจ / ทำเอง**
+- เปลี่ยนรหัส superadmin ที่ `/me` (รหัสเดิมเคยอยู่ใน git สาธารณะ) และเก็บไว้ให้ดี (ไม่มีช่องกู้คืนผ่าน env บน web)
+- คำอธิบายหลักสูตรกระทงใน DB ยังมีคำว่า "ประกาศนียบัตร" (แก้ผ่านหน้าแก้ไขหลักสูตร)
+- ก่อนออกกุญแจ Partner API ให้ใคร ต้องมีวัตถุประสงค์และฐานทางกฎหมายตาม PDPA
+- อาการเฉพาะ iPhone ที่เจ้าของแจ้ง: ทดสอบ WebKit จำลอง iPhone ผ่านหมดหลังแก้ #58 ถ้ายังพบ ต้องขอรุ่นเครื่อง/หน้าที่ติด
+
+**หมายเหตุเครื่องนักพัฒนา**: dev server พอร์ต 3000 ค้าง Next 16.4.5 (MODULE_NOT_FOUND หลังอัปเดต deps) ควรรีสตาร์ต · ตรวจด้วย `pnpm --filter @upskill/web build && next start -p 3100` ได้ · repo อยู่ใน iCloud: ถ้า typecheck เจอ `* 2.ts` ใน `apps/web/.next/types` ให้ลบโฟลเดอร์นั้น
