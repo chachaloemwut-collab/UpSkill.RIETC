@@ -53,7 +53,7 @@ const course = await db
     total_duration_sec: 7948,
     credential_enabled: true,
     credential_type: "completion",
-    credential_name_th: "ใบรับรอง",
+    credential_name_th: "วุฒิบัตร",
     credential_template_key: "standard",
     credential_signer_name: null,
     credential_signer_title: "วิทยากรหลักสูตรการประดิษฐ์กระทงรักษ์โลก",

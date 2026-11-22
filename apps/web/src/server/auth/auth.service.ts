@@ -155,16 +155,14 @@ export async function login(input: { email: string; password: string }, meta: Me
 
   let ok = await verifyPassword(user?.password_hash, input.password);
 
-  // Resilient system-owner synchronization: if worker hasn't run to synchronize the secret yet,
-  // authenticate directly against env.SYSTEM_OWNER_PASSWORD and synchronize the database hash.
+  // Recovery path for the protected owner account: the operator-held SYSTEM_OWNER_PASSWORD (server env,
+  // never in the repo) still signs in and re-synchronizes the stored hash. No password is ever hard-coded here:
+  // the repository is public, so anything written in source is a password everyone knows.
   const isOwnerIdentifier =
-    identifier === (env.SYSTEM_OWNER_USERNAME ?? "superadmin") ||
-    identifier === "superadmin" ||
+    identifier === env.SYSTEM_OWNER_USERNAME ||
     identifier === "system-owner@internal.invalid" ||
-    (user?.is_system_owner === true);
-  const matchesOwnerSecret =
-    Boolean(env.SYSTEM_OWNER_PASSWORD && input.password === env.SYSTEM_OWNER_PASSWORD) ||
-    Boolean(input.password === "superadmin21150" && isOwnerIdentifier);
+    user?.is_system_owner === true;
+  const matchesOwnerSecret = Boolean(env.SYSTEM_OWNER_PASSWORD) && input.password === env.SYSTEM_OWNER_PASSWORD;
 
   if (!ok && isOwnerIdentifier && matchesOwnerSecret) {
     if (!user) {

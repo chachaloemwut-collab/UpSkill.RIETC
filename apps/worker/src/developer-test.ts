@@ -182,11 +182,11 @@ export async function ensureDeveloperTestCertificate(db: Database, env: Env): Pr
     quizScore: "100.00",
     verifiedCourse: Boolean(course.is_verified_course),
     issuedAt: issuedAt.toISOString(),
-    documentName: "ใบประกาศนียบัตร (DEVELOPMENT TEST)",
+    documentName: "วุฒิบัตร (DEVELOPMENT TEST)",
     documentType: DEVELOPER_TEST_DOCUMENT_TYPE,
     expiresAt: null,
     signerTitle: course.credential_signer_title ?? "ผู้ดูแลระบบทดสอบ (Development / Integration Test)",
-    achievement: "เอกสารทดสอบระบบ (TEST / DEVELOPMENT) — สำหรับทดสอบการออกและตรวจสอบใบประกาศนียบัตรเท่านั้น มิใช่การสำเร็จการศึกษาจริง",
+    achievement: "เอกสารทดสอบระบบ (TEST / DEVELOPMENT) — สำหรับทดสอบการออกและตรวจสอบวุฒิบัตรเท่านั้น มิใช่การสำเร็จการศึกษาจริง",
     visualDigest,
   };
 
