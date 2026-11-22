@@ -100,6 +100,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
   const [error, setError] = useState<string | null>(initialError ? errorMessage(initialError) : null);
   const [countdown, setCountdown] = useState<number | null>(null);
   // Set after a wrong password: offers the reset link for exactly the account the user typed
+  const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState(Boolean(initialError));
   const [forgotFor, setForgotFor] = useState<string | null>(null);
 
@@ -199,19 +200,13 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
             <MailCheck className="h-4 w-4" /> ส่งลิงก์ยืนยันอีเมลอีกครั้ง
           </Button>
         )}
-        <Field label="อีเมลหรือชื่อผู้ใช้">
-          <Input name="email" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email" placeholder="you@example.com" required className="h-11" defaultValue={initialIdentifier} />
-        </Field>
         <div className="grid gap-1.5">
-          <div className="flex items-center justify-between">
-            <label htmlFor="login-password" className="text-sm font-medium leading-none">
-              รหัสผ่าน
-            </label>
-            <Link href="/forgot-password" className="-my-2 -mr-2 inline-flex min-h-10 items-center px-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-              ลืมรหัสผ่าน?
-            </Link>
-          </div>
-          <PasswordInput id="login-password" name="password" autoComplete="current-password" required className="h-11" />
+          <label htmlFor="login-identifier" className="text-sm font-medium">อีเมลหรือชื่อผู้ใช้</label>
+          <Input id="login-identifier" name="email" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email" enterKeyHint="next" placeholder="you@example.com" required className="h-11" defaultValue={initialIdentifier} />
+        </div>
+        <div className="grid gap-1.5">
+          <label htmlFor="login-password" className="text-sm font-medium">รหัสผ่าน</label>
+          <Input id="login-password" type={showPassword ? "text" : "password"} name="password" autoComplete="current-password" enterKeyHint="go" required className="h-11" />
         </div>
         <Button
           type="submit"
@@ -222,6 +217,14 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
         >
           {countdown && countdown > 0 ? `กรุณารออีก ${countdown} วินาที...` : "เข้าสู่ระบบ"}
         </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <button type="button" aria-controls="login-password" aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)} className="min-h-10 rounded px-1 text-muted-foreground hover:text-foreground focus-visible:outline-ring">
+            {showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+          </button>
+          <Link href="/forgot-password" className="inline-flex min-h-10 items-center rounded px-1 text-muted-foreground hover:underline">
+            ลืมรหัสผ่าน?
+          </Link>
+        </div>
       </form>
       <p className="text-center text-sm text-muted-foreground">
         ยังไม่มีบัญชี?{" "}

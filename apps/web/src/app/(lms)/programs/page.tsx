@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { RouteLoading } from "@/components/brand/RouteLoading";
 import type { Metadata } from "next";
 import { GraduationCap } from "lucide-react";
 import { EmptyState } from "@/components/ui";
@@ -14,7 +16,15 @@ const GROUPS = [
   { key: "other", title: "หลักสูตรอื่น", phases: null },
 ] as const;
 
-export default async function ProgramsPage() {
+export default function ProgramsPage() {
+  return (
+    <Suspense fallback={<RouteLoading>กำลังโหลดรอบอบรม</RouteLoading>}>
+      <ProgramList />
+    </Suspense>
+  );
+}
+
+async function ProgramList() {
   const programs = await listPublishedPrograms();
   const used = new Set<string>();
   const sections = GROUPS.map((g) => {
