@@ -25,8 +25,10 @@ it("opens the mobile task menu and lets a member navigate into and back from dev
     await devices.waitFor({ state: "visible" });
     await page.setViewportSize({ width: 1366, height: 960 });
     await page.reload();
-    expect(await page.locator("#emails").isVisible()).toBe(true);
-    await page.locator("#devices").waitFor({ state: "visible" });
+    // React may briefly stage streamed markup outside the active main landmark.
+    const account = page.getByRole("main");
+    await account.locator("#emails").waitFor({ state: "visible" });
+    await account.locator("#devices").waitFor({ state: "visible" });
   } finally {
     await browser.close();
   }
