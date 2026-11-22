@@ -212,3 +212,12 @@
   Reveal ไม่ซ่อนเนื้อหาจาก SSR, hydration error /me (ApiTokens origin) แก้แล้ว, การ์ดตัวเลข 2 คอลัมน์บนมือถือ
 - Live check: health/`/`/login/courses 200; หน้า public บน production 375/768 ไม่ล้นจอ (ยกเว้น /courses เกิน 1px)
 - หมายเหตุ dev: dev server พอร์ต 3000 ค้าง next 16.4.5 (MODULE_NOT_FOUND หลังอัปเดต deps) — ตรวจด้วย `next build && next start -p 3100` แทน
+
+## 2026-11-22T09:15:00+00:00 (16:15 Asia/Bangkok) — Claude Code: release 58780dc (self-service password reset)
+
+- Released 58780dc (live เดิม 2362183) = PR #56; ไม่มี migration
+- ลิงก์รีเซ็ตทางอีเมลใช้ได้ 1 ชั่วโมง (เดิม 15 นาที; ลิงก์ที่แอดมินส่ง 1 ชม. อยู่แล้วแต่อีเมลเขียน 15 นาที) — ใช้ครั้งเดียว, เก็บ SHA-256, ใช้ลิงก์ใดลิงก์หนึ่งแล้วลิงก์ที่เหลือตายหมด
+- login: รหัสผิด → กล่อง "จำรหัสผ่านไม่ได้?" ส่งไป /forgot-password?id=… (กรอกให้); /login?reset=1 แจ้งตั้งรหัสใหม่แล้ว
+- forgot: หน้า "ตรวจสอบอีเมลของคุณ" + ขั้นตอน + ส่งซ้ำหลัง 60 วิ + ทางติดต่อเมื่อเข้าอีเมลไม่ได้ (คำตอบเหมือนกันทุกกรณี ไม่เปิดเผยว่ามีบัญชี)
+- reset: `inspectResetToken` ตรวจก่อนแสดงฟอร์ม → ลิงก์ตายแสดง "ขอลิงก์ใหม่"; /me: `POST /api/user/password/reset-link` (ล็อกอินอยู่แต่ลืมรหัสปัจจุบัน, rate limit ต่อบัญชี, owner ปฏิเสธ)
+- Live check: /login, /forgot-password, /reset-password (ลิงก์ตาย → ข้อความหมดอายุ), /login?reset=1 = 200
