@@ -52,6 +52,7 @@ export type AuditAction =
   | "program.visibility_changed"
   | "program.deleted"
   | "cohort.created"
+  | "cohort.deleted"
   | "cohort.published"
   | "cohort.cancelled"
   | "cohort.registration_decided"

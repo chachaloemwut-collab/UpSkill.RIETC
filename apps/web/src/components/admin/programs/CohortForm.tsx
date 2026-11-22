@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Ban, CalendarClock, Globe, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowUp, ArrowDown, Ban, CalendarClock, Globe, Plus, Save, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { fromBangkokInput, toBangkokInput } from "@/lib/format";
 import { Alert, AlertDialog, Button, Checkbox, Dialog, Field, Input, MultiSelect, Select, TagInput, useToast } from "@/components/ui";
@@ -58,7 +58,9 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
     if (dates.some((d) => !d)) return setLocalError("กรุณากรอกวันที่ให้ครบ");
     const cap = String(f.get("capacity") ?? "").trim();
     const wlh = String(f.get("waitlistAcceptanceHours") ?? "").trim();
-    const fields = rules.applicationForm.filter((x) => x.label.trim());
+    const fields = rules.applicationForm;
+    if (fields.some(x => !x.label.trim())) return setLocalError("กรุณาระบุชื่อคำถาม หรือลบคำถามที่ไม่ใช้");
+    if (fields.some(x => x.showIf && !fields.some(parent => parent.key === x.showIf!.field && parent.type === "select" && parent.options?.includes(x.showIf!.value)))) return setLocalError("กรุณาตรวจเงื่อนไขแสดงคำถามหลังแก้ไขคำถามหรือตัวเลือก");
     setLocalError(null);
     onSubmit({
       title: f.get("title"),
@@ -145,7 +147,7 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
         <legend className="px-1 text-sm font-semibold">คำถามในใบสมัคร</legend>
         {rules.applicationForm.length === 0 && <p className="text-sm text-muted-foreground">ไม่มีคำถาม ผู้ใช้กดสมัครได้ทันที</p>}
         {rules.applicationForm.map((q, i) => (
-          <div key={i} className="rounded-lg border p-3 grid gap-2">
+          <div key={q.key} className="rounded-lg border p-3 grid gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <Input className="min-w-48 flex-1" value={q.label} maxLength={120} placeholder="คำถาม เช่น หน่วยงาน" onChange={(e) => setField(i, { label: e.currentTarget.value })} />
               <div className="w-40">
@@ -160,6 +162,11 @@ function CohortFields({ defaults, groups, courses, onSubmit, busy, error, submit
                   <option value="number">ตัวเลข</option>
                 </Select>
               </div>
+              {([-1, 1] as const).map(offset => <Button key={offset} type="button" size="icon" variant="ghost" aria-label={offset < 0 ? "เลื่อนคำถามขึ้น" : "เลื่อนคำถามลง"} disabled={!rules.applicationForm[i + offset]} onClick={() => setRules(r => {
+                const fields = [...r.applicationForm];
+                [fields[i], fields[i + offset]] = [fields[i + offset]!, fields[i]!];
+                return { ...r, applicationForm: fields };
+              })}>{offset < 0 ? <ArrowUp size={16}/> : <ArrowDown size={16}/>}</Button>)}
               <Checkbox checked={q.required} onChange={(e) => setField(i, { required: e.currentTarget.checked })} label="บังคับ" />
               <Button type="button" variant="ghost" size="icon" aria-label="ลบคำถาม" onClick={() => setRules((r) => ({ ...r, applicationForm: r.applicationForm.filter((_, j) => j !== i) }))}>
                 <Trash2 className="h-4 w-4" />
@@ -331,6 +338,7 @@ export function CohortStatusActions({ cohortId, status }: { cohortId: string; st
   const router = useRouter();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   async function act(action: "publish" | "cancel") {
     setBusy(true);
@@ -344,6 +352,13 @@ export function CohortStatusActions({ cohortId, status }: { cohortId: string; st
   if (status === "cancelled") return null;
   return (
     <>
+      {status === "draft" && <><Button variant="outline" disabled={busy} onClick={() => setConfirmDelete(true)}>ลบฉบับร่าง</Button><AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete} title="ลบรอบอบรมฉบับร่าง?" description="ลบได้เฉพาะฉบับร่างที่ยังไม่มีใบสมัครหรือรายการอ้างอิง" confirmLabel="ลบฉบับร่าง" destructive onConfirm={async () => {
+        setBusy(true);
+        const result = await api<{ programId: string }>(`/api/admin/cohorts/${cohortId}`, { method: "DELETE" });
+        setBusy(false);
+        if (result.ok) router.replace(`/admin/programs/${result.data.programId}`);
+        else toast({ title: result.message, variant: "destructive" });
+      }} /></>}
       {status === "draft" && <Button loadingState="saving" loading={busy} onClick={() => void act("publish")}><Globe className="h-4 w-4" /> เผยแพร่รอบ</Button>}
       <Button variant="outline" className="text-destructive" disabled={busy} onClick={() => setConfirmCancel(true)}><Ban className="h-4 w-4" /> ยกเลิกรอบ</Button>
       <AlertDialog

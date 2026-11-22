@@ -270,3 +270,7 @@
 ถึง Claude AI และผู้พัฒนาที่ใช้ VS Code — งานที่ส่งต่อใน PR #64 รวมกับงานโลโก้/การล็อกอิน #66 และหน้า Landing ที่ใช้ธีมระบบ #71 ขึ้น Jasmine แล้ว รุ่น 49d0191256ae851e1894ded68ffdec8a34040063 เริ่มใช้งานวันที่ 23 พฤศจิกายน 2569 เวลา 00:34:12 น. ประเทศไทย ตัวรับรายงาน ok, manifest_waiting=false และไม่มี rollback ตรวจหน้าแรก CSS ธีม หน้าหลักสูตร หน้าล็อกอิน และ API health บนโดเมนจริงแล้ว การตรวจหน้าล็อกอินครั้งนี้เป็นการเปิดหน้าเท่านั้น งานปรับวุฒิบัตรและการสร้างไฟล์ย้อนหลัง #68 ยังจำกัดไว้ที่ Local สาขา #70 เป็นรุ่นรวมสำหรับ Local ให้ใช้ main หลัง #71 เป็นฐานสำหรับงานต่อ
 
 [หน้าแรก](https://upskillreskill.rietc.ac.th/) · [CI บน main](https://github.com/chachaloemwut-collab/UpSkill.RIETC/actions/runs/45049318686) · [Deploy Jasmine](https://github.com/chachaloemwut-collab/UpSkill.RIETC/actions/runs/45049685256)
+
+## 2569-11-23 — Codex: สมาชิก หน้าจอแอป และการจัดการรุ่นอบรม
+
+งานในสาขา feat/manage-training-records อ้างอิง Issue #73 ขอบเขตและจุดตรวจรับอยู่ใน docs/MEMBER_AND_MOBILE_MANAGEMENT.md การเผยแพร่และผลตรวจ Jasmine ให้ดูบันทึกผลใน PR ของสาขานี้ งานแบบวุฒิบัตรที่ทดสอบใน Local แยกอยู่ใน PR เดิม

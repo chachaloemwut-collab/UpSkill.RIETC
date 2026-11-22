@@ -3,6 +3,7 @@
  * AES-256-GCM ciphertext (authorised retrieval) and its last 4 digits (display); never in clear, never logged.
  */
 import "server-only";
+import { normalizePhone, THAI_PROVINCES } from "@upskill/core/profile";
 import { z } from "zod";
 import { PDPA_NOTICE_VERSION, composeLegalNames, maskNationalId, validateProfile, type Profile, type ProfileInput } from "@upskill/core";
 import { PG, pgErrorCode, type Tx } from "@upskill/db";
@@ -165,12 +166,12 @@ export async function saveMyProfile(userId: string, input: ProfileInput & { pdpa
 }
 
 export const ContactPatch = z.strictObject({
-  phone: z.string().max(20).optional(),
-  addressLine: z.string().max(255).optional(),
-  subdistrict: z.string().max(100).optional(),
-  district: z.string().max(100).optional(),
-  province: z.string().max(100).optional(),
-  postalCode: z.string().max(10).optional(),
+  phone: z.string().max(20).refine(v => normalizePhone(v) !== null, "เบอร์โทรศัพท์ไม่ถูกต้อง").transform(v => normalizePhone(v)!).optional(),
+  addressLine: z.string().trim().min(3).max(255).optional(),
+  subdistrict: z.string().trim().min(2).max(100).optional(),
+  district: z.string().trim().min(2).max(100).optional(),
+  province: z.enum(THAI_PROVINCES).optional(),
+  postalCode: z.string().trim().regex(/^[1-9]\d{4}$/, "กรุณากรอกรหัสไปรษณีย์ 5 หลัก").optional(),
 });
 
 /** Patch only contact/address fields; never touches identity or name. */

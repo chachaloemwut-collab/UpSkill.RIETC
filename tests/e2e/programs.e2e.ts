@@ -350,3 +350,25 @@ describe("pages render", () => {
     expect((await admin.req("/instructor")).text).toContain(`Program course ${run}`);
   });
 });
+
+describe("fine-grained administration", () => {
+  it("deletes an unused draft but retains published cohorts", async () => {
+    const newDraft = await admin.req(`/api/admin/programs/${programId}/cohorts`, { body: cohortBody() });
+    expect(newDraft.status).toBe(200);
+    const path = `/api/admin/cohorts/${newDraft.json.id}`;
+    expect((await instructor.req(path, { method: "DELETE" })).status).toBe(403);
+    expect((await admin.req(path, { method: "DELETE" })).json.programId).toBe(programId);
+    expect((await admin.req(path)).status).toBe(404);
+    expect((await admin.req(`/api/admin/cohorts/${cohortId}`, { method: "DELETE" })).status).toBe(409);
+  });
+
+  it("keeps the current session and isolates device removal by account", async () => {
+    const member = await makeUser("devices");
+    const result = await withDb(db => db.query("select id from user_sessions where user_id = $1", [member.id]));
+    const id = result.rows[0].id;
+    expect((await member.client.req(`/api/user/sessions/${id}`, { method: "DELETE" })).status).toBe(409);
+    expect((await a.client.req(`/api/user/sessions/${id}`, { method: "DELETE" })).status).toBe(404);
+    expect((await admin.req(`/api/admin/users/${member.id}/sessions/${id}`, { method: "DELETE" })).status).toBe(200);
+    expect((await member.client.req("/api/user/me")).json.id).toBe(null);
+  });
+});

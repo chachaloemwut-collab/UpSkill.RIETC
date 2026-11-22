@@ -1,5 +1,5 @@
 import { route } from "@/server/http";
-import { getCohortForAdmin, updateCohort } from "@/server/programs/cohorts.service";
+import { deleteDraftCohort, getCohortForAdmin, updateCohort } from "@/server/programs/cohorts.service";
 import { CohortBody } from "@/server/programs/schemas";
 import { uuidParam } from "@/server/params";
 
@@ -9,3 +9,6 @@ export const PATCH = route<typeof CohortBody, { id: string }>({ auth: "required"
   await updateCohort(user!, uuidParam(params.id), body);
   return { ok: true };
 });
+
+export const DELETE = route<never, { id: string }>({ auth: "required", roles: ["admin"] }, async ({ user, params, ip }) =>
+  deleteDraftCohort(user!, uuidParam(params.id), ip));

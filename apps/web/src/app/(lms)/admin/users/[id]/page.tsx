@@ -5,6 +5,7 @@ import { Award, BellRing, ChevronRight, Clock, Fingerprint, GraduationCap, Histo
 import { Badge, Card } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { UserAdminActions } from "@/components/admin/UserAdminActions";
+import { DisconnectDevice } from "@/components/account/DisconnectDevice";
 import { PasswordAdminPanel } from "@/components/admin/PasswordAdminPanel";
 import { listPasswordResets } from "@/server/admin/password.service";
 import { LegalNameAdminCard } from "@/components/admin/LegalNameAdminCard";
@@ -22,7 +23,7 @@ const STATUS_LABEL: Record<string, { label: string; variant: "secondary" | "succ
 };
 
 export default async function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdminPage();
+  const actor = await requireAdminPage();
   const { id } = await params;
   const d = await getUserDetailAdmin(id).catch(() => null);
   if (!d) notFound();
@@ -137,7 +138,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                 {d.sessions.map((s) => (
                   <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                     <span className="text-muted-foreground">เข้าเมื่อ {formatDateTimeTh(s.created_at)} · ใช้ล่าสุด {formatDateTimeTh(s.last_seen_at)}</span>
-                    {s.revoked_at ? <Badge variant="secondary">ยกเลิกแล้ว ({s.revoked_reason ?? "-"})</Badge> : <Badge variant="success">ใช้งาน</Badge>}
+                    {s.revoked_at ? <Badge variant="secondary">ยกเลิกแล้ว ({s.revoked_reason ?? "-"})</Badge> : s.expired ? <Badge variant="secondary">หมดอายุ</Badge> : <><Badge variant="success">ใช้งาน</Badge>{!u.is_system_owner && actor.id !== u.id && <DisconnectDevice path={`/api/admin/users/${u.id}/sessions/${s.id}`} />}</>}
                   </li>
                 ))}
               </ul>
