@@ -13,7 +13,8 @@
     "./profile": "./src/profile.ts",
     "./completion": "./src/completion.ts",
     "./application": "./src/application.ts",
-    "./certificate-patterns": "./src/certificate-patterns.ts"
+    "./certificate-patterns": "./src/certificate-patterns.ts",
+    "./partner-api": "./src/partner-api.ts"
   },
   "//exports": "Client components must import only from the subpaths above (no node:crypto). The '.' entry is server-only.",
   "scripts": {

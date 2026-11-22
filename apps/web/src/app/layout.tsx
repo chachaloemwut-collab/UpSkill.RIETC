@@ -73,7 +73,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* eslint-disable-next-line react/no-danger */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className="min-h-dvh font-sans">
+      <body className="min-h-dvh font-reading">
         {outdated && (
           // Inline styles on purpose: on these browsers the app's CSS may not apply
           <div role="status" style={{ background: "#fff7ed", color: "#9a3412", borderBottom: "1px solid #fdba74", padding: "10px 16px", fontSize: "14px", lineHeight: 1.5, textAlign: "center" }}>
