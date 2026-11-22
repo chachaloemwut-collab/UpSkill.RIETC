@@ -1,3 +1,4 @@
+import { buttonClass } from "@/components/ui";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, QrCode } from "lucide-react";
 import { BrandLogo } from "@/components/brand/BrandLogo";
@@ -64,12 +65,12 @@ export async function LandingPage() {
           <div className={styles.heroGrid}>
             <div>
               <p className={styles.college}>{DEFAULT_ISSUER_TH}</p>
-              <h1 id="home-title" className={styles.masthead} lang="en">Upskill.<br /><em>Reskill.</em></h1>
+              <h1 id="home-title" className={styles.masthead} lang="en">Upskill.<br /><span>Reskill.</span></h1>
               <p className={styles.intro}>ระบบอบรมเพื่อพัฒนาทักษะวิชาชีพ</p>
               <p className={styles.lead}>เลือกหลักสูตรของวิทยาลัย เรียนตามบทเรียน และตรวจสอบผลการอบรมของตนเองได้ในที่เดียว</p>
               <div className={styles.actions}>
-                <Link href="/courses" className={styles.primary}>ดูหลักสูตรทั้งหมด <ArrowRight size={17} aria-hidden /></Link>
-                <Link href="/verify" className={styles.secondary}><QrCode size={17} aria-hidden /> ตรวจสอบเอกสาร</Link>
+                <Link href="/courses" className={buttonClass("default", "lg")}>ดูหลักสูตรทั้งหมด <ArrowRight size={17} aria-hidden /></Link>
+                <Link href="/verify" className={buttonClass("outline", "lg")}><QrCode size={17} aria-hidden /> ตรวจสอบเอกสาร</Link>
               </div>
               <dl className={styles.numbers}>{numbers.map(([label, value]) => (
                 <div key={label}><dt>{label}</dt><dd>{value.toLocaleString("th-TH")}</dd></div>
@@ -151,7 +152,7 @@ export async function LandingPage() {
 
         <section className={styles.closing}>
           <h2>สมัครเข้าอบรมกับวิทยาลัย</h2>
-          <div className={styles.actions}><Link href="/register" className={styles.primary}>สร้างบัญชีผู้เรียน</Link><Link href="/courses" className={styles.secondary}>ดูหลักสูตรทั้งหมด</Link></div>
+          <div className={styles.actions}><Link href="/register" className={buttonClass("default", "lg")}>สร้างบัญชีผู้เรียน</Link><Link href="/courses" className={buttonClass("outline", "lg")}>ดูหลักสูตรทั้งหมด</Link></div>
         </section>
       </main>
       <footer className={styles.footer}>

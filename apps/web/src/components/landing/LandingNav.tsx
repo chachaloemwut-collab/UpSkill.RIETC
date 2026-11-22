@@ -70,7 +70,7 @@ export function LandingNav({ hasEvents }: { hasEvents: boolean }) {
         <Link href="/login" className={buttonClass("ghost", "sm", "hidden px-3 sm:inline-flex")}>
           เข้าสู่ระบบ
         </Link>
-        <Link href="/register" className={buttonClass("default", "sm", "rounded-[3px] bg-[var(--action)] text-[var(--action-text)] hover:bg-[var(--action)] hover:underline")}>
+        <Link href="/register" className={buttonClass("default", "sm")}>
           สมัครสมาชิก
         </Link>
         <button
