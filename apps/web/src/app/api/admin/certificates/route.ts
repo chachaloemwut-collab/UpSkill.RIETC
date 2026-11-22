@@ -1,6 +1,7 @@
+import { uuidParam } from "@/server/params";
 import { z } from "zod";
 import { route } from "@/server/http";
-import { listCertificatesAdmin, adminManualIssueCertificate, type AdminCertificateStatus } from "@/server/admin/certificates.service";
+import { listCertificatesAdmin, nextCertificateBatch, adminManualIssueCertificate, type AdminCertificateStatus } from "@/server/admin/certificates.service";
 
 const PostBody = z.object({
   userId: z.string().uuid(),
@@ -11,7 +12,11 @@ const PostBody = z.object({
 
 export const GET = route({ auth: "required", roles: ["admin"] }, async ({ req }) => {
   const sp = req.nextUrl.searchParams;
+  const after = sp.get("after");
+  const course = sp.get("course");
+  if (after) return nextCertificateBatch(uuidParam(after), course ? uuidParam(course) : undefined);
   return listCertificatesAdmin({
+    courseId: course ? uuidParam(course) : undefined,
     query: sp.get("q") ?? undefined,
     status: (sp.get("status") as AdminCertificateStatus) ?? undefined,
     page: Number(sp.get("page") ?? 1),

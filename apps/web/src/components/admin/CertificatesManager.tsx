@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Award, Copy, ExternalLink, Eye, FileSpreadsheet, Plus, RotateCcw, ShieldAlert, ShieldCheck, XCircle } from "lucide-react";
@@ -59,6 +59,7 @@ export interface CertificatesManagerProps {
   initialQuery?: string;
   initialStatus?: string;
   /** Title of the course the page was opened for (?course=…), or null for every course */
+  courseId: string | null;
   courseFilter?: string | null;
   limit: number;
 }
@@ -76,9 +77,37 @@ const VIEWS: TableView[] = [
  * KPI tiles that also filter, and the template's AdvancedDataTable (search, per-column filters, sort, column
  * show/hide/pin, saved views, paging) inside a card. Row actions stay on the row as labelled icon buttons.
  */
-export function CertificatesManager({ initialData, courses, initialQuery = "", initialStatus = "", courseFilter = null, limit }: CertificatesManagerProps) {
+export function CertificatesManager({ initialData, courses, initialQuery = "", initialStatus = "", courseId, courseFilter = null, limit }: CertificatesManagerProps) {
   const router = useRouter();
   const toast = useToast();
+
+  const target = Math.min(initialData.total, limit);
+  const initialBatch = { source: initialData, rows: initialData.certificates, done: false, failed: false };
+  const [batch, setBatch] = useState(initialBatch);
+  if (batch.source !== initialData) setBatch(initialBatch);
+  const last = batch.rows.at(-1)?.id;
+  const remaining = target - batch.rows.length;
+
+  useEffect(() => {
+    if (batch.source !== initialData || !last || remaining <= 0 || batch.done || batch.failed) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams({ after: last });
+    if (courseId) params.set("course", courseId);
+    async function loadMore() {
+      try {
+        const response = await fetch(`/api/admin/certificates?${params}`, { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("Could not load register");
+        const { certificates }: { certificates: CertificateRow[] } = await response.json();
+        if (!controller.signal.aborted) setBatch(current => current.source !== initialData ? current : {
+          ...current, rows: [...current.rows, ...certificates.slice(0, remaining)], done: certificates.length === 0,
+        });
+      } catch {
+        if (!controller.signal.aborted) setBatch(current => current.source !== initialData ? current : { ...current, failed: true });
+      }
+    }
+    void loadMore();
+    return () => controller.abort();
+  }, [batch.source, batch.done, batch.failed, courseId, initialData, last, remaining]);
 
   // Revoke Dialog State
   const [revokeCert, setRevokeCert] = useState<CertificateRow | null>(null);
@@ -104,8 +133,8 @@ export function CertificatesManager({ initialData, courses, initialQuery = "", i
   };
 
   const courseOptions = useMemo(
-    () => [...new Set(initialData.certificates.map((c) => c.course_title_snapshot))].sort((a, b) => a.localeCompare(b, "th")).map((t) => ({ value: t, label: t })),
-    [initialData.certificates],
+    () => [...new Set(batch.rows.map((c) => c.course_title_snapshot))].sort((a, b) => a.localeCompare(b, "th")).map((t) => ({ value: t, label: t })),
+    [batch.rows],
   );
 
   const columns: Column<CertificateRow>[] = [
@@ -327,6 +356,10 @@ export function CertificatesManager({ initialData, courses, initialQuery = "", i
           <Link href="/admin/certificates" className="font-medium text-primary hover:underline">ดูวุฒิบัตรทุกหลักสูตร</Link>
         </Alert>
       )}
+      {remaining > 0 && !batch.done && <div className="flex items-center gap-3 py-2 text-sm" role="status">
+        {batch.failed ? <>โหลดรายการถัดไปไม่สำเร็จ <Button size="sm" variant="outline" onClick={() => setBatch(current => ({ ...current, failed: false }))}>ลองอีกครั้ง</Button></>
+          : <>กำลังโหลดทะเบียน {batch.rows.length.toLocaleString("th-TH")} จาก {target.toLocaleString("th-TH")} ฉบับ</>}
+      </div>}
       {initialData.total > limit && (
         <Alert variant="warning" title={`แสดง ${limit.toLocaleString("th-TH")} ฉบับล่าสุด จากทั้งหมด ${initialData.total.toLocaleString("th-TH")} ฉบับ`}>
           ใช้หน้ารายงานเพื่อส่งออกทั้งหมด หรือเปิดจากหลักสูตรเพื่อดูเฉพาะหลักสูตรนั้น
@@ -336,7 +369,7 @@ export function CertificatesManager({ initialData, courses, initialQuery = "", i
       <Card className="p-5">
         <AdvancedDataTable
           key={statusView}
-          data={initialData.certificates}
+          data={batch.rows}
           columns={columns}
           rowKey="id"
           pageSize={20}

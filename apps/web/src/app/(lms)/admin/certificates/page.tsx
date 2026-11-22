@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { Suspense } from "react";
 import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
@@ -25,10 +26,11 @@ async function CertificateRegister({
   searchParams: Promise<{ q?: string; status?: string; course?: string }>;
 }) {
   const sp = await searchParams;
+  const courseId = z.uuid().safeParse(sp.course).data;
 
   const [data, courses] = await Promise.all([
     // Search and status are applied in the table (from the URL as its starting state); a course link narrows the load
-    listCertificatesAdmin({ courseId: sp.course, all: true }),
+    listCertificatesAdmin({ courseId }),
     listEligibleCoursesForAdmin(),
   ]);
 
@@ -39,7 +41,8 @@ async function CertificateRegister({
         courses={courses}
         initialQuery={sp.q ?? ""}
         initialStatus={sp.status ?? ""}
-        courseFilter={sp.course ? (courses.find((c) => c.id === sp.course)?.title ?? "หลักสูตรที่เลือก") : null}
+        courseFilter={courseId ? (courses.find((c) => c.id === courseId)?.title ?? "หลักสูตรที่เลือก") : null}
+        courseId={courseId ?? null}
         limit={ADMIN_TABLE_LIMIT}
       />
     </div>
