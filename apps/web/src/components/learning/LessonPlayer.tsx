@@ -783,7 +783,7 @@ export function LessonPlayer({
           >
             {isPublic ? <Share2 className="h-4 w-4" /> : <Lock className="h-4 w-4 text-amber-400/80" />}
           </button>
-          <button type="button" className={cn(iconButton, "hidden sm:inline-flex")} onClick={() => setShortcutsOpen((v) => !v)} aria-label="คู่มือคีย์ลัด (?)" title="คู่มือคีย์ลัด (?)">
+          <button type="button" className={cn(iconButton, "hidden lg:inline-flex")} onClick={() => setShortcutsOpen((v) => !v)} aria-label="คู่มือคีย์ลัด (?)" title="คู่มือคีย์ลัด (?)">
             <HelpCircle className="h-4 w-4" />
           </button>
           <button

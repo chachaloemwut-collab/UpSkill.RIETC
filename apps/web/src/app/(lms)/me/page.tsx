@@ -162,7 +162,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
 
 function Section({ icon, title, description, children }: { icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) {
   return (
-    <section className="grid gap-4 md:grid-cols-[240px_1fr]">
+    <section className="grid gap-4 lg:grid-cols-[240px_1fr]">
       <div>
         <h2 className="flex items-center gap-2 font-semibold">
           {icon} {title}

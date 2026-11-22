@@ -42,7 +42,7 @@ export default async function AnnouncementPage({ params }: Props) {
           <Alert variant="warning" title="ตัวอย่างสำหรับผู้ดูแล">ประกาศนี้ยังไม่แสดงต่อสาธารณะ (ฉบับร่าง ยังไม่ถึงเวลาเผยแพร่ หรือหมดอายุแล้ว)</Alert>
         </div>
       )}
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card className="p-6 text-sm">
           {a.summary && <p className="mb-4 text-base text-muted-foreground">{a.summary}</p>}
           <RichText text={a.body} />

@@ -56,8 +56,8 @@ export default async function ProgramPage({ params }: Props) {
         )}
       </PageHeader>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <div className="grid min-w-0 content-start gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid min-w-0 grid-cols-1 content-start gap-6">
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1.5"><Layers className="h-4 w-4" /> {courses.length} รายวิชา</span>
             <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4" /> {formatDuration(totalSec)}</span>

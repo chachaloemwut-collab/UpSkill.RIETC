@@ -73,7 +73,7 @@ export default async function AdminReportsPage({ searchParams }: { searchParams:
           <p className="text-sm text-muted-foreground">ลงทะเบียน {totals.enrolled} · เรียนจบ {totals.completed} · ได้รับวุฒิบัตร {totals.certified}</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-sm">
+          <table className="w-full text-sm [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
             <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
               <tr><th className="px-4 py-2">หลักสูตร</th><th className="px-4 py-2 text-right">ลงทะเบียน</th><th className="px-4 py-2 text-right">กำลังเรียน</th><th className="px-4 py-2 text-right">เรียนจบ</th><th className="px-4 py-2 text-right">ได้รับวุฒิบัตร</th><th className="no-print px-4 py-2" /></tr>
             </thead>
@@ -81,7 +81,7 @@ export default async function AdminReportsPage({ searchParams }: { searchParams:
               {summary.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">ยังไม่มีผู้ลงทะเบียนตามเงื่อนไขนี้</td></tr>}
               {summary.map((r) => (
                 <tr key={r.course_id}>
-                  <td className="px-4 py-2 font-medium">{r.course_title}</td>
+                  <td className="max-w-[18rem] truncate px-4 py-2 font-medium" title={r.course_title}>{r.course_title}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{r.enrolled}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{r.in_progress}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{r.completed}</td>
@@ -118,7 +118,7 @@ export default async function AdminReportsPage({ searchParams }: { searchParams:
           <p className="no-print border-b bg-warning/10 px-4 py-2 text-sm text-warning">แสดง {PAGE_ROWS} รายการแรก — ดาวน์โหลด Excel (CSV) เพื่อดูทั้งหมด หรือกรองให้แคบลง</p>
         )}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-sm print:min-w-0 print:text-[9pt]">
+          <table className="w-full text-sm print:text-[9pt] [&_td]:whitespace-nowrap print:[&_td]:whitespace-normal">
             <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
               <tr>{REPORT_COLUMNS.map((c) => <th key={c} className="whitespace-nowrap px-3 py-2">{c}</th>)}</tr>
             </thead>
