@@ -42,8 +42,12 @@ jobs:
           set -euo pipefail
           trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          # Shown to users on the account page: release date + short commit
+          APP_VERSION="$(git log -1 --format=%cd --date=format:%Y.%m.%d)-${GITHUB_SHA:0:7}"
           for svc in web worker; do
-            docker buildx build --platform linux/amd64 --push \
+            extra=()
+            if [ "$svc" = web ]; then extra=(--build-arg "APP_VERSION=$APP_VERSION"); fi
+            docker buildx build --platform linux/amd64 --push "${extra[@]}" \
               --file "infra/docker/$svc.Dockerfile" \
               --tag "$IMAGE_BASE-$svc:$GITHUB_SHA" \
               --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \

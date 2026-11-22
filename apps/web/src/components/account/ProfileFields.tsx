@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { ADULT_AGE, THAI_PROVINCES, TITLES_EN, TITLES_TH, ageOn, type ProfileErrors, type ProfileInput } from "@upskill/core/profile";
+import { ADULT_AGE, ELECTRONIC_SIGNATURE_STATEMENT, GUARDIAN_CONSENT_TEXT, THAI_PROVINCES, TITLES_EN, TITLES_TH, ageOn, type ProfileErrors, type ProfileInput } from "@upskill/core/profile";
 import { Checkbox, Field, Input, Select } from "@/components/ui";
 
 export type ProfileDefaults = Partial<Record<keyof ProfileInput, string>> & { nationalIdMasked?: string | null };
@@ -111,18 +111,28 @@ export function ProfileFields({
         </div>
       </Section>
       {minor && (
-        <Section title="ผู้ปกครอง" description={`ผู้สมัครอายุต่ำกว่า ${ADULT_AGE} ปี ต้องได้รับความยินยอมจากผู้ปกครองตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล`} hidden={hide("address")}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="ชื่อ-นามสกุลผู้ปกครอง" error={errors.guardianName}><Input name="guardianName" defaultValue={defaults.guardianName} maxLength={255} required /></Field>
-            <Field label="เบอร์โทรศัพท์ผู้ปกครอง" error={errors.guardianPhone}><Input name="guardianPhone" type="tel" defaultValue={defaults.guardianPhone} maxLength={20} required /></Field>
-          </div>
-          <div>
-            <Checkbox name="guardianConsent" defaultChecked={!!defaults.guardianName} label="ผู้ปกครองรับทราบประกาศความเป็นส่วนตัวและให้ความยินยอมในการสมัครครั้งนี้" />
+        <Section title="ความยินยอมของผู้ปกครอง" description={`ผู้สมัครอายุต่ำกว่า ${ADULT_AGE} ปี กรอกชื่อ-นามสกุลผู้ปกครอง และยืนยันว่าได้รับอนุญาตแล้ว`} hidden={hide("address")}>
+          <Field label="ชื่อ-นามสกุลผู้ปกครอง" error={errors.guardianName} hint="เช่น นางสมศรี ใจดี">
+            <Input name="guardianName" defaultValue={defaults.guardianName} maxLength={255} required autoComplete="off" />
+          </Field>
+          {/* not asked any more; a number saved by an older form is kept as it is */}
+          <input type="hidden" name="guardianPhone" defaultValue={defaults.guardianPhone ?? ""} />
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <Checkbox name="guardianConsent" defaultChecked={!!defaults.guardianName} label={GUARDIAN_CONSENT_TEXT} />
             {errors.guardianConsent && <p className="mt-1 text-xs text-destructive">{errors.guardianConsent}</p>}
           </div>
         </Section>
       )}
     </div>
+  );
+}
+
+/** The legal effect of submitting, shown right above every submit button for an application */
+export function ElectronicSignatureNotice() {
+  return (
+    <p className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm leading-relaxed text-foreground">
+      <b className="font-semibold">โปรดทราบ</b> {ELECTRONIC_SIGNATURE_STATEMENT}
+    </p>
   );
 }
 

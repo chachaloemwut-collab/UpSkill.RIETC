@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ChevronLeft, ChevronRight, MailCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, MailCheck, Printer } from "lucide-react";
 import { api } from "@/lib/api";
 import { validateProfile, type ProfileErrors } from "@upskill/core/profile";
-import { PROFILE_PART_FIELDS, PdpaNotice, ProfileFields, readProfile, type ProfilePart } from "@/components/account/ProfileFields";
+import { ElectronicSignatureNotice, PROFILE_PART_FIELDS, PdpaNotice, ProfileFields, readProfile, type ProfilePart } from "@/components/account/ProfileFields";
+import { ApplicationSheet, type ApplicationSheetData } from "@/components/account/ApplicationSheet";
 import { errorMessage } from "@/lib/errors";
 import { Alert, Button, CheckDrawIcon, Field, Input, LoginIcon, PasswordInput, Separator, buttonClass, useActionScene, useToast } from "@/components/ui";
 
@@ -82,7 +83,7 @@ function OrDivider() {
 
 export function AuthHeading({ title, description }: { title: string; description?: React.ReactNode }) {
   return (
-    <div className="mb-6">
+    <div className="mb-6 print:hidden">
       <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
       {description && <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>}
     </div>
@@ -265,6 +266,7 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
   const [accountErrors, setAccountErrors] = useState<{ email?: string; password?: string; confirm?: string }>({});
   const [errors, setErrors] = useState<ProfileErrors>({});
   const [consentError, setConsentError] = useState<string | undefined>();
+  const [sheet, setSheet] = useState<ApplicationSheetData | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   const top = () => formRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -347,10 +349,23 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
     s.setBusy(true);
     s.setError(null);
     const r = await api<{ message: string }>("/api/auth/register", {
-      body: { email: f.get("email"), password: f.get("password"), profile: all.profile, pdpaConsent: consent },
+      // The server validates again, so it needs the applicant's guardian confirmation too: the normalized profile
+      // does not carry it, and without it every applicant under 20 was refused.
+      body: { email: f.get("email"), password: f.get("password"), profile: { ...all.profile, guardianConsent: f.get("guardianConsent") === "on" }, pdpaConsent: consent },
     });
     s.setBusy(false);
-    if (r.ok) s.setNotice(r.data.message);
+    if (r.ok) {
+      const pr = all.profile;
+      setSheet({
+        email: String(f.get("email") ?? "").trim(),
+        titleTh: pr.titleTh, firstNameTh: pr.firstNameTh, lastNameTh: pr.lastNameTh,
+        titleEn: pr.titleEn, firstNameEn: pr.firstNameEn, lastNameEn: pr.lastNameEn,
+        birthDate: pr.birthDate, nationalIdLast4: pr.nationalId.slice(-4), phone: pr.phone,
+        addressLine: pr.addressLine, subdistrict: pr.subdistrict, district: pr.district, province: pr.province, postalCode: pr.postalCode,
+        guardianName: pr.guardianName, submittedAt: new Date(),
+      });
+      s.setNotice(r.data.message);
+    }
     else {
       s.setError(r.message);
       top();
@@ -359,7 +374,9 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
 
   if (s.notice)
     return (
-      <div data-auth-wide className="grid justify-items-center gap-4 rounded-lg border bg-card p-8 text-center">
+      <>
+      {sheet && <div className="hidden print:block"><ApplicationSheet data={sheet} /></div>}
+      <div data-auth-wide className="grid justify-items-center gap-4 rounded-lg border bg-card p-8 text-center print:hidden">
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success/10 text-success [&>svg]:h-7 [&>svg]:w-7">
           <CheckDrawIcon play={1} />
         </span>
@@ -368,10 +385,19 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
           <p className="mt-1 text-sm text-muted-foreground">{s.notice}</p>
           <p className="mt-2 text-xs text-muted-foreground">ไม่พบอีเมล? ลองดูในโฟลเดอร์จดหมายขยะ (Spam) หรือโปรโมชัน</p>
         </div>
-        <Link href="/login" className={buttonClass("outline", "md")}>
-          ไปหน้าเข้าสู่ระบบ
-        </Link>
+        <div className="flex flex-wrap justify-center gap-2">
+          {sheet && (
+            <Button variant="outline" onClick={() => window.print()}>
+              <Printer className="h-4 w-4" /> พิมพ์ใบสมัคร
+            </Button>
+          )}
+          <Link href="/login" className={buttonClass("default", "md")}>
+            ไปหน้าเข้าสู่ระบบ
+          </Link>
+        </div>
+        <p className="text-xs text-muted-foreground">พิมพ์ใบสมัครย้อนหลังได้ทุกเมื่อที่เมนู ข้อมูลผู้เรียน → พิมพ์ใบสมัคร</p>
       </div>
+      </>
     );
 
   const last = step === REGISTER_STEPS.length - 1;
@@ -413,7 +439,10 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
         <ProfileFields errors={errors} show={step === 1 ? "identity" : step === 2 ? "address" : "none"} />
 
         <div className={last ? "" : "hidden"}>
-          <PdpaNotice error={consentError} />
+          <div className="grid gap-3">
+            <PdpaNotice error={consentError} />
+            <ElectronicSignatureNotice />
+          </div>
         </div>
 
         <div className="flex items-center gap-3 pt-1">

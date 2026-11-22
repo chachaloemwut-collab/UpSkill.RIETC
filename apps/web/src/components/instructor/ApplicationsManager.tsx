@@ -281,7 +281,7 @@ function ApplicationDetail({ base, app }: { base: string; app: EditorApplication
         {line("ที่อยู่", [a.addressLine, a.subdistrict, a.district, a.province, a.postalCode].filter(Boolean).join(" "))}
         {ed && line("การศึกษา", [ed.level, ed.qualification, ed.institution].filter(Boolean).join(" · "))}
         {oc && line("อาชีพ", [oc.occupation, oc.organization].filter(Boolean).join(" · "))}
-        {g && line("ผู้ปกครอง", `${g.name} (${g.relation}) ${g.phone}`)}
+        {g && line("ผู้ปกครอง", `${g.name}${g.relation ? ` (${g.relation})` : ""}${g.phone ? ` ${g.phone}` : ""} · ยืนยันการได้รับอนุญาตแล้ว`)}
         {line("ลงชื่อผู้สมัคร", app.declaration_name)}
       </div>
       <form onSubmit={save} className="grid content-start gap-3">

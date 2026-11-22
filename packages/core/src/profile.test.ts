@@ -59,9 +59,14 @@ describe("validateProfile", () => {
   });
   it("requires a guardian for applicants under 20", () => {
     const minor = { ...base, titleTh: "นางสาว", birthDate: "2010-01-01" };
-    expect(Object.keys(validateProfile(minor, today).errors).sort()).toEqual(["guardianConsent", "guardianName", "guardianPhone"]);
-    const ok = validateProfile({ ...minor, guardianName: "นางสมศรี ใจดี", guardianPhone: "0899999999", guardianConsent: true }, today);
-    expect(ok.profile?.guardianPhone).toBe("0899999999");
+    // only the guardian's full name and the applicant's confirmation are required
+    expect(Object.keys(validateProfile(minor, today).errors).sort()).toEqual(["guardianConsent", "guardianName"]);
+    expect(validateProfile({ ...minor, guardianName: "สมศรี", guardianConsent: true }, today).errors.guardianName).toBeTruthy();
+    const ok = validateProfile({ ...minor, guardianName: "นางสมศรี ใจดี", guardianConsent: true }, today);
+    expect(ok.errors).toEqual({});
+    expect(ok.profile).toMatchObject({ guardianName: "นางสมศรี ใจดี", guardianPhone: null });
+    // a phone kept from an older form is still stored
+    expect(validateProfile({ ...minor, guardianName: "นางสมศรี ใจดี", guardianPhone: "0899999999", guardianConsent: true }, today).profile?.guardianPhone).toBe("0899999999");
   });
   it("refuses applicants younger than 10", () => expect(validateProfile({ ...base, birthDate: "2020-01-01" }, today).errors.birthDate).toBeTruthy());
 });

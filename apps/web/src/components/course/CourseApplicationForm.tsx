@@ -11,17 +11,16 @@ import { CheckCircle2, ClipboardList, FileUp, Paperclip, Printer, X } from "luci
 import {
   APPLICATION_FILE_MAX_BYTES,
   EDUCATION_LEVELS,
-  GUARDIAN_RELATIONS,
   OCCUPATIONS,
   validateApplication,
   type ApplicationErrors,
   type ApplicationInput,
   type ApplicationSettings,
 } from "@upskill/core/application";
-import { THAI_PROVINCES } from "@upskill/core/profile";
+import { ELECTRONIC_SIGNATURE_STATEMENT, GUARDIAN_CONSENT_TEXT, THAI_PROVINCES, maskNationalId } from "@upskill/core/profile";
 import { api } from "@/lib/api";
 import { Alert, Button, Card, Checkbox, Field, Input, Select, buttonClass } from "@/components/ui";
-import { PdpaNotice } from "@/components/account/ProfileFields";
+import { ElectronicSignatureNotice, PdpaNotice } from "@/components/account/ProfileFields";
 import { formatDateTimeTh } from "@/lib/format";
 
 export interface ApplyProfile {
@@ -115,7 +114,7 @@ export function CourseApplicationForm({
   const [updateProfileContact, setUpdateProfileContact] = useState(false);
   const [education, setEducation] = useState({ level: "", institution: "", qualification: "" });
   const [occupation, setOccupation] = useState({ occupation: "", organization: "" });
-  const [guardian, setGuardian] = useState({ name: profile.guardian_name ?? "", relation: "", phone: profile.guardian_phone ?? "", consent: false });
+  const [guardian, setGuardian] = useState({ name: profile.guardian_name ?? "", relation: "", phone: "", consent: false });
   const [documents, setDocuments] = useState<Record<string, boolean>>(Object.fromEntries(pendingFiles.map((f) => [f.doc_key, true])));
   // newest file per document (the server keeps one per document)
   const [files, setFiles] = useState<Record<string, ApplicationFile>>(() => {
@@ -259,7 +258,7 @@ export function CourseApplicationForm({
           <Row label="ชื่อ-นามสกุล" value={`${profile.title_th}${profile.first_name_th} ${profile.last_name_th}`} />
           <Row label="Name" value={`${profile.title_en} ${profile.first_name_en} ${profile.last_name_en}`} />
           <Row label="วันเดือนปีเกิด" value={thaiDate(profile.birth_date)} />
-          <Row label="เลขประจำตัวประชาชน" value={<span className="font-mono">x-xxxx-xxxxx-{profile.national_id_last4.slice(0, 2)}-{profile.national_id_last4.slice(2)}</span>} />
+          <Row label="เลขประจำตัวประชาชน" value={<span className="font-mono">{maskNationalId(profile.national_id_last4)}</span>} />
         </div>
         <Link href="/me/profile" className="w-fit text-sm font-medium text-primary hover:underline">แก้ไขข้อมูลส่วนตัว</Link>
       </Section>
@@ -320,16 +319,12 @@ export function CourseApplicationForm({
       )}
 
       {minor && (
-        <Section n={++n} title="ข้อมูลผู้ปกครอง" hint="ผู้สมัครอายุต่ำกว่า 20 ปี ต้องได้รับความยินยอมจากผู้ปกครอง">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="ชื่อ-นามสกุล" error={err("guardian.name")}><Input maxLength={255} value={guardian.name} onChange={(e) => setGuardian((x) => ({ ...x, name: e.target.value }))} /></Field>
-            <Field label="ความสัมพันธ์" error={err("guardian.relation")}>
-              <Select value={guardian.relation} onValueChange={(v) => setGuardian((x) => ({ ...x, relation: v }))} options={GUARDIAN_RELATIONS.map((v) => ({ value: v, label: v }))} placeholder="เลือก…" />
-            </Field>
-            <Field label="เบอร์โทรศัพท์" error={err("guardian.phone")}><Input type="tel" maxLength={20} value={guardian.phone} onChange={(e) => setGuardian((x) => ({ ...x, phone: e.target.value }))} /></Field>
-          </div>
-          <div>
-            <Checkbox checked={guardian.consent} onChange={(e) => setGuardian((x) => ({ ...x, consent: e.target.checked }))} label="ผู้ปกครองรับรองว่าได้รับทราบและยินยอมให้ผู้สมัครเข้ารับการอบรม" />
+        <Section n={++n} title="ความยินยอมของผู้ปกครอง" hint="ผู้สมัครอายุต่ำกว่า 20 ปี กรอกชื่อ-นามสกุลผู้ปกครอง และยืนยันว่าได้รับอนุญาตแล้ว">
+          <Field label="ชื่อ-นามสกุลผู้ปกครอง" error={err("guardian.name")} hint="เช่น นางสมศรี ใจดี">
+            <Input maxLength={255} value={guardian.name} onChange={(e) => setGuardian((x) => ({ ...x, name: e.target.value }))} autoComplete="off" />
+          </Field>
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <Checkbox checked={guardian.consent} onChange={(e) => setGuardian((x) => ({ ...x, consent: e.target.checked }))} label={GUARDIAN_CONSENT_TEXT} />
             {err("guardian.consent") && <p className="mt-1 text-xs text-destructive">{err("guardian.consent")}</p>}
           </div>
         </Section>
@@ -410,6 +405,7 @@ export function CourseApplicationForm({
           <p className="pb-2 text-sm text-muted-foreground">วันที่สมัคร {new Date().toLocaleDateString("th-TH", { dateStyle: "long" })}</p>
         </div>
         <PdpaNotice error={err("pdpaConsent")} />
+        <ElectronicSignatureNotice />
       </Section>
 
       <Button type="submit" size="lg" loading={busy} className="w-full">
@@ -479,8 +475,9 @@ export function ApplicationSummary({
         </Section>
       )}
       {g && (
-        <Section n={4} title="ผู้ปกครอง">
-          <Row label="ชื่อ-นามสกุล" value={`${g.name} (${g.relation}) โทร ${g.phone}`} />
+        <Section n={4} title="ความยินยอมของผู้ปกครอง">
+          <Row label="ชื่อ-นามสกุลผู้ปกครอง" value={`${g.name}${g.relation ? ` (${g.relation})` : ""}${g.phone ? ` โทร ${g.phone}` : ""}`} />
+          <p className="text-sm">☑ {GUARDIAN_CONSENT_TEXT}</p>
         </Section>
       )}
       {docs.length > 0 && (
@@ -507,8 +504,10 @@ export function ApplicationSummary({
         </Section>
       )}
       <Section n={6} title="การรับรองข้อมูล">
+        <p className="text-sm">☑ ข้าพเจ้าขอรับรองว่าข้อความข้างต้นเป็นความจริงทุกประการ หากตรวจพบภายหลังว่าไม่เป็นความจริง ยินยอมให้ยกเลิกการสมัคร</p>
         <Row label="ลงชื่อผู้สมัคร" value={application.declaration_name} />
         <Row label="วันที่สมัคร" value={formatDateTimeTh(application.declared_at)} />
+        <p className="rounded-md border p-3 text-xs leading-relaxed text-muted-foreground print:text-black">{ELECTRONIC_SIGNATURE_STATEMENT}</p>
       </Section>
     </div>
   );

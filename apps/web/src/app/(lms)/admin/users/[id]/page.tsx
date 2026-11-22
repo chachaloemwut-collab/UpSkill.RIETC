@@ -120,7 +120,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                 <Row label="วันเกิด" value={d.profile.birth_date ? formatDateTimeTh(d.profile.birth_date) : null} />
                 <Row label="เลขบัตร (4 ตัวท้าย)" value={d.profile.national_id_last4} />
                 <Row label="ที่อยู่" value={`${d.profile.address_line} ${d.profile.subdistrict} ${d.profile.district} ${d.profile.province} ${d.profile.postal_code}`} full />
-                {d.profile.guardian_name && <Row label="ผู้ปกครอง" value={`${d.profile.guardian_name} · ${d.profile.guardian_phone}`} full />}
+                {d.profile.guardian_name && <Row label="ผู้ปกครอง" value={`${d.profile.guardian_name}${d.profile.guardian_phone ? ` · ${d.profile.guardian_phone}` : ""} · ยืนยันการได้รับอนุญาตแล้ว`} full />}
                 <Row label="ยินยอม PDPA" value={`เวอร์ชัน ${d.profile.pdpa_notice_version} · ${formatDateTimeTh(d.profile.pdpa_consented_at)}`} full />
               </dl>
             ) : (

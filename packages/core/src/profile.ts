@@ -6,6 +6,13 @@ export const PDPA_NOTICE_VERSION = "2026-11-14";
 
 /** Under this age (Thai civil majority) a guardian's consent is recorded too */
 export const ADULT_AGE = 20;
+/** First name and surname: two words, 3–255 characters */
+const GUARDIAN_FULL_NAME = /^(?=.{3,255}$)\S+(\s+\S+)+$/;
+/** What an applicant under ADULT_AGE ticks, in the wording of a short vocational course paper form */
+export const GUARDIAN_CONSENT_TEXT = "ข้าพเจ้าขอยืนยันว่า การสมัครเรียนครั้งนี้ข้าพเจ้าได้ขออนุญาตและได้รับความยินยอมจากผู้ปกครองแล้ว";
+/** Shown wherever an applicant submits, and printed on the application */
+export const ELECTRONIC_SIGNATURE_STATEMENT =
+  "การกรอกและส่งข้อมูลในระบบนี้ ถือเป็นการสมัครเรียนหลักสูตรวิชาชีพระยะสั้นของวิทยาลัยเทคนิคนิคมอุตสาหกรรมระยอง และมีผลเสมือนผู้สมัครได้ลงลายมือชื่อในใบสมัครที่เป็นกระดาษทุกประการ";
 export const MIN_AGE = 10;
 
 export const TITLES_TH = ["นาย", "นาง", "นางสาว", "เด็กชาย", "เด็กหญิง", "ดร.", "ผศ.", "รศ.", "ศ.", "ว่าที่ร้อยตรี"] as const;
@@ -145,11 +152,12 @@ export function validateProfile(input: ProfileInput, today = new Date()): { prof
   let guardianName: string | null = null;
   let guardianPhone: string | null = null;
   if (age >= 0 && age < ADULT_AGE) {
+    // Only the guardian's full name and the applicant's confirmation are required. A phone number given on
+    // older forms is kept when it is valid, never asked for.
     guardianName = clean(input.guardianName);
-    guardianPhone = normalizePhone(input.guardianPhone ?? "");
-    if (guardianName.length < 3) e.guardianName = "ผู้สมัครอายุต่ำกว่า 20 ปี กรุณากรอกชื่อผู้ปกครอง";
-    if (!guardianPhone) e.guardianPhone = "กรอกเบอร์โทรศัพท์ผู้ปกครอง";
-    if (input.guardianConsent !== true) e.guardianConsent = "ต้องได้รับความยินยอมจากผู้ปกครอง";
+    guardianPhone = input.guardianPhone ? normalizePhone(input.guardianPhone) : null;
+    if (!GUARDIAN_FULL_NAME.test(guardianName)) e.guardianName = "กรอกชื่อและนามสกุลของผู้ปกครอง เช่น นางสมศรี ใจดี";
+    if (input.guardianConsent !== true) e.guardianConsent = "ติ๊กยืนยันว่าได้รับอนุญาตจากผู้ปกครองแล้ว";
   }
 
   if (Object.keys(e).length) return { profile: null, errors: e };

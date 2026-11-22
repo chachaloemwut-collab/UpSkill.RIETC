@@ -11,6 +11,7 @@ import { ApiTokens } from "@/components/account/ApiTokens";
 import { LockLegalNameForm } from "@/components/course/CertificatePanel";
 import { UserEmailsManager } from "@/components/account/UserEmailsManager";
 import { ROLE_LABEL, formatDateTh, formatDateTimeTh } from "@/lib/format";
+import { APP_VERSION } from "@/lib/version";
 import { ctx } from "@/server/context";
 import { isGoogleEnabled } from "@/server/auth/google";
 import { getViewer } from "@/server/viewer";
@@ -155,6 +156,10 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             <ApiTokens />
           </Card>
         </Section>
+        {/* Which release is running: quote it when reporting a problem */}
+        <p className="text-center text-xs text-muted-foreground">
+          เวอร์ชันระบบ <span className="font-mono">{APP_VERSION}</span> · แจ้งเลขนี้เมื่อพบปัญหาการใช้งาน
+        </p>
       </div>
     </div>
   );

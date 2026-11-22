@@ -36,7 +36,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <p className="relative text-xs text-primary-foreground/50">© {BRAND_NAME}</p>
       </aside>
       <main className="flex flex-col px-4 py-6 sm:px-8">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 print:hidden">
           <Link href="/" className={buttonClass("ghost", "sm", "group -ml-2 text-muted-foreground hover:text-foreground")}>
             <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-0.5" /> กลับหน้าแรก
           </Link>
@@ -45,7 +45,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {/* Long forms (sign-up) mark themselves data-auth-wide to get a wider column */}
         <div className="mx-auto my-auto w-full max-w-sm animate-slide-up py-10 has-[[data-auth-wide]]:max-w-xl">
           {/* The brand panel is hidden below lg: show the logo above the form instead */}
-          <BrandLogo mode="unfold" className="mb-8 lg:hidden" />
+          <BrandLogo mode="unfold" className="mb-8 lg:hidden print:hidden" />
           {children}
         </div>
       </main>
