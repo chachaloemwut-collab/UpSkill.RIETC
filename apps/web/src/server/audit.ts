@@ -10,6 +10,7 @@ export type AuditAction =
   | "auth.password_reset"
   | "auth.password_change_required"
   | "auth.password_reset_link_created"
+  | "auth.password_reset_requested"
   | "auth.temporary_password_set"
   | "auth.login_unlocked"
   | "auth.account_deleted"

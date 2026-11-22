@@ -6,14 +6,18 @@ import { getCurrentUser } from "@/server/auth/session";
 
 export const metadata: Metadata = { title: "เข้าสู่ระบบ" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; reset?: string }> }) {
   const current = await getCurrentUser();
   if (current) redirect(current.isSystemOwner ? "/admin" : "/");
-  const { error } = await searchParams;
+  const { error, reset } = await searchParams;
   return (
     <>
       <AuthHeading title="ยินดีต้อนรับกลับ" description="เข้าสู่ระบบเพื่อเรียนต่อจากที่ค้างไว้" />
-      <LoginForm googleEnabled={await isGoogleEnabled()} initialError={error?.slice(0, 64)} />
+      <LoginForm
+        googleEnabled={await isGoogleEnabled()}
+        initialError={error?.slice(0, 64)}
+        notice={reset === "1" ? "ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย" : undefined}
+      />
     </>
   );
 }

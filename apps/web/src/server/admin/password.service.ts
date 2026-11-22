@@ -17,7 +17,7 @@ import { addEmailToOutbox } from "../email/outbox.service";
 import { revokeAllSessions } from "../auth/session";
 import { emailKey } from "../rate-keys";
 
-const EMAIL_LINK_TTL_MS = 60 * 60_000; // admin-sent email: 1 hour (self-service stays at 15 minutes)
+const EMAIL_LINK_TTL_MS = 60 * 60_000; // admin-sent email: 1 hour, same as self-service (the email text says so)
 const ADMIN_LINK_TTL_MS = 24 * 60 * 60_000; // link handed over by the admin: 24 hours, single use
 
 type Meta = { ip: string };

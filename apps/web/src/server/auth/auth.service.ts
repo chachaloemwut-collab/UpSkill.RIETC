@@ -17,7 +17,9 @@ import { createSession, revokeAllSessions } from "./session";
 import { NATIONAL_ID_IN_USE, checkedProfile, insertProfile, nationalIdInUse } from "./profile.service";
 
 const VERIFY_TTL_MS = 24 * 3600_000;
-const RESET_EMAIL_TTL_MS = 15 * 60_000; // spec: 15 minutes
+// Emailed links: 1 hour. 15 minutes was too short for school mail servers and greylisting; the token is still
+// single-use, stored only as a SHA-256, and every outstanding link dies when any one of them is used.
+export const RESET_EMAIL_TTL_MS = 60 * 60_000;
 const RESET_GOOGLE_TTL_MS = 5 * 60_000; // spec: 5 minutes
 const FORCED_CHANGE_TTL_MS = 15 * 60_000; // after signing in with an admin-issued temporary password
 
@@ -268,7 +270,7 @@ export async function login(input: { email: string; password: string }, meta: Me
  * address, or the primary one for a username). The protected owner account never resets by email.
  */
 export async function forgotPassword(identifierRaw: string): Promise<void> {
-  const { db, env } = ctx();
+  const { db } = ctx();
   const identifier = identifierRaw.trim().toLowerCase();
   let user: { id: string; status: string; email: string; is_system_owner: boolean } | undefined;
   let email: string;
@@ -287,8 +289,12 @@ export async function forgotPassword(identifierRaw: string): Promise<void> {
     email = user?.email ?? "";
   }
   if (!user || user.status !== "active" || user.is_system_owner || !email || email.endsWith(".invalid")) return;
-  const target = { id: user.id, email };
+  await issueEmailResetLink({ id: user.id, email });
+}
 
+/** Mail a single-use set-a-new-password link (stored as a SHA-256 only). */
+async function issueEmailResetLink(target: { id: string; email: string }): Promise<void> {
+  const { db, env } = ctx();
   // Spec: 32 random bytes; only the SHA-256 is stored
   await db.transaction().execute(async (trx) => {
     const token = generateToken();
@@ -303,6 +309,35 @@ export async function forgotPassword(identifierRaw: string): Promise<void> {
       { userId: target.id, deduplicationKey: `reset-password:${reset.id}` },
     );
   });
+}
+
+/**
+ * Signed-in user who no longer remembers the current password: mail a reset link to the account's own address.
+ * Returns the address so the page can say where it went (the user is already authenticated).
+ */
+export async function sendOwnResetLink(userId: string, meta: Meta): Promise<{ email: string }> {
+  const { db } = ctx();
+  const u = await db.selectFrom("users").select(["id", "email", "status", "is_system_owner"]).where("id", "=", userId).executeTakeFirstOrThrow();
+  if (u.is_system_owner) throw new HttpError(409, "SYSTEM_OWNER_PROTECTED");
+  if (u.status !== "active" || !u.email || u.email.endsWith(".invalid")) throw new HttpError(409, "NO_EMAIL_FOR_RESET");
+  await issueEmailResetLink({ id: u.id, email: u.email });
+  await audit(db, { action: "auth.password_reset_requested", userId: u.id, ip: meta.ip, userAgent: meta.userAgent, details: { via: "settings" } });
+  return { email: u.email };
+}
+
+/** Read-only check used by the reset page, so an expired link says so before the user types a new password. */
+export async function inspectResetToken(token: string): Promise<{ valid: boolean; expiresAt?: Date; method?: string }> {
+  const { db } = ctx();
+  const t = await db
+    .selectFrom("password_reset_tokens as t")
+    .innerJoin("users as u", "u.id", "t.user_id")
+    .select(["t.expires_at", "t.reset_method", "u.status"])
+    .where("t.token_hash", "=", hashToken(token))
+    .where("t.used_at", "is", null)
+    .where("t.expires_at", ">", new Date())
+    .executeTakeFirst();
+  if (!t || t.status !== "active") return { valid: false };
+  return { valid: true, expiresAt: t.expires_at, method: t.reset_method };
 }
 
 export async function resetPassword(input: { token: string; newPassword: string }, meta: Meta): Promise<void> {

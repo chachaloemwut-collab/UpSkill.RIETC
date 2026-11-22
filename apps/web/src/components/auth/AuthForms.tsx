@@ -89,7 +89,7 @@ export function AuthHeading({ title, description }: { title: string; description
   );
 }
 
-export function LoginForm({ googleEnabled, initialError }: { googleEnabled: boolean; initialError?: string | undefined }) {
+export function LoginForm({ googleEnabled, initialError, notice, initialIdentifier }: { googleEnabled: boolean; initialError?: string | undefined; notice?: string | undefined; initialIdentifier?: string | undefined }) {
   const router = useRouter();
   const toast = useToast();
   const [scene, runScene] = useActionScene();
@@ -97,6 +97,8 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initialError ? errorMessage(initialError) : null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  // Set after a wrong password: offers the reset link for exactly the account the user typed
+  const [forgotFor, setForgotFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!countdown || countdown <= 0) return;
@@ -143,6 +145,7 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
       setError(r.message);
     }
     if (r.code === "EMAIL_NOT_VERIFIED") setUnverifiedEmail(String(f.get("email")));
+    setForgotFor(r.code === "INVALID_CREDENTIALS" ? String(f.get("email") ?? "").trim() : null);
   }
 
   return (
@@ -156,6 +159,7 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
       )}
       {/* action: plain-form fallback when JavaScript did not run (older Safari / in-app browsers); onSubmit handles the normal case */}
       <form method="post" action="/api/auth/login/form" onSubmit={onSubmit} className="grid gap-4">
+        {notice && !error && <Alert variant="success" title={notice} />}
         {error && (
           <Alert
             variant="destructive"
@@ -165,6 +169,15 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
                 : error
             }
           />
+        )}
+        {forgotFor && (
+          <div className="grid gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
+            <p className="font-medium">จำรหัสผ่านไม่ได้?</p>
+            <p className="text-muted-foreground">รับลิงก์ตั้งรหัสผ่านใหม่ทางอีเมลของบัญชีนี้ได้ทันที ใช้เวลาไม่ถึง 1 นาที</p>
+            <Link href={`/forgot-password${forgotFor ? `?id=${encodeURIComponent(forgotFor)}` : ""}`} className={buttonClass("outline", "md", "w-full")}>
+              <MailCheck className="h-4 w-4" /> ส่งลิงก์ตั้งรหัสผ่านใหม่
+            </Link>
+          </div>
         )}
         {unverifiedEmail && (
           <Button
@@ -181,7 +194,7 @@ export function LoginForm({ googleEnabled, initialError }: { googleEnabled: bool
           </Button>
         )}
         <Field label="อีเมลหรือชื่อผู้ใช้">
-          <Input name="email" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email" placeholder="you@example.com" required className="h-11" />
+          <Input name="email" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="email" placeholder="you@example.com" required className="h-11" defaultValue={initialIdentifier} />
         </Field>
         <div className="grid gap-1.5">
           <div className="flex items-center justify-between">
@@ -434,31 +447,105 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
   );
 }
 
-export function ForgotPasswordForm({ googleEnabled }: { googleEnabled: boolean }) {
+const RESEND_AFTER_SEC = 60;
+
+/**
+ * Self-service reset: email or username → link by email. After sending it shows what to do next (inbox, spam,
+ * 1-hour single-use link), a resend button with a short cooldown, and where to get help without email access.
+ * The reply is the same whether or not the account exists, so it never reveals who is registered.
+ */
+export function ForgotPasswordForm({ googleEnabled, initialIdentifier }: { googleEnabled: boolean; initialIdentifier?: string | undefined }) {
   const s = useSubmit();
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [wait, setWait] = useState(0);
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const t = setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => clearTimeout(t);
+  }, [wait]);
+
+  async function send(identifier: string) {
     s.setBusy(true);
     s.setError(null);
-    const r = await api<{ message: string }>("/api/auth/forgot-password", { body: { email: String(f.get("email") ?? "").trim().toLowerCase() } });
+    const r = await api<{ message: string }>("/api/auth/forgot-password", { body: { email: identifier.trim().toLowerCase() } });
     s.setBusy(false);
-    if (r.ok) s.setNotice(r.data.message);
-    else s.setError(r.message);
+    if (r.ok) {
+      setSentTo(identifier.trim());
+      setWait(RESEND_AFTER_SEC);
+      return true;
+    }
+    s.setError(r.code === "VALIDATION_FAILED" ? "กรอกอีเมล (เช่น name@example.com) หรือชื่อผู้ใช้ให้ถูกต้อง" : r.message);
+    if (r.code === "RATE_LIMITED") setWait(r.retryAfter && r.retryAfter > 0 ? r.retryAfter : RESEND_AFTER_SEC);
+    return false;
   }
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    await send(String(new FormData(e.currentTarget).get("email") ?? ""));
+  }
+
+  if (sentTo)
+    return (
+      <div className="grid gap-5">
+        <div className="grid justify-items-center gap-3 rounded-lg border bg-card p-6 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-success/10 text-success">
+            <MailCheck className="h-6 w-6" />
+          </span>
+          <div>
+            <p className="font-semibold">ตรวจสอบอีเมลของคุณ</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              ถ้ามีบัญชี <span className="font-medium text-foreground">{sentTo}</span> ในระบบ เราส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลของบัญชีแล้ว
+            </p>
+          </div>
+        </div>
+        <ol className="grid gap-2 text-sm">
+          <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">1</span><span>เปิดอีเมลชื่อ “ลิงก์ตั้งรหัสผ่านใหม่” แล้วกดปุ่ม <b>ตั้งรหัสผ่านใหม่</b></span></li>
+          <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">2</span><span>ไม่พบใน 2–3 นาที? ดูในโฟลเดอร์จดหมายขยะ (Spam) หรือโปรโมชัน</span></li>
+          <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">3</span><span>ลิงก์ใช้ได้ 1 ชั่วโมงและใช้ได้ครั้งเดียว ถ้าขอหลายครั้ง ให้ใช้อีเมลฉบับล่าสุด</span></li>
+        </ol>
+        {s.error && <Alert variant="destructive" title={s.error} />}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Button variant="outline" size="lg" loading={s.busy} disabled={wait > 0} onClick={() => void send(sentTo)}>
+            {wait > 0 ? `ส่งอีกครั้งได้ใน ${wait} วินาที` : "ส่งอีเมลอีกครั้ง"}
+          </Button>
+          <Button variant="ghost" size="lg" onClick={() => { setSentTo(null); s.setError(null); }}>
+            ใช้อีเมลหรือชื่อผู้ใช้อื่น
+          </Button>
+        </div>
+        <Alert variant="default" title="เข้าอีเมลไม่ได้หรือไม่เคยได้รับอีเมล?">
+          ติดต่อผู้ดูแลระบบหรือครูผู้สอน แจ้งชื่อ-นามสกุลและอีเมลที่ใช้สมัคร ผู้ดูแลส่งลิงก์ใหม่หรือตั้งรหัสผ่านชั่วคราวให้ได้
+        </Alert>
+        <Link href="/login" className={buttonClass("default", "lg", "w-full")}>
+          กลับไปหน้าเข้าสู่ระบบ
+        </Link>
+      </div>
+    );
+
   return (
     <div className="grid gap-6">
       <form method="post" onSubmit={onSubmit} className="grid gap-4">
-        <p className="text-sm font-medium">รับลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล</p>
-        <p className="-mt-2 text-xs text-muted-foreground">กรอกอีเมลหรือชื่อผู้ใช้ ระบบจะส่งลิงก์ไปที่อีเมลของบัญชี หากไม่ได้รับอีเมลหรือเข้าอีเมลไม่ได้ ติดต่อผู้ดูแลระบบเพื่อขอลิงก์หรือรหัสผ่านชั่วคราว</p>
-        {s.notice && <Alert variant="success" title="ส่งคำขอแล้ว">{s.notice}</Alert>}
-        {s.error && <Alert variant="destructive" title={s.error} />}
-        <Field label="อีเมลหรือชื่อผู้ใช้">
-          <Input name="email" type="text" autoComplete="username" placeholder="you@example.com" required className="h-10" />
+        {s.error && <Alert variant="destructive" title={wait > 0 ? `ขอลิงก์บ่อยเกินไป กรุณารออีก ${wait} วินาที` : s.error} />}
+        <Field label="อีเมลหรือชื่อผู้ใช้" hint="ใช้อีเมลหรือชื่อผู้ใช้เดียวกับตอนเข้าสู่ระบบ">
+          <Input
+            name="email"
+            type="text"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            inputMode="email"
+            placeholder="you@example.com"
+            required
+            autoFocus={!initialIdentifier}
+            defaultValue={initialIdentifier}
+            className="h-11"
+          />
         </Field>
-        <Button type="submit" size="lg" loading={s.busy} className="w-full">
-          ส่งลิงก์ตั้งรหัสผ่านใหม่
+        <Button type="submit" size="lg" loading={s.busy} disabled={wait > 0} className="w-full">
+          <MailCheck className="h-4 w-4" /> ส่งลิงก์ตั้งรหัสผ่านใหม่
         </Button>
+        <p className="text-xs text-muted-foreground">ลิงก์จะส่งไปที่อีเมลของบัญชี ใช้ได้ 1 ชั่วโมง รหัสผ่านเดิมยังใช้ได้จนกว่าคุณจะตั้งรหัสใหม่</p>
       </form>
       {googleEnabled && (
         <div className="grid gap-3">
@@ -467,7 +554,7 @@ export function ForgotPasswordForm({ googleEnabled }: { googleEnabled: boolean }
           <GoogleButton mode="reset" label="ยืนยันตัวตนด้วย Google" />
         </div>
       )}
-      <Link href="/login" className="text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+      <Link href="/login" className="inline-flex min-h-10 items-center justify-center text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
         ← กลับไปหน้าเข้าสู่ระบบ
       </Link>
     </div>
@@ -477,37 +564,62 @@ export function ForgotPasswordForm({ googleEnabled }: { googleEnabled: boolean }
 export function ResetPasswordForm({ token }: { token: string }) {
   const router = useRouter();
   const s = useSubmit();
+  const [pwd, setPwd] = useState("");
   const [mismatch, setMismatch] = useState(false);
+  const [expired, setExpired] = useState(false);
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     if (f.get("password") !== f.get("confirm")) return setMismatch(true);
     setMismatch(false);
     s.setBusy(true);
+    s.setError(null);
     const r = await api("/api/auth/reset-password", { body: { token, new_password: f.get("password") } });
     s.setBusy(false);
     if (r.ok) {
-      s.setNotice("ตั้งรหัสผ่านใหม่แล้ว ทุกอุปกรณ์ถูกออกจากระบบ กรุณาเข้าสู่ระบบอีกครั้ง");
+      s.setNotice("ตั้งรหัสผ่านใหม่แล้ว");
       setTimeout(() => {
-        router.push("/login");
+        router.replace("/login?reset=1");
         router.refresh();
-      }, 1500);
-    } else s.setError(r.message);
+      }, 1200);
+    } else {
+      setExpired(r.code === "INVALID_OR_EXPIRED_TOKEN");
+      s.setError(r.message);
+    }
   }
-  if (s.notice) return <Alert variant="success" title="สำเร็จ">{s.notice}</Alert>;
+  if (s.notice) return <Alert variant="success" title="ตั้งรหัสผ่านใหม่แล้ว">กำลังพาไปหน้าเข้าสู่ระบบ ใช้รหัสผ่านใหม่เข้าสู่ระบบได้เลย</Alert>;
+  if (expired) return <ResetLinkExpired />;
   return (
     <form method="post" onSubmit={onSubmit} className="grid gap-4">
       {s.error && <Alert variant="destructive" title={s.error} />}
-      <Field label="รหัสผ่านใหม่" hint="อย่างน้อย 12 ตัวอักษร">
-        <PasswordInput name="password" autoComplete="new-password" minLength={12} required className="h-10" />
+      <Field label="รหัสผ่านใหม่" hint="อย่างน้อย 12 ตัวอักษร ใช้วลีที่จำง่ายได้ เช่น ‘ลอยกระทงปี2569สนุกมาก’">
+        <PasswordInput name="password" autoComplete="new-password" minLength={12} required autoFocus className="h-11" value={pwd} onChange={(e) => setPwd(e.target.value)} />
+        <PasswordStrengthMeter password={pwd} />
       </Field>
       <Field label="ยืนยันรหัสผ่านใหม่" error={mismatch ? "รหัสผ่านทั้งสองช่องไม่ตรงกัน" : undefined}>
-        <PasswordInput name="confirm" autoComplete="new-password" minLength={12} required className="h-10" />
+        <PasswordInput name="confirm" autoComplete="new-password" minLength={12} required className="h-11" />
       </Field>
       <Button type="submit" size="lg" loading={s.busy} className="w-full">
         ตั้งรหัสผ่านใหม่
       </Button>
     </form>
+  );
+}
+
+/** Shown instead of the form when the link is expired, already used or mistyped. */
+export function ResetLinkExpired() {
+  return (
+    <div className="grid gap-4">
+      <Alert variant="warning" title="ลิงก์นี้หมดอายุหรือถูกใช้ไปแล้ว">
+        ลิงก์ตั้งรหัสผ่านใช้ได้ 1 ชั่วโมงและใช้ได้ครั้งเดียว ถ้าขอหลายครั้ง ให้ใช้อีเมลฉบับล่าสุด หรือขอลิงก์ใหม่ได้เลย
+      </Alert>
+      <Link href="/forgot-password" className={buttonClass("default", "lg", "w-full")}>
+        <MailCheck className="h-4 w-4" /> ขอลิงก์ใหม่
+      </Link>
+      <Link href="/login" className={buttonClass("ghost", "lg", "w-full")}>
+        กลับไปหน้าเข้าสู่ระบบ
+      </Link>
+    </div>
   );
 }
 

@@ -52,6 +52,9 @@ export function emailCategory(template: EmailTemplate): EmailCategory {
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const action = (link: string, label: string) => `<p><a href="${esc(link)}">${esc(label)}</a></p>`;
+/** Large tappable link for the one action an email exists for (inline styles: mail clients drop <style>) */
+const button = (link: string, label: string) =>
+  `<p><a href="${esc(link)}" style="display:inline-block;padding:12px 24px;border-radius:8px;background:#2563eb;color:#ffffff;font-weight:600;text-decoration:none">${esc(label)}</a></p>`;
 const optionalText = (label: string, value?: string) => (value ? `\n${label}: ${value}` : "");
 const optionalHtml = (label: string, value?: string) => (value ? `<p>${esc(label)}: ${esc(value)}</p>` : "");
 
@@ -59,7 +62,7 @@ function renderEmailEn(job: EmailJob): { subject: string; text: string; html: st
   const result = (subject: string, text: string, link?: string, label = "Open") => ({ subject, text: `${text}${link ? `\n${link}` : ""}`, html: `<p>${esc(text)}</p>${link ? action(link, label) : ""}` });
   switch (job.template) {
     case "verify-email": return result("Verify your email", "Use this link within 24 hours to verify your email. If you did not register, no action is required.", job.link, "Verify email");
-    case "reset-password": return result("Set a new password", "Use this link within 15 minutes to set a new password. If you did not request this, your current password remains valid.", job.link, "Set password");
+    case "reset-password": return result("Set a new password", "Use this link within 1 hour to set a new password. It works once; a newer link replaces older ones. If you did not request this, ignore this email: your current password remains valid.", job.link, "Set password");
     case "password-changed": return result("Your password was changed", "Your account password was changed and other devices were signed out. Contact an administrator if this was not you.");
     case "account-status-changed": return result("Account status changed", `Current account status: ${job.statusLabel}`);
     case "enrollment-confirmed": return result(`Course enrollment recorded: ${job.courseTitle}`, `Enrollment was recorded on ${job.enrolledAt}.`, job.courseLink, "Open course");
@@ -101,7 +104,11 @@ export function renderEmail(job: EmailJob): { subject: string; text: string; htm
     case "verify-email":
       return { subject: "ยืนยันอีเมลของคุณ", text: `กดลิงก์เพื่อยืนยันอีเมล (หมดอายุใน 24 ชั่วโมง):\n${job.link}\n\nหากคุณไม่ได้สมัคร ไม่ต้องดำเนินการ`, html: `<p>กดลิงก์เพื่อยืนยันอีเมล (หมดอายุใน 24 ชั่วโมง)</p>${action(job.link, "ยืนยันอีเมล")}<p>หากคุณไม่ได้สมัคร ไม่ต้องดำเนินการ</p>` };
     case "reset-password":
-      return { subject: "ตั้งรหัสผ่านใหม่", text: `กดลิงก์เพื่อตั้งรหัสผ่านใหม่ (หมดอายุใน 15 นาที):\n${job.link}\n\nหากคุณไม่ได้ขอ รหัสผ่านเดิมยังใช้ได้`, html: `<p>กดลิงก์เพื่อตั้งรหัสผ่านใหม่ (หมดอายุใน 15 นาที)</p>${action(job.link, "ตั้งรหัสผ่านใหม่")}<p>หากคุณไม่ได้ขอ รหัสผ่านเดิมยังใช้ได้</p>` };
+      return {
+        subject: "ลิงก์ตั้งรหัสผ่านใหม่ (ใช้ได้ 1 ชั่วโมง)",
+        text: `มีคำขอตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ กดลิงก์ด้านล่างภายใน 1 ชั่วโมง (ใช้ได้ครั้งเดียว ถ้าขอหลายครั้งให้ใช้อีเมลฉบับล่าสุด):\n${job.link}\n\nหากคุณไม่ได้ขอ ไม่ต้องทำอะไร รหัสผ่านเดิมยังใช้ได้ตามปกติ`,
+        html: `<p>มีคำขอตั้งรหัสผ่านใหม่สำหรับบัญชีของคุณ</p>${button(job.link, "ตั้งรหัสผ่านใหม่")}<p>ลิงก์ใช้ได้ภายใน 1 ชั่วโมงและใช้ได้ครั้งเดียว ถ้าขอหลายครั้ง ให้ใช้อีเมลฉบับล่าสุด</p><p>หากคุณไม่ได้ขอ ไม่ต้องทำอะไร รหัสผ่านเดิมยังใช้ได้ตามปกติ</p><p style="color:#71717a;font-size:12px">ถ้าปุ่มกดไม่ได้ ให้คัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์: ${esc(job.link)}</p>`,
+      };
     case "password-changed":
       return { subject: "รหัสผ่านของคุณถูกเปลี่ยนแล้ว", text: "รหัสผ่านของบัญชีถูกเปลี่ยนและอุปกรณ์อื่นถูกออกจากระบบแล้ว หากไม่ใช่คุณ กรุณาติดต่อผู้ดูแลระบบ", html: "<p>รหัสผ่านของบัญชีถูกเปลี่ยนและอุปกรณ์อื่นถูกออกจากระบบแล้ว</p><p>หากไม่ใช่คุณ กรุณาติดต่อผู้ดูแลระบบ</p>" };
     case "account-status-changed":

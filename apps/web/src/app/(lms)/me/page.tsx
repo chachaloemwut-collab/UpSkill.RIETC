@@ -113,7 +113,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           description={me.password_hash ? "เมื่อเปลี่ยนรหัสผ่าน อุปกรณ์อื่นจะถูกออกจากระบบ" : "บัญชีนี้เข้าสู่ระบบด้วย Google ตั้งรหัสผ่านเพื่อเข้าสู่ระบบด้วยอีเมลได้ด้วย"}
         >
           <Card className="p-5">
-            <ChangePasswordForm hasPassword={!!me.password_hash} />
+            <ChangePasswordForm hasPassword={!!me.password_hash} canEmailReset={!me.is_system_owner && !me.email.endsWith(".invalid")} />
           </Card>
         </Section>
 
