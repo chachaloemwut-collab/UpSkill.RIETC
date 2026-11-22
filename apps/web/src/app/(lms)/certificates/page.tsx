@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -16,6 +18,10 @@ export const metadata: Metadata = { title: "วุฒิบัตรของฉ
 export default async function MyCertificatesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  return <Suspense fallback={<LoadingSkeleton label="กำลังโหลดวุฒิบัตรของฉัน" />}><CertificateList user={user} /></Suspense>;
+}
+
+async function CertificateList({ user }: { user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>> }) {
   const isDev = isDeveloperTestEmail(user.email);
   const { enrollments } = await learnerOverview(user.id);
   const certs = enrollments.filter((e) => e.certificate_code);

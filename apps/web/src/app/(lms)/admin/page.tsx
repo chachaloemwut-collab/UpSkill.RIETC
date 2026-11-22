@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -26,8 +28,11 @@ const REASONS: Record<string, string> = { POSITION_JUMP: "กรอข้าม 
 export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") redirect("/");
-  const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings, googleSettings, instructors, courseDefaults, automationFlags, automationBacklog, certificateDisplay] = await Promise.all([adminOverview(), getEmailSettingsView(), getGoogleOAuthSettingsView(), listInstructors(), getCourseDefaults(), getAutomationFlags(), getAutomationBacklog(), getCertificateDisplay()]);
-  const partnerClients = await listPartnerClients();
+  return <Suspense fallback={<LoadingSkeleton label="กำลังโหลดภาพรวมระบบ" />}><AdminOverview user={user} /></Suspense>;
+}
+
+async function AdminOverview({ user }: { user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>> }) {
+  const [{ courses, flags, topFlagged, stats, emails, suppressions }, emailSettings, googleSettings, instructors, courseDefaults, automationFlags, automationBacklog, certificateDisplay, partnerClients] = await Promise.all([adminOverview(), getEmailSettingsView(), getGoogleOAuthSettingsView(), listInstructors(), getCourseDefaults(), getAutomationFlags(), getAutomationBacklog(), getCertificateDisplay(), listPartnerClients()]);
 
   return (
     <>

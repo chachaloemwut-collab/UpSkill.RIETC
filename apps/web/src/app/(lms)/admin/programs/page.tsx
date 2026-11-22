@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,6 +17,10 @@ export const metadata: Metadata = { title: "หลักสูตรอบรม
 
 export default async function AdminProgramsPage() {
   const user = await requireAdminPage();
+  return <Suspense fallback={<LoadingSkeleton label="กำลังโหลดหลักสูตรอบรม" />}><TrainingPrograms user={user} /></Suspense>;
+}
+
+async function TrainingPrograms({ user }: { user: NonNullable<Awaited<ReturnType<typeof requireAdminPage>>> }) {
   const [programs, categories] = await Promise.all([listProgramsAdmin(user), listProgramCategories()]);
   return (
     <>

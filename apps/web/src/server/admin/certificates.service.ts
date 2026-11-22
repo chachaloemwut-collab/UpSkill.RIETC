@@ -19,32 +19,15 @@ export async function listEligibleCoursesForAdmin() {
     .execute();
 }
  
-export async function listCertificatesAdmin(input: {
+interface CertificateFilter {
   query?: string | undefined;
   status?: AdminCertificateStatus | undefined;
   courseId?: string | undefined;
-  page?: number | undefined;
-  pageSize?: number | undefined;
-  /** Load every row up to ADMIN_TABLE_LIMIT for the client-side table (page/pageSize ignored) */
-  all?: boolean;
-}) {
-  const { db } = ctx();
-  const q = (input.query ?? "").trim();
-  const page = Math.max(1, Math.floor(input.page || 1));
-  const pageSize = input.all ? ADMIN_TABLE_LIMIT : input.pageSize ? Math.min(100, Math.max(10, input.pageSize)) : PAGE_SIZE;
+}
 
-  // Counts by category
-  const counts = await db
-    .selectFrom("certificates")
-    .select([
-      sql<number>`count(*)::int`.as("total"),
-      sql<number>`count(*) filter (where revoked_at is not null)::int`.as("revoked"),
-      sql<number>`count(*) filter (where revoked_at is null and expires_at is not null and expires_at <= now())::int`.as("expired"),
-      sql<number>`count(*) filter (where revoked_at is null and (expires_at is null or expires_at > now()))::int`.as("valid"),
-    ])
-    .executeTakeFirstOrThrow();
-
-  let query = db
+function certificateQuery(input: CertificateFilter) {
+  const q = input.query?.trim();
+  let query = ctx().db
     .selectFrom("certificates as cert")
     .innerJoin("users as u", "u.id", "cert.user_id")
     // A06: program-level certificates have course_id = null; use leftJoin so they appear in the list
@@ -96,30 +79,58 @@ export async function listCertificatesAdmin(input: {
 
   if (input.courseId && /^[0-9a-f-]{36}$/i.test(input.courseId)) query = query.where("cert.course_id", "=", input.courseId);
 
-  // The page count must use the same search + status filters as the rows (the category totals above ignore the search)
-  const filtered = await db
-    .selectFrom(query.as("f"))
-    .select(sql<number>`count(*)::int`.as("n"))
-    .executeTakeFirstOrThrow();
+  return query;
+}
 
-  const certificates = await query
-    .orderBy("cert.issued_at", "desc")
-    .limit(pageSize)
-    .offset(input.all ? 0 : (page - 1) * pageSize)
-    .execute();
+type RegisterRow = Awaited<ReturnType<ReturnType<typeof certificateQuery>["execute"]>>[number];
+
+function serializeCertificate(c: RegisterRow) {
+  const isExpired = c.expires_at ? new Date(c.expires_at).getTime() <= Date.now() : false;
+  const status: AdminCertificateStatus = c.revoked_at ? "revoked" : isExpired ? "expired" : "valid";
+  return {
+    ...c,
+    status,
+    issued_at: new Date(c.issued_at).toISOString(),
+    expires_at: c.expires_at ? new Date(c.expires_at).toISOString() : null,
+    revoked_at: c.revoked_at ? new Date(c.revoked_at).toISOString() : null,
+  };
+}
+
+// Seek from the stored timestamp (Postgres keeps sub-millisecond precision), with the ID as a tie-breaker.
+export async function nextCertificateBatch(after: string, courseId?: string) {
+  const rows = await certificateQuery({ courseId })
+    .where(sql<boolean>`(cert.issued_at, cert.id) < (select issued_at, id from certificates where id = ${after}::uuid)`)
+    .orderBy("cert.issued_at", "desc").orderBy("cert.id", "desc").limit(250).execute();
+  return { certificates: rows.map(serializeCertificate) };
+}
+
+export async function listCertificatesAdmin(input: CertificateFilter & { page?: number | undefined; pageSize?: number | undefined }) {
+  const { db } = ctx();
+  const q = (input.query ?? "").trim();
+  const page = Math.max(1, Math.floor(input.page || 1));
+  const pageSize = input.pageSize ? Math.min(100, Math.max(10, input.pageSize)) : PAGE_SIZE;
+
+  // Counts by category
+  const countsQuery = db
+    .selectFrom("certificates")
+    .select([
+      sql<number>`count(*)::int`.as("total"),
+      sql<number>`count(*) filter (where revoked_at is not null)::int`.as("revoked"),
+      sql<number>`count(*) filter (where revoked_at is null and expires_at is not null and expires_at <= now())::int`.as("expired"),
+      sql<number>`count(*) filter (where revoked_at is null and (expires_at is null or expires_at > now()))::int`.as("valid"),
+    ]);
+
+  const query = certificateQuery(input);
+  // The page count must use the same search + status filters as the rows (the category totals above ignore the search)
+  const hasFilters = Boolean(q || input.status || input.courseId);
+  const [counts, filtered, certificates] = await Promise.all([
+    countsQuery.executeTakeFirstOrThrow(),
+    hasFilters ? db.selectFrom(query.as("f")).select(sql<number>`count(*)::int`.as("n")).executeTakeFirstOrThrow() : null,
+    query.orderBy("cert.issued_at", "desc").orderBy("cert.id", "desc").limit(pageSize).offset((page - 1) * pageSize).execute(),
+  ]);
 
   return {
-    certificates: certificates.map((c) => {
-      const isExpired = c.expires_at ? new Date(c.expires_at).getTime() <= Date.now() : false;
-      const status: AdminCertificateStatus = c.revoked_at ? "revoked" : isExpired ? "expired" : "valid";
-      return {
-        ...c,
-        status,
-        issued_at: new Date(c.issued_at).toISOString(),
-        expires_at: c.expires_at ? new Date(c.expires_at).toISOString() : null,
-        revoked_at: c.revoked_at ? new Date(c.revoked_at).toISOString() : null,
-      };
-    }),
+    certificates: certificates.map(serializeCertificate),
     counts: {
       total: counts.total,
       valid: counts.valid,
@@ -128,7 +139,7 @@ export async function listCertificatesAdmin(input: {
     },
     page,
     pageSize,
-    total: filtered.n,
+    total: filtered?.n ?? counts.total,
   };
 }
 

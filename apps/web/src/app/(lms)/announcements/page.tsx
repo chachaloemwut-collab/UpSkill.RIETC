@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
 import { Megaphone } from "lucide-react";
 import { EmptyState } from "@/components/ui";
@@ -8,13 +10,17 @@ import { listPublicAnnouncements } from "@/server/programs/announcements.service
 export const metadata: Metadata = { title: "ประกาศและกิจกรรม", description: "ข่าวสาร กิจกรรม และประกาศรอบอบรม" };
 export const dynamic = "force-dynamic";
 
-export default async function AnnouncementsPage() {
+export default function AnnouncementsPage() {
+  return <><PageHeader title="ประกาศและกิจกรรม" description="ข่าวสาร กิจกรรมที่กำลังจะเกิดขึ้น และประกาศรอบอบรม" /><Suspense fallback={<LoadingSkeleton label="กำลังโหลดประกาศ" />}><AnnouncementList /></Suspense></>;
+}
+
+async function AnnouncementList() {
   const items = await listPublicAnnouncements();
   const latest = items.reduce<(typeof items)[number] | undefined>((newest, item) =>
     !newest || item.publish_at > newest.publish_at ? item : newest, undefined);
   return (
     <>
-      <PageHeader title="ประกาศและกิจกรรม" description="ข่าวสาร กิจกรรมที่กำลังจะเกิดขึ้น และประกาศรอบอบรม" />
+
       {items.length === 0 ? (
         <EmptyState icon={<Megaphone className="h-5 w-5" />} title="ยังไม่มีประกาศ" />
       ) : (

@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -28,18 +30,25 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
   const viewer = await getViewer();
   if (!viewer) redirect("/login");
   const { linked } = await searchParams;
+  return <Suspense fallback={<LoadingSkeleton label="กำลังโหลดบัญชีสมาชิก" />}><AccountDetails viewer={viewer} linked={linked} /></Suspense>;
+}
+
+async function AccountDetails({ viewer, linked }: { viewer: NonNullable<Awaited<ReturnType<typeof getViewer>>>; linked: string | undefined }) {
   const { db } = ctx();
-  const me = await db
+  const [me, google, emailPreferences, instructorInvitation, contact, devices, userEmails, googleEnabled] = await Promise.all([
+    db
     .selectFrom("users")
     .select(["email", "username", "is_system_owner", "role", "legal_full_name_th", "legal_full_name_en", "legal_name_locked_at", "password_hash", "email_verified_at", "created_at"])
     .where("id", "=", viewer.id)
-    .executeTakeFirstOrThrow();
-  const google = await db.selectFrom("user_oauth_accounts").select(["provider_email"]).where("user_id", "=", viewer.id).where("provider", "=", "google").executeTakeFirst();
-  const emailPreferences = await emailPreferenceSummary(viewer.id);
-  const instructorInvitation = me.role === "member" ? await getMyPendingInvitation(me.email) : null;
-  const contact = await db.selectFrom("user_profiles").select(["phone", "address_line as addressLine", "subdistrict", "district", "province", "postal_code as postalCode"]).where("user_id", "=", viewer.id).executeTakeFirst();
-  const devices = await listMyDevices(viewer);
-  const userEmails = await listUserEmails(viewer.id);
+    .executeTakeFirstOrThrow(),
+    db.selectFrom("user_oauth_accounts").select(["provider_email"]).where("user_id", "=", viewer.id).where("provider", "=", "google").executeTakeFirst(),
+    emailPreferenceSummary(viewer.id),
+    viewer.role === "member" ? getMyPendingInvitation(viewer.email) : null,
+    db.selectFrom("user_profiles").select(["phone", "address_line as addressLine", "subdistrict", "district", "province", "postal_code as postalCode"]).where("user_id", "=", viewer.id).executeTakeFirst(),
+    listMyDevices(viewer),
+    listUserEmails(viewer.id),
+    isGoogleEnabled(),
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -137,7 +146,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           </Section>
         )}
 
-        {(await isGoogleEnabled()) && (
+        {googleEnabled && (
           <Section icon={<Link2 className="h-4 w-4" />} id="connections" title="บัญชีที่เชื่อมต่อ" description="ใช้เข้าสู่ระบบ และยืนยันตัวตนเมื่อลืมรหัสผ่าน">
             <Card className="flex flex-wrap items-center gap-3 p-5">
               <span className="flex h-9 w-9 items-center justify-center rounded-md border font-semibold">G</span>

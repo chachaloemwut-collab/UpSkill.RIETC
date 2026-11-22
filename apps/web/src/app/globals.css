@@ -445,3 +445,12 @@
   .account-index:has(.account-screen:target) > :not(:target) { display: none; }
   .account-return { display: inline-flex; align-items: center; min-height: 44px; color: hsl(var(--primary)); }
 }
+
+.navigation-feedback { display: none; }
+@media screen {
+  html[data-route-pending] .navigation-feedback {
+    display: block; position: fixed; z-index: 60; inset-inline-end: 1rem;
+    top: calc(3.5rem + env(safe-area-inset-top)); width: min(22rem, calc(100vw - 2rem));
+    pointer-events: none;
+  }
+}

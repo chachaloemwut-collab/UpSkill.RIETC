@@ -322,6 +322,22 @@ describe("certificate", () => {
     expect(certCode).toMatch(/^CERT-\d{4}-[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
   });
 
+  it("continues the register in order and keeps the selected course and admin permissions", async () => {
+    const page = await admin.req(`/api/admin/certificates?course=${courseId}`);
+    expect(page.status).toBe(200);
+    const issued = page.json.certificates.find((item: { certificate_code: string }) => item.certificate_code === certCode);
+    expect(issued).toBeDefined();
+    const url = `/api/admin/certificates?course=${courseId}&after=${issued.id}`;
+    expect((await learner.req(url)).status).toBe(403);
+    const batch = await admin.req(url);
+    expect(batch.status).toBe(200);
+    const expected = await withDb(db => db.query(
+      "select id from certificates where course_id = $1 and (issued_at, id) < (select issued_at, id from certificates where id = $2) order by issued_at desc, id desc limit 250",
+      [courseId, issued.id],
+    ));
+    expect(batch.json.certificates.map((item: { id: string }) => item.id)).toEqual(expected.rows.map(row => row.id));
+  });
+
   it("public verification works without login and exposes no internal ids", async () => {
     const r = await new Client().req(`/api/public/verify/${certCode}`);
     expect(r.json.status).toBe("valid");

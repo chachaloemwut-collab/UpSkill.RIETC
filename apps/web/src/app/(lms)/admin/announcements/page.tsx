@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Mail, Megaphone, Pin, Plus } from "lucide-react";
@@ -17,6 +19,10 @@ const VIS: Record<string, { label: string; variant: "secondary" | "success" | "o
 
 export default async function AdminAnnouncementsPage() {
   const user = await requireAdminPage();
+  return <Suspense fallback={<LoadingSkeleton label="กำลังโหลดประกาศ" />}><Announcements user={user} /></Suspense>;
+}
+
+async function Announcements({ user }: { user: NonNullable<Awaited<ReturnType<typeof requireAdminPage>>> }) {
   const items = await listAnnouncementsAdmin(user);
   const now = new Date();
   return (

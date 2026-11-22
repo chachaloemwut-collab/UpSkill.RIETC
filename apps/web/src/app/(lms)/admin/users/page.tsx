@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Search, UserCog, Download } from "lucide-react";
@@ -29,6 +31,10 @@ function pageNumbers(current: number, total: number): number[] {
 
 export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ q?: string; role?: string; status?: string; page?: string }> }) {
   await requireAdminPage();
+  return <Suspense fallback={<LoadingSkeleton label="กำลังโหลดรายชื่อสมาชิก" />}><MemberDirectory searchParams={searchParams} /></Suspense>;
+}
+
+async function MemberDirectory({ searchParams }: { searchParams: Promise<{ q?: string; role?: string; status?: string; page?: string }> }) {
   const sp = await searchParams;
   const data = await listUsersAdmin({ query: sp.q, role: sp.role, status: sp.status, page: Number(sp.page ?? 1) });
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
