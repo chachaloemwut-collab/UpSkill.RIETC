@@ -50,7 +50,7 @@ export async function searchUsersForPicker(query: string) {
   return { users };
 }
 
-export async function listUsersAdmin(input: { query?: string; role?: string; status?: string; page: number }) {
+export async function listUsersAdmin(input: { query?: string; role?: string; idRecord?: string; status?: string; page: number }) {
   const { db } = ctx();
   const q = (input.query ?? "").trim();
   const page = Math.max(1, Math.floor(input.page || 1));
@@ -61,6 +61,9 @@ export async function listUsersAdmin(input: { query?: string; role?: string; sta
 
   const total = await db
     .selectFrom("users as u")
+    .leftJoin("user_profiles as idp", "idp.user_id", "u.id")
+    .$if(input.idRecord === "missing", qb => qb.where("idp.user_id", "is", null))
+    .$if(input.idRecord === "recorded", qb => qb.where("idp.user_id", "is not", null))
     .select(sql<number>`count(*)::int`.as("n"))
     .$if(Boolean(role), (x) => x.where("u.role", "=", role!))
     .$if(Boolean(status), (x) => x.where("u.status", "=", status!))
@@ -79,7 +82,11 @@ export async function listUsersAdmin(input: { query?: string; role?: string; sta
 
   const users = await db
     .selectFrom("users as u")
+    .leftJoin("user_profiles as idp", "idp.user_id", "u.id")
+    .$if(input.idRecord === "missing", qb => qb.where("idp.user_id", "is", null))
+    .$if(input.idRecord === "recorded", qb => qb.where("idp.user_id", "is not", null))
     .select([
+      sql<boolean>`idp.user_id is not null`.as("has_id_record"),
       "u.id", "u.email", "u.username", "u.role", "u.status", "u.deleted_at", "u.created_at",
       "u.legal_full_name_th", "u.legal_full_name_en", "u.legal_name_locked_at", "u.is_system_owner",
       sql<number>`(select count(*)::int from enrollments e where e.user_id = u.id)`.as("enrollments"),
@@ -111,7 +118,7 @@ export async function listUsersAdmin(input: { query?: string; role?: string; sta
  * All users matching the same filters as the list (for CSV export). Fetches in chunks
  * of 1000 rows so an export stays bounded even with a large member base.
  */
-export async function exportUsersAdmin(input: { query?: string; role?: string; status?: string }) {
+export async function exportUsersAdmin(input: { query?: string; role?: string; idRecord?: string; status?: string }) {
   const { db } = ctx();
   const q = (input.query ?? "").trim();
   const role = input.role && ["member", "instructor", "admin"].includes(input.role) ? input.role : undefined;
@@ -126,6 +133,9 @@ export async function exportUsersAdmin(input: { query?: string; role?: string; s
   for (let offset = 0; ; offset += CHUNK) {
     const chunk = await db
       .selectFrom("users as u")
+      .leftJoin("user_profiles as idp", "idp.user_id", "u.id")
+      .$if(input.idRecord === "missing", qb => qb.where("idp.user_id", "is", null))
+      .$if(input.idRecord === "recorded", qb => qb.where("idp.user_id", "is not", null))
       .select([
         "u.email", "u.username", "u.role", "u.status", "u.deleted_at",
         "u.legal_full_name_th", "u.legal_full_name_en", "u.created_at", "u.email_verified_at",

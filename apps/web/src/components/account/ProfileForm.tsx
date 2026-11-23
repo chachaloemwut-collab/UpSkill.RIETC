@@ -8,7 +8,7 @@ import { Alert, Button, useToast } from "@/components/ui";
 import { PdpaNotice, ProfileFields, readProfile, type ProfileDefaults } from "./ProfileFields";
 
 /** Create (first time, with PDPA consent) or update the member profile */
-export function ProfileForm({ defaults, exists, namesLocked }: { defaults: ProfileDefaults; exists: boolean; namesLocked: boolean }) {
+export function ProfileForm({ defaults, exists, namesLocked, googleSignup = false }: { defaults: ProfileDefaults; exists: boolean; namesLocked: boolean; googleSignup?: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const [errors, setErrors] = useState<ProfileErrors>({});
@@ -28,7 +28,7 @@ export function ProfileForm({ defaults, exists, namesLocked }: { defaults: Profi
     if (Object.keys(errs).length || (!exists && !consent)) return setError("กรุณาตรวจสอบข้อมูลที่ไฮไลต์");
     setBusy(true);
     setError(null);
-    const r = await api("/api/user/profile", { method: "PUT", body: { ...profile, ...(exists ? {} : { pdpaConsent: consent }) } });
+    const r = await api(googleSignup ? "/api/auth/google/register" : "/api/user/profile", { method: googleSignup ? "POST" : "PUT", body: { ...profile, ...(exists ? {} : { pdpaConsent: consent }) } });
     setBusy(false);
     if (r.ok) {
       toast({ title: "บันทึกข้อมูลแล้ว", variant: "success" });
@@ -37,11 +37,11 @@ export function ProfileForm({ defaults, exists, namesLocked }: { defaults: Profi
     } else setError(r.message);
   }
   return (
-    <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+    <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
       {error && <Alert variant="destructive" title={error} />}
       <ProfileFields defaults={defaults} errors={errors} namesLocked={namesLocked} />
       {!exists && <PdpaNotice error={consentError} />}
-      <div><Button type="submit" loadingState="saving" loading={busy}><Save className="h-4 w-4" /> บันทึกข้อมูล</Button></div>
+      <div><Button type="submit" loadingState="saving" loading={busy}><Save className="h-4 w-4" /> {googleSignup ? "ยืนยันการสมัครสมาชิก" : "บันทึกข้อมูล"}</Button></div>
     </form>
   );
 }

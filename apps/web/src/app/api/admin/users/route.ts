@@ -18,7 +18,7 @@ export const PATCH = route<typeof Body>({ auth: "required", roles: ["admin"], bo
 export const GET = route({ auth: "required", roles: ["admin"] }, async ({ req }) => {
   const sp = req.nextUrl.searchParams;
   return listUsersAdmin({
-    query: sp.get("q") ?? undefined,
+    idRecord: sp.get("idRecord") ?? undefined, query: sp.get("q") ?? undefined,
     role: sp.get("role") ?? undefined,
     status: sp.get("status") ?? undefined,
     page: Number(sp.get("page") ?? 1),

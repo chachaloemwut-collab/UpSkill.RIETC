@@ -6,6 +6,7 @@
  * for unknown emails so response time is the same.
  */
 import "server-only";
+import { beginGoogleSignup, finishGoogleSignup, pendingGoogleSignup } from "./google-signup";
 import { PDPA_NOTICE_VERSION, decideGoogleSignIn, generateToken, hashToken, normalizeName, type GoogleClaims, type ProfileInput } from "@upskill/core";
 import { PG, pgErrorCode, type Database, type Tx } from "@upskill/db";
 import { hashPassword, validatePasswordPolicy, verifyPassword } from "@upskill/infra/password";
@@ -471,17 +472,9 @@ export async function applyGoogleSignIn(
       await revokeAllSessions(userId, "unverified_takeover");
       await audit(db, { action: "auth.unverified_account_taken_over", userId, ip: meta.ip, userAgent: meta.userAgent });
       break;
-    case "CREATE_USER_AND_LOGIN": {
-      const created = await db.transaction().execute(async (trx) => {
-        const u = await trx.insertInto("users").values({ email: claims.email, email_verified_at: new Date() }).returning(["id", "created_at"]).executeTakeFirstOrThrow();
-        await trx.insertInto("user_emails").values({ user_id: u.id, email: claims.email, is_primary: true, verified_at: new Date(), created_at: u.created_at }).execute();
-        // Google gives no profile: the member completes it (with the privacy notice) on the profile page
-        await trx.insertInto("user_oauth_accounts").values({ user_id: u.id, provider_user_id: claims.sub, provider_email: claims.email }).execute();
-        return u;
-      });
-      userId = created.id;
-      break;
-    }
+    case "CREATE_USER_AND_LOGIN":
+      await beginGoogleSignup(claims);
+      return { redirectTo: "/register/google" };
   }
 
   await createSession(userId, meta);
@@ -496,7 +489,36 @@ export async function applyGoogleSignIn(
       .execute();
     return { redirectTo: `/reset-password?token=${token}` };
   }
-  return { redirectTo: decision.action === "CREATE_USER_AND_LOGIN" ? "/me/profile?welcome=1" : "/" };
+  return { redirectTo: "/" };
+}
+
+/** A successful OAuth callback alone never creates a member. Unique constraints serialize concurrent submissions. */
+export async function completeGoogleSignup(input: ProfileInput & { pdpaConsent: boolean }, meta: Meta) {
+  const pending = await pendingGoogleSignup();
+  if (!pending) throw new HttpError(401, "GOOGLE_SIGNUP_EXPIRED", "การยืนยัน Google หมดอายุ กรุณากลับไปเข้าสู่ระบบด้วย Google อีกครั้ง");
+  if (!input.pdpaConsent) throw new HttpError(400, "PDPA_CONSENT_REQUIRED");
+  const profile = checkedProfile(input);
+  const { db, env } = ctx();
+  let userId: string;
+  try {
+    userId = await db.transaction().execute(async trx => {
+      const now = new Date();
+      const user = await trx.insertInto("users").values({ email: pending.email, email_verified_at: now }).returning("id").executeTakeFirstOrThrow();
+      await insertProfile(trx, user.id, profile);
+      await trx.insertInto("user_emails").values({ user_id: user.id, email: pending.email, is_primary: true, verified_at: now }).execute();
+      await trx.insertInto("user_oauth_accounts").values({ user_id: user.id, provider_user_id: pending.sub, provider_email: pending.email }).execute();
+      await audit(trx, { action: "user.pdpa_consent", userId: user.id, ...meta, details: { notice: PDPA_NOTICE_VERSION, via: "google_registration" } });
+      const timestamp = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
+      await addEmailToOutbox(trx, { template: "membership-confirmed", to: pending.email, name: profile.firstNameTh + " " + profile.lastNameTh, registeredAt: timestamp, verifiedAt: timestamp, applicationLink: env.APP_ORIGIN + "/me/application" }, { userId: user.id, deduplicationKey: "membership-confirmed:" + user.id });
+      return user.id;
+    });
+  } catch (err) {
+    if (pgErrorCode(err) === PG.UNIQUE_VIOLATION) throw new HttpError(409, "ACCOUNT_EXISTS", "บัญชีนี้ลงทะเบียนแล้ว กรุณากลับไปเข้าสู่ระบบ");
+    throw err;
+  }
+  await finishGoogleSignup(pending.key);
+  await createSession(userId, meta);
+  await audit(db, { action: "auth.login", userId, ...meta, details: { method: "google", via: "registration" } });
 }
 
 /** Link Google to the logged-in account from the settings page */
