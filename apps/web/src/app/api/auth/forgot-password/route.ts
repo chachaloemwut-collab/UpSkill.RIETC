@@ -2,11 +2,12 @@ import { requireOutboundEmail } from "@/server/admin/email-settings.service";
 import { z } from "zod";
 import { RATE_LIMITS } from "@upskill/infra/rate-limit";
 import { route } from "@/server/http";
+import { LoginIdentifier } from "@/server/auth/login-identifier";
 import { emailKey } from "@/server/rate-keys";
 import { forgotPassword } from "@/server/auth/auth.service";
 
 // "email" keeps its name for old clients; it may also be a username (same rule as the login form)
-const Body = z.strictObject({ email: z.union([z.email().max(254), z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9._-]{2,31}$/)]) });
+const Body = z.strictObject({ email: LoginIdentifier });
 
 // Per-account limit prevents mail-bombing a victim's inbox; it applies to unknown emails too (no enumeration)
 export const POST = route<typeof Body>(
