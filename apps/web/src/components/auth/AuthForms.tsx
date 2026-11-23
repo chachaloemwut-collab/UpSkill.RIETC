@@ -373,7 +373,7 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
         addressLine: pr.addressLine, subdistrict: pr.subdistrict, district: pr.district, province: pr.province, postalCode: pr.postalCode,
         guardianName: pr.guardianName, submittedAt: new Date(),
       });
-      s.setNotice(r.data.message);
+      s.setNotice(`${r.data.message} ${maskEmail(String(f.get("email") ?? ""))}`);
     }
     else {
       s.setError(r.message);

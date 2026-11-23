@@ -9,7 +9,7 @@ import { CohortApply } from "@/components/programs/CohortApply";
 import { WatchCohortButton } from "@/components/programs/WatchCohortButton";
 import { ProgramCertificateButton } from "@/components/programs/ProgramCertificateButton";
 import { RichText } from "@/components/programs/RichText";
-import { COHORT_PHASE, PROGRAM_VISIBILITY, REGISTRATION_STATUS, formatDateTimeTh, formatDuration } from "@/lib/format";
+import { COHORT_PHASE, PROGRAM_VISIBILITY, REGISTRATION_STATUS, formatDateTimeTh } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { getProgramForViewer } from "@/server/programs/programs.service";
 
