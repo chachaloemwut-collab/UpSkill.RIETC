@@ -222,7 +222,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
             {showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
           </button>
           <Link href="/forgot-password" className="inline-flex min-h-10 items-center rounded px-1 text-muted-foreground hover:underline">
-            ลืมรหัสผ่าน?
+            ลืมรหัสผ่านหรือจำอีเมลไม่ได้?
           </Link>
         </div>
       </form>
@@ -484,6 +484,42 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
   );
 }
 
+function AccountRecoveryHelp() {
+  return <section className="grid gap-2 rounded-lg border p-4">
+    <h2 className="font-semibold">จำอีเมลเดิมไม่ได้หรือเข้าอีเมลไม่ได้</h2>
+    <p className="text-sm">ติดต่อครูผู้สอน หรือโทรหาวิทยาลัยเพื่อขอประสานผู้ดูแลระบบ แจ้งชื่อและหลักสูตรที่สมัคร เมื่อเจ้าหน้าที่ตรวจสอบตัวตนแล้ว จะออกชื่อเข้าสู่ระบบและรหัสผ่านชั่วคราวให้สำหรับบัญชีเดิม</p>
+    <a className="text-sm underline" href="tel:038685383">โทรหาวิทยาลัย 038-685383</a>
+  </section>;
+}
+
+function OpenRecoveryLink() {
+  const router = useRouter();
+  const [error, setError] = useState(false);
+  function open(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const value = String(new FormData(e.currentTarget).get("recovery") ?? "").trim();
+    const pattern = /^[A-Za-z0-9_-]{40,64}$/;
+    let token = value;
+    if (!pattern.test(token)) {
+      try {
+        const url = new URL(value);
+        token = url.origin === window.location.origin && url.pathname === "/reset-password"
+          ? url.searchParams.get("token") ?? "" : "";
+      } catch { token = ""; }
+    }
+    if (!pattern.test(token)) { setError(true); return; }
+    router.push("/reset-password?token=" + encodeURIComponent(token));
+  }
+  return <details className="rounded-lg border p-4"><summary className="cursor-pointer font-semibold">มีลิงก์แล้วแต่กดเปิดไม่ได้</summary>
+    <form method="post" onSubmit={open} className="mt-3 grid gap-3">
+      <Field label="ลิงก์หรือรหัสตั้งรหัสผ่าน" hint="คัดลอกลิงก์ที่ได้รับมาวาง หรือกรอกรหัสหลังคำว่า token=">
+        <Input name="recovery" type="password" autoComplete="off" spellCheck={false} required maxLength={2048} />
+      </Field>
+      {error && <p role="alert">กรุณาวางลิงก์ตั้งรหัสผ่านของระบบนี้ให้ครบ หรือวางเฉพาะรหัสที่ได้รับ</p>}
+      <Button type="submit" variant="outline">เปิดหน้าตั้งรหัสผ่าน</Button>
+    </form></details>;
+}
+
 const RESEND_AFTER_SEC = 60;
 
 /**
@@ -491,7 +527,7 @@ const RESEND_AFTER_SEC = 60;
  * 1-hour single-use link), a resend button with a short cooldown, and where to get help without email access.
  * The reply is the same whether or not the account exists, so it never reveals who is registered.
  */
-export function ForgotPasswordForm({ googleEnabled, initialIdentifier }: { googleEnabled: boolean; initialIdentifier?: string | undefined }) {
+export function ForgotPasswordForm({ googleEnabled, emailAvailable, initialIdentifier }: { googleEnabled: boolean; emailAvailable: boolean; initialIdentifier?: string | undefined }) {
   const s = useSubmit();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [wait, setWait] = useState(0);
@@ -550,9 +586,8 @@ export function ForgotPasswordForm({ googleEnabled, initialIdentifier }: { googl
             ใช้อีเมลหรือชื่อผู้ใช้อื่น
           </Button>
         </div>
-        <Alert variant="default" title="เข้าอีเมลไม่ได้หรือไม่เคยได้รับอีเมล?">
-          ติดต่อผู้ดูแลระบบหรือครูผู้สอน แจ้งชื่อ-นามสกุลและอีเมลที่ใช้สมัคร ผู้ดูแลส่งลิงก์ใหม่หรือตั้งรหัสผ่านชั่วคราวให้ได้
-        </Alert>
+        <OpenRecoveryLink />
+        <AccountRecoveryHelp />
         <Link href="/login" className={buttonClass("default", "lg", "w-full")}>
           กลับไปหน้าเข้าสู่ระบบ
         </Link>
@@ -561,7 +596,7 @@ export function ForgotPasswordForm({ googleEnabled, initialIdentifier }: { googl
 
   return (
     <div className="grid gap-6">
-      <form method="post" onSubmit={onSubmit} className="grid gap-4">
+      {emailAvailable && <form method="post" onSubmit={onSubmit} className="grid gap-4">
         {s.error && <Alert variant="destructive" title={wait > 0 ? `ขอลิงก์บ่อยเกินไป กรุณารออีก ${wait} วินาที` : s.error} />}
         <Field label="อีเมลหรือชื่อผู้ใช้" hint="ใช้อีเมลหรือชื่อผู้ใช้เดียวกับตอนเข้าสู่ระบบ">
           <Input
@@ -583,7 +618,9 @@ export function ForgotPasswordForm({ googleEnabled, initialIdentifier }: { googl
           <MailCheck className="h-4 w-4" /> ส่งลิงก์ตั้งรหัสผ่านใหม่
         </Button>
         <p className="text-xs text-muted-foreground">ลิงก์จะส่งไปที่อีเมลของบัญชี ใช้ได้ 1 ชั่วโมง รหัสผ่านเดิมยังใช้ได้จนกว่าคุณจะตั้งรหัสใหม่</p>
-      </form>
+      </form>}
+      <OpenRecoveryLink />
+      <AccountRecoveryHelp />
       {googleEnabled && (
         <div className="grid gap-3">
           <OrDivider />
@@ -648,10 +685,10 @@ export function ResetLinkExpired() {
   return (
     <div className="grid gap-4">
       <Alert variant="warning" title="ลิงก์นี้หมดอายุหรือถูกใช้ไปแล้ว">
-        ลิงก์ตั้งรหัสผ่านใช้ได้ 1 ชั่วโมงและใช้ได้ครั้งเดียว ถ้าขอหลายครั้ง ให้ใช้อีเมลฉบับล่าสุด หรือขอลิงก์ใหม่ได้เลย
+        โปรดตรวจว่าคัดลอกลิงก์มาครบ ลิงก์แต่ละฉบับใช้ได้ครั้งเดียวภายในเวลาที่ระบุ
       </Alert>
       <Link href="/forgot-password" className={buttonClass("default", "lg", "w-full")}>
-        <MailCheck className="h-4 w-4" /> ขอลิงก์ใหม่
+        <MailCheck className="h-4 w-4" /> เลือกวิธีกู้บัญชี
       </Link>
       <Link href="/login" className={buttonClass("ghost", "lg", "w-full")}>
         กลับไปหน้าเข้าสู่ระบบ
