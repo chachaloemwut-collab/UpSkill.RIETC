@@ -65,7 +65,8 @@ export function route<TBody extends z.ZodType = z.ZodNever, TParams = Record<str
     let actorId: string | null = null;
     let status = 500;
     const params = await routeCtx.params;
-    const segments = new Set(Object.values(params as object).map(String));
+    const paramValues = Object.values(params ?? {}).map(String);
+    const segments = new Set(paramValues);
     const endpoint = req.nextUrl.pathname.split("/").map(s => segments.has(s) ? "[record]" : s).join("/");
     try {
       const { env, redis } = ctx();
@@ -129,7 +130,7 @@ export function route<TBody extends z.ZodType = z.ZodNever, TParams = Record<str
       return NextResponse.json({ error: "INTERNAL", requestId }, { status: 500 });
     } finally {
       if (endpoint !== "/api/health" && endpoint !== "/api/user/activity") {
-        const resource = Object.values(params as object).map(String).find(v=>/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v));
+        const resource = paramValues.find(v=>/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v));
         const details = { method:req.method, endpoint, status, requestId };
         after(async () => {
           try { await audit(ctx().db,{ action:"activity.request",userId:actorId,entityType:"request",...(resource?{entityId:resource}:{}),details }); }
