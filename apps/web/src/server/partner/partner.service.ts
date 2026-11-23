@@ -1,3 +1,4 @@
+import { completedHours } from "@upskill/core/study-hours";
 import "server-only";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { normalizeNationalId } from "@upskill/core/profile";
@@ -124,7 +125,7 @@ export async function lookupTrainingByNationalId(rawNationalId: string): Promise
       course_title: r.title,
       course_code: settings.courseCode?.trim() || null,
       completed_at: new Date(r.completed_at!).toISOString(),
-      study_hours: r.total_actual_study_sec != null ? Math.round((r.total_actual_study_sec / 3600) * 100) / 100 : null,
+      study_hours: r.total_actual_study_sec != null ? completedHours(r.total_actual_study_sec) : null,
       certificate: r.certificate_code
         ? {
             code: r.certificate_code,

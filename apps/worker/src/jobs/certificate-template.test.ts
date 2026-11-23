@@ -42,7 +42,8 @@ describe("certificate artwork", () => {
     assert.ok(html.includes("<h1>วุฒิบัตร</h1>"));
     assert.ok(html.includes("ฉบับนี้ให้ไว้เพื่อแสดงว่า"));
     assert.ok(html.includes("ได้ผ่านการอบรมออนไลน์"));
-    assert.ok(html.includes("จำนวนชั่วโมงการอบรม ๒ ชั่วโมง ๑๕ นาที"));
+    assert.ok(html.includes("จำนวนชั่วโมงการอบรม ๒ ชั่วโมง"));
+    assert.ok(!html.includes("๑๕ นาที"));
     assert.ok(html.includes("ให้ไว้ ณ วันที่ ๑๙ พฤศจิกายน พ.ศ. ๒๕๖๙"));
     assert.ok(!html.includes("ร้อยละ") && !html.includes("คะแนน") && !html.includes("ผลการประเมิน") && !html.includes("๙๒"));
     assert.ok(!html.includes("TEST / DEVELOPMENT"));

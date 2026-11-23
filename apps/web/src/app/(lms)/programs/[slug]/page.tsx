@@ -1,3 +1,4 @@
+import { formatStudyDurationTh } from "@upskill/core/study-hours";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -60,7 +61,7 @@ export default async function ProgramPage({ params }: Props) {
         <div className="grid min-w-0 grid-cols-1 content-start gap-6">
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1.5"><Layers className="h-4 w-4" /> {courses.length} รายวิชา</span>
-            <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4" /> {formatDuration(totalSec)}</span>
+            <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4" /> {formatStudyDurationTh(totalSec)}</span>
           </div>
 
           {program.description && (
@@ -82,7 +83,7 @@ export default async function ProgramPage({ params }: Props) {
                       <Link href={`/courses/${c.slug}`} className="font-medium hover:underline">{c.title}</Link>
                       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1"><UserRound className="h-3.5 w-3.5" /> {c.instructor_name}</span>
-                        <span>{c.lesson_count} บท · {formatDuration(c.total_duration_sec)}</span>
+                        <span>{c.lesson_count} บท · {formatStudyDurationTh(c.total_duration_sec)}</span>
                         {!c.is_required && <Badge variant="outline">วิชาเลือก</Badge>}
                       </div>
                     </div>

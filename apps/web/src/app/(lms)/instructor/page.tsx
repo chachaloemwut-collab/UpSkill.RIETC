@@ -1,3 +1,4 @@
+import { formatStudyDurationTh } from "@upskill/core/study-hours";
 import { Suspense } from "react";
 import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
@@ -9,7 +10,7 @@ import { Badge, Card, EmptyState, Table } from "@/components/ui";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
 import { CreateCourseDialog } from "@/components/instructor/CreateCourseForm";
-import { VISIBILITY, formatDateTh, formatDuration, youtubeThumb } from "@/lib/format";
+import { VISIBILITY, formatDateTh, youtubeThumb } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { listInstructors, listMyCourses } from "@/server/courses/instructor.service";
 import { AdminCreateCourseDialog } from "@/components/admin/CourseOwnerActions";
@@ -93,7 +94,7 @@ async function InstructorOverview({ user }: { user: NonNullable<Awaited<ReturnTy
                         </div>
                       </td>
                       <td className="text-right tabular-nums">
-                        {c.lesson_count} <span className="text-xs text-muted-foreground">({formatDuration(c.total_duration_sec)})</span>
+                        {c.lesson_count} <span className="text-xs text-muted-foreground">({formatStudyDurationTh(c.total_duration_sec)})</span>
                       </td>
                       <td className="text-right tabular-nums">{c.enrollment_count.toLocaleString("th-TH")}</td>
                       <td className="text-right tabular-nums">{c.completed_count.toLocaleString("th-TH")}</td>

@@ -38,7 +38,7 @@ export async function renderCertificatePdf(db: Database, env: Env, code: string,
   const display = parseCertificateDisplay(displayRow?.value);
 
   const verifyUrl = `${env.APP_ORIGIN}/verify/${encodeURIComponent(c.certificate_code)}`;
-  const qr = await QRCode.toDataURL(verifyUrl, { errorCorrectionLevel: "M", margin: 1, width: 360 });
+  const qr = await QRCode.toDataURL(verifyUrl, { errorCorrectionLevel: "M", margin: 4, width: 384 });
   const fontCss = (
     await Promise.all([
       fontFace("Sarabun", "Sarabun-Regular.ttf", 400),

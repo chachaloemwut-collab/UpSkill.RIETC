@@ -179,10 +179,4 @@ export function verifyCertificate(
   return { ok: true, payload };
 }
 
-/** "2 ชั่วโมง 15 นาที" (2 hours 15 minutes) */
-export function formatStudyDurationTh(totalSec: number): string {
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  if (h === 0) return `${m} นาที`;
-  return m === 0 ? `${h} ชั่วโมง` : `${h} ชั่วโมง ${m} นาที`;
-}
+export { formatStudyDurationTh } from "./study-hours.ts";

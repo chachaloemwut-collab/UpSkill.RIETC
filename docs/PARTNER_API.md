@@ -84,7 +84,7 @@ Base URL: `https://upskillreskill.rietc.ac.th/api/partner/v1`
       "course_title": "การประดิษฐ์กระทงรักษ์โลกและจริยธรรมสิ่งแวดล้อม",
       "course_code": null,
       "completed_at": "2026-11-22T10:10:58.901Z",
-      "study_hours": 2.21,
+      "study_hours": 2,
       "certificate": {
         "code": "CERT-2026-MEAS-74NK-870T",
         "status": "valid",
@@ -113,7 +113,7 @@ Base URL: `https://upskillreskill.rietc.ac.th/api/partner/v1`
 | `trainings[]` | เฉพาะหลักสูตรที่ **เรียนจบและผ่านเกณฑ์แล้ว** เรียงจากล่าสุด |
 | `course_code` | รหัสหลักสูตร ถ้าผู้จัดหลักสูตรกำหนดไว้ |
 | `completed_at` | วันเวลาที่ผ่านเกณฑ์ (ISO 8601, UTC) |
-| `study_hours` | ชั่วโมงเรียนตามที่บันทึกในวุฒิบัตร (`null` ถ้ายังไม่ออกวุฒิบัตร) |
+| `study_hours` | จำนวนชั่วโมงเต็มโดยปัดเศษเวลาลงตามข้อมูลในวุฒิบัตร (`null` ถ้ายังไม่ออกวุฒิบัตร) |
 | `certificate` | `null` ถ้าผู้เรียนยังไม่ได้กดออกวุฒิบัตร |
 | `certificate.status` | `valid` ใช้งานได้ · `expired` หมดอายุ · `revoked` ถูกเพิกถอน |
 | `certificate.verify_url` | หน้าตรวจสอบวุฒิบัตรสาธารณะ ใช้ยืนยันซ้ำได้ |

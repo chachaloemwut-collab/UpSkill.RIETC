@@ -129,10 +129,9 @@ export function LandingPage() {
 
 async function LandingNumbers() {
   const stats = await landingStats();
-  const hours = stats.durationSec >= 36_000;
   const numbers = [
     ["หลักสูตรที่เผยแพร่", stats.courses], ["บทเรียนวิดีโอ", stats.lessons],
-    [hours ? "ชั่วโมงของเนื้อหา" : "นาทีของเนื้อหา", Math.round(stats.durationSec / (hours ? 3600 : 60))],
+    ["ชั่วโมงหลักสูตรรวม", stats.courseHours],
     ["เอกสารที่ออกแล้ว", stats.certificates],
   ] as const;
   return <dl className={styles.numbers}>{numbers.map(([label, value]) => (

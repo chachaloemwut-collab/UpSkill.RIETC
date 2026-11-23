@@ -1,4 +1,4 @@
-import { QrCode } from "lucide-react";
+import Image from "next/image";
 import {
   CERTIFICATE_DISPLAY_DEFAULTS,
   CERTIFICATE_INTRO,
@@ -63,7 +63,7 @@ export function CertificatePreview({
   const showSigner = !!signatureUrl && !!signerName?.trim();
   const r: CertificatePreviewRecord = record ?? {
     recipientName: "นายสมชาย พัฒนาวิชาชีพ",
-    studyText: "2 ชั่วโมง 15 นาที",
+    studyText: "2 ชั่วโมง",
     issuedAt: new Date(),
     code: "UR-2026-XXXX-XXXX",
   };
@@ -129,10 +129,10 @@ export function CertificatePreview({
         <div className="absolute" style={{ left: "8.8cqw", right: "8.8cqw", bottom: "8cqw", height: "12cqw" }}>
           <div className="absolute bottom-0 left-0 flex items-end" style={{ gap: "1.2cqw" }}>
             <span className="flex items-center justify-center bg-white" style={{ width: "8.8cqw", height: "8.8cqw", border: `0.1cqw solid ${p.frame}40` }}>
-              <QrCode style={{ width: "7cqw", height: "7cqw", color: p.ink }} />
+              <Image unoptimized src={`/api/public/verification-qr/${encodeURIComponent(record?.code ?? "sample")}`} alt="คิวอาร์โค้ดตรวจสอบวุฒิบัตร" width={384} height={384} style={{ width: "100%", height: "100%" }} />
             </span>
             <span style={{ fontSize: "1.1cqw", color: p.muted, lineHeight: 1.45 }}>
-              <b className="block" style={{ color: p.title, fontFamily: prompt }}>สแกนเพื่อตรวจสอบ</b>
+              <b className="block" style={{ color: p.title, fontFamily: prompt }}>{record ? "สแกนเพื่อตรวจสอบ" : "สแกนเพื่อเปิดหน้าตรวจสอบ"}</b>
               รหัสเอกสาร
               <span className="block font-mono" style={{ color: p.ink }}>{r.code}</span>
             </span>
