@@ -8,7 +8,8 @@
  */
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { NextResponse, type NextRequest } from "next/server";
+import { audit } from "./audit";
+import { after, NextResponse, type NextRequest } from "next/server";
 import type { z } from "zod";
 import { isAllowedOrigin } from "@upskill/infra/env";
 import { logger } from "@upskill/infra/logger";
@@ -61,6 +62,11 @@ export function route<TBody extends z.ZodType = z.ZodNever, TParams = Record<str
 ) {
   return async (req: NextRequest, routeCtx: { params: Promise<TParams> }): Promise<Response> => {
     const requestId = randomUUID();
+    let actorId: string | null = null;
+    let status = 500;
+    const params = await routeCtx.params;
+    const segments = new Set(Object.values(params as object).map(String));
+    const endpoint = req.nextUrl.pathname.split("/").map(s => segments.has(s) ? "[record]" : s).join("/");
     try {
       const { env, redis } = ctx();
 
@@ -71,6 +77,7 @@ export function route<TBody extends z.ZodType = z.ZodNever, TParams = Record<str
 
       const ip = clientIp(req);
       const user = opts.auth === "none" ? null : await getCurrentUser();
+      actorId = user?.id ?? null;
       if (opts.auth === "required" && !user) throw new HttpError(401, "UNAUTHENTICATED");
       if (opts.roles && (!user || !opts.roles.includes(user.role))) throw new HttpError(403, "FORBIDDEN");
 
@@ -98,16 +105,18 @@ export function route<TBody extends z.ZodType = z.ZodNever, TParams = Record<str
 
       const result = await fn({
         req,
-        params: await routeCtx.params,
+        params,
         body,
         user,
         ip,
         userAgent: req.headers.get("user-agent")?.slice(0, 512) ?? "",
         requestId,
       });
+      status = result instanceof Response ? result.status : 200;
       return result instanceof Response ? result : NextResponse.json(result ?? { ok: true });
     } catch (err) {
       if (err instanceof HttpError) {
+        status = err.status;
         // err.message is only ever a user-facing text we wrote ourselves (never an internal error)
         const message = err.message !== err.code ? { message: err.message } : {};
         const retryAfter = err.headers?.["Retry-After"] ? parseInt(err.headers["Retry-After"], 10) : undefined;
@@ -116,8 +125,17 @@ export function route<TBody extends z.ZodType = z.ZodNever, TParams = Record<str
           { status: err.status, ...(err.headers ? { headers: err.headers } : {}) },
         );
       }
-      logger.error({ err, requestId, path: req.nextUrl.pathname }, "unhandled error");
+      logger.error({ err, requestId, path: endpoint }, "unhandled error");
       return NextResponse.json({ error: "INTERNAL", requestId }, { status: 500 });
+    } finally {
+      if (endpoint !== "/api/health" && endpoint !== "/api/user/activity") {
+        const resource = Object.values(params as object).map(String).find(v=>/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v));
+        const details = { method:req.method, endpoint, status, requestId };
+        after(async () => {
+          try { await audit(ctx().db,{ action:"activity.request",userId:actorId,entityType:"request",...(resource?{entityId:resource}:{}),details }); }
+          catch { logger.error({ requestId, endpoint, status }, "request audit write failed"); }
+        });
+      }
     }
   };
 }

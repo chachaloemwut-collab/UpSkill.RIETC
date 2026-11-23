@@ -342,6 +342,13 @@ export interface EmailVerificationTokens {
   user_id: string;
 }
 
+export interface EnrollmentPortraits {
+  content_type: string;
+  created_at: Generated<Timestamp>;
+  enrollment_id: string;
+  image_bytes: Buffer;
+}
+
 export interface Enrollments {
   cohort_id: string | null;
   completed_at: Timestamp | null;
@@ -612,6 +619,15 @@ export interface QuizScoreCorrections {
   question_id: string;
 }
 
+export interface SupportMessages {
+  author_id: string;
+  body: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  member_id: string;
+  request_id: string;
+}
+
 export interface SystemSettings {
   key: string;
   updated_at: Generated<Timestamp>;
@@ -739,6 +755,7 @@ export interface DB {
   email_provider_settings: EmailProviderSettings;
   email_suppressions: EmailSuppressions;
   email_verification_tokens: EmailVerificationTokens;
+  enrollment_portraits: EnrollmentPortraits;
   enrollments: Enrollments;
   google_oauth_settings: GoogleOauthSettings;
   instructor_invitations: InstructorInvitations;
@@ -759,6 +776,7 @@ export interface DB {
   quiz_lockout_resets: QuizLockoutResets;
   quiz_questions: QuizQuestions;
   quiz_score_corrections: QuizScoreCorrections;
+  support_messages: SupportMessages;
   system_settings: SystemSettings;
   user_api_tokens: UserApiTokens;
   user_emails: UserEmails;

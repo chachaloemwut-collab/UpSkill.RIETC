@@ -2,6 +2,12 @@ import "server-only";
 import type { Database } from "@upskill/db";
 
 export type AuditAction =
+  | "enrollment.portrait_added"
+  | "enrollment.document_served"
+  | "certificate.document_served"
+  | "activity.page"
+  | "activity.request"
+  | "support.message_sent"
   | "auth.login"
   | "auth.login_failed"
   | "auth.logout"
