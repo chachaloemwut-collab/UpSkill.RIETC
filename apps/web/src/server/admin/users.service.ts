@@ -192,7 +192,7 @@ export async function getUserDetailAdmin(userId: string) {
       .execute(),
     db
       .selectFrom("certificates")
-      .select(["certificate_code", "document_name_snapshot", "course_title_snapshot", "issued_at", "revoked_at", "revoked_reason", "expires_at"])
+      .select(["enrollment_id", "certificate_code", "document_name_snapshot", "course_title_snapshot", "issued_at", "revoked_at", "revoked_reason", "expires_at"])
       .where("user_id", "=", userId)
       .orderBy("issued_at", "desc")
       .execute(),

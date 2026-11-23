@@ -83,6 +83,20 @@ export async function waitForEmailLink(to: string, pathPrefix: string): Promise<
   throw new Error(`no email with ${pathPrefix} for ${to} (is the worker running?)`);
 }
 
+/** Inspect delivery at the test mailbox, including the actual attachment metadata. */
+export async function waitForAttachment(to: string, filename: string) {
+  for (let i = 0; i < 40; i++) {
+    const query = encodeURIComponent(`to:"${to}"`);
+    const list = await (await fetch(`${MAILPIT}/api/v1/search?query=${query}`)).json() as { messages: Array<{ ID: string }> };
+    for (const message of list.messages ?? []) {
+      const detail = await (await fetch(`${MAILPIT}/api/v1/message/${message.ID}`)).json() as { Attachments?: Array<{ FileName: string; Size: number }> };
+      if (detail.Attachments?.some(file => file.FileName === filename && file.Size > 0)) return;
+    }
+    await sleep(500);
+  }
+  throw new Error(`Missing attachment: ${filename}`);
+}
+
 /** Random Thai national ID with a correct check digit (first digit 1-8, never a real person by design of the test) */
 export function randomNationalId(): string {
   const first12 = String(1 + Math.floor(Math.random() * 8)) + Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join("");

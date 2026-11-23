@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
-  Award, BookOpen, CalendarRange, FileSpreadsheet, GraduationCap, LayoutDashboard, Library, LogIn, Megaphone, Presentation, Search, Settings, ShieldAlert, ShieldCheck, Sun, Moon, UserPlus, UsersRound,
+  MessageSquare, Award, BookOpen, CalendarRange, FileSpreadsheet, GraduationCap, LayoutDashboard, Library, LogIn, Megaphone, Presentation, Search, Settings, ShieldAlert, ShieldCheck, Sun, Moon, UserPlus, UsersRound,
 } from "lucide-react";
 import {
   AppShell, Avatar, Button, CommandPalette, DropdownMenu, Kbd, LogoutIcon, MenuToggleIcon, ThemeCustomizer, ThemeToggle, buttonClass, useActionScene, useHotkey, useThemeSettings, useToast,
@@ -56,7 +56,7 @@ function buildNav(user: ShellUser | null): ShellNavGroup[] {
       ],
     });
   }
-  if (user) groups.push({ label: "บัญชี", items: [{ id: "/me", href: "/me", label: "ตั้งค่าบัญชี", icon: <Settings /> }] });
+  if (user) groups.push({ label: "บัญชี", items: [{id:"/support",href:"/support",label:"แจ้งปัญหาและติดต่อผู้ดูแล",icon:<MessageSquare/>}, { id: "/me", href: "/me", label: "ตั้งค่าบัญชี", icon: <Settings /> }] });
   return groups;
 }
 

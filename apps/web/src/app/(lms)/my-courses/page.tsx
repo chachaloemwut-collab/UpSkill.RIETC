@@ -1,3 +1,4 @@
+import { EnrollmentLinks } from "@/components/course/EnrollmentLinks";
 import { Suspense } from "react";
 import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
@@ -70,8 +71,7 @@ function Grid({ items, empty }: { items: Enrollment[]; empty: string }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((e, i) => (
-        <CourseCard
-          key={e.slug}
+        <div key={e.enrollment_id}><CourseCard
           index={i}
           course={e}
           progress={e.progressPercent}
@@ -91,7 +91,7 @@ function Grid({ items, empty }: { items: Enrollment[]; empty: string }) {
               )}
             </div>
           }
-        />
+        /><EnrollmentLinks id={e.enrollment_id} code={e.certificate_code} completed={e.status === "completed" && !e.revoked_at} /></div>
       ))}
     </div>
   );

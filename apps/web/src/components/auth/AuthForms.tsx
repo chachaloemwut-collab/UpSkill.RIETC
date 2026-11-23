@@ -532,7 +532,7 @@ export function ForgotPasswordForm({ googleEnabled, initialIdentifier }: { googl
           <div>
             <p className="font-semibold">ตรวจสอบอีเมลของคุณ</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              ถ้ามีบัญชี <span className="font-medium text-foreground">{sentTo}</span> ในระบบ เราส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลของบัญชีแล้ว
+              ถ้ามีบัญชี <span className="font-medium text-foreground">{sentTo}</span> ที่ใช้ช่องทางกู้คืนทางอีเมล ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้
             </p>
           </div>
         </div>

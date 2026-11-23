@@ -70,6 +70,7 @@ async function CertificateList({ user }: { user: NonNullable<Awaited<ReturnType<
                 </div>
                 <div className="mt-auto flex flex-wrap gap-2">
                   {!e.revoked_at && e.certificate_code && <DownloadCertificateButton code={e.certificate_code} size="sm" />}
+                  <Link prefetch={false} href={`/documents/certificates/${e.certificate_code}`} className={buttonClass("outline","sm")}>เปิดวุฒิบัตร</Link>
                   <Link href={`/verify/${e.certificate_code}`} className={buttonClass("outline", "sm")}>
                     <ExternalLink className="h-3.5 w-3.5" /> หน้าตรวจสอบ
                   </Link>

@@ -78,6 +78,8 @@ export async function deleteOwnAccount(user: CurrentUser, meta: { ip: string }):
       .where("deleted_at", "is", null)
       .executeTakeFirst();
     if (Number(r.numUpdatedRows) === 0) throw new HttpError(409, "ALREADY_DELETED");
+    await trx.deleteFrom("support_messages").where(eb=>eb.or([eb("member_id","=",user.id),eb("author_id","=",user.id)])).execute();
+    await trx.deleteFrom("enrollment_portraits").where("enrollment_id","in",trx.selectFrom("enrollments").select("id").where("user_id","=",user.id)).execute();
     await trx.deleteFrom("user_profiles").where("user_id", "=", user.id).execute();
     // Applications: drop the personal data, keep the registry fields (number, status, payment/receipt) for the records
     await trx

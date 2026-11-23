@@ -112,12 +112,12 @@ export async function resendVerification(emailRaw: string): Promise<void> {
 }
 
 export async function verifyEmail(token: string): Promise<void> {
-  const { db } = ctx();
+  const { db, env } = ctx();
   await db.transaction().execute(async (trx) => {
     const t = await trx
       .selectFrom("email_verification_tokens as t")
       .innerJoin("users as u", "u.id", "t.user_id")
-      .select(["t.id", "t.user_id", "t.email as token_email", "u.email as user_email"])
+      .select(["t.id", "t.user_id", "t.email as token_email", "u.email as user_email", "u.created_at", "u.legal_full_name_th"])
       .where("t.token_hash", "=", hashToken(token))
       .where("t.used_at", "is", null)
       .where("t.expires_at", ">", new Date())
@@ -128,7 +128,12 @@ export async function verifyEmail(token: string): Promise<void> {
     await trx.updateTable("email_verification_tokens").set({ used_at: new Date() }).where("id", "=", t.id).execute();
     await trx.updateTable("user_emails").set({ verified_at: new Date() }).where("user_id", "=", t.user_id).where("email", "=", t.token_email).execute();
     if (t.token_email.toLowerCase() === t.user_email.toLowerCase()) {
-      await trx.updateTable("users").set({ email_verified_at: new Date() }).where("id", "=", t.user_id).where("email_verified_at", "is", null).execute();
+      const now = new Date();
+      const verified = await trx.updateTable("users").set({ email_verified_at: now }).where("id","=",t.user_id).where("email_verified_at","is",null).returning("id").executeTakeFirst();
+      if (verified) {
+        const date = (d: Date) => d.toLocaleString("th-TH", {timeZone:"Asia/Bangkok"});
+        await addEmailToOutbox(trx,{template:"membership-confirmed",to:t.user_email,name:t.legal_full_name_th ?? t.user_email,registeredAt:date(t.created_at),verifiedAt:date(now),applicationLink:env.APP_ORIGIN+"/me/application"},{userId:t.user_id,deduplicationKey:"membership-confirmed:"+t.user_id});
+      }
     }
   });
 }

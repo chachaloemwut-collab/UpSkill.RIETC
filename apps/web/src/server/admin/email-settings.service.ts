@@ -44,6 +44,20 @@ function environmentSettings() {
   };
 }
 
+/** Public availability only. No sender credentials or recipient details leave the server. */
+export async function emailRequestsAvailable() {
+  const { db,env }=ctx();
+  const row=await db.selectFrom("email_provider_settings").select(["enabled","smtp_host"]).where("id","=",1).executeTakeFirst();
+  const host=(row?.smtp_host ?? new URL(env.SMTP_URL).hostname).trim().toLowerCase();
+  return (row?.enabled ?? true) && !!host && !host.endsWith(".invalid");
+}
+
+export async function requireOutboundEmail() {
+  if (!await emailRequestsAvailable()) {
+    throw new HttpError(503, "EMAIL_UNAVAILABLE", "ขณะนี้ระบบอีเมลยังไม่พร้อมส่งลิงก์ กรุณาติดต่อผู้ดูแลระบบ");
+  }
+}
+
 export async function getEmailSettingsView() {
   const row = await ctx().db.selectFrom("email_provider_settings").selectAll().where("id", "=", 1).executeTakeFirst();
   if (!row) return environmentSettings();

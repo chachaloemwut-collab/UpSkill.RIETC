@@ -1,3 +1,4 @@
+import { EnrollmentLinks } from "@/components/course/EnrollmentLinks";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -166,7 +167,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                 <tbody>
                   {d.enrollments.map((e) => (
                     <tr key={e.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4 font-medium"><Link href={`/courses/${e.slug}`} className="hover:underline">{e.title}</Link></td>
+                      <td className="py-2 pr-4 font-medium"><Link href={`/courses/${e.slug}`} className="hover:underline">{e.title}</Link><EnrollmentLinks id={e.id} code={d.certificates.find(c=>c.enrollment_id===e.id)?.certificate_code} completed={e.status==="completed" && !d.certificates.some(c=>c.enrollment_id===e.id && c.revoked_at)}/></td>
                       <td className="py-2 pr-4">{e.status === "completed" ? <Badge variant="success">จบแล้ว</Badge> : e.status === "revoked" ? <Badge variant="destructive">ถูกเพิกถอน</Badge> : <Badge variant="secondary">กำลังเรียน</Badge>}</td>
                       <td className="py-2 pr-4 text-right">{e.study_sec ? `${Math.floor(e.study_sec / 60)} นาที` : "—"}</td>
                       <td className="py-2 pr-4 text-right">{e.lessons_done}/{e.lessons_total}</td>
@@ -177,7 +178,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                           enrollmentId={e.id}
                           courseId={e.course_id}
                           currentStatus={e.status}
-                          hasCertificate={d.certificates.some((c) => c.course_title_snapshot === e.title)}
+                          hasCertificate={d.certificates.some((c) => c.enrollment_id === e.id)}
                         />
                       </td>
                     </tr>
@@ -262,6 +263,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="p-6">
             <h2 className="mb-3 flex items-center gap-2 font-semibold"><History className="h-5 w-5" /> Audit log ล่าสุด ({d.auditLog.length})</h2>
+            <Link href={`/admin/users/${u.id}/activity`} className="text-sm underline">ดูประวัติการใช้งานทั้งหมด</Link>
             {d.auditLog.length === 0 ? (
               <p className="text-sm text-muted-foreground">ไม่มีรายการ</p>
             ) : (
@@ -269,6 +271,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                 {d.auditLog.map((a) => (
                   <li key={a.id} className="py-2">
                     <p className="font-medium">{a.action}</p>
+                    {a.details && typeof a.details === "object" && !Array.isArray(a.details) && <p className="break-all text-xs">{[a.details.event,a.details.screen,a.details.method,a.details.endpoint,a.details.status,a.details.kind,a.entity_id].filter(v=>typeof v==="string"||typeof v==="number").join(" · ")}</p>}
                     <p className="text-xs text-muted-foreground">{formatDateTimeTh(a.created_at)}{a.ip_address ? ` · ${a.ip_address}` : ""}</p>
                   </li>
                 ))}

@@ -231,12 +231,12 @@ export function CertificatesManager({ initialData, courses, initialQuery = "", i
         <div className="flex items-center justify-end gap-1">
           {c.status !== "revoked" && (
             <a
-              href={`/api/certificates/${encodeURIComponent(c.certificate_code)}/download?inline=1`}
+              href={`/documents/certificates/${encodeURIComponent(c.certificate_code)}`}
               target="_blank"
               rel="noopener noreferrer"
               className={buttonClass("ghost", "icon", "h-8 w-8")}
               aria-label={`เปิดดูวุฒิบัตร ${c.certificate_code}`}
-              title="เปิดดูไฟล์ PDF"
+              title="เปิดวุฒิบัตร"
             >
               <Eye className="h-4 w-4" />
             </a>
