@@ -52,6 +52,12 @@ export async function emailRequestsAvailable() {
   return (row?.enabled ?? true) && !!host && !host.endsWith(".invalid");
 }
 
+export async function requireOutboundEmail() {
+  if (!await emailRequestsAvailable()) {
+    throw new HttpError(503, "EMAIL_UNAVAILABLE", "ขณะนี้ระบบอีเมลยังไม่พร้อมส่งลิงก์ กรุณาติดต่อผู้ดูแลระบบ");
+  }
+}
+
 export async function getEmailSettingsView() {
   const row = await ctx().db.selectFrom("email_provider_settings").selectAll().where("id", "=", 1).executeTakeFirst();
   if (!row) return environmentSettings();

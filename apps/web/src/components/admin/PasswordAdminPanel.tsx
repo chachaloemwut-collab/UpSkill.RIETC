@@ -40,7 +40,7 @@ export function PasswordAdminPanel({ userId, email, emailVerified, mustChange }:
     if (!(await confirm({ title: msg, destructive: logout }))) return;
     const r = await call<{ sentTo: string }>(logout ? "email-logout" : "email", "reset-password", { logout });
     if (r.ok) {
-      toast({ title: "ส่งอีเมลแล้ว", description: `ลิงก์ใช้ได้ 1 ชั่วโมง · ${r.data.sentTo}`, variant: "success" });
+      toast({ title: "บันทึกคำขอส่งอีเมลแล้ว", description: `ลิงก์ใช้ได้ 1 ชั่วโมง · ${r.data.sentTo}`, variant: "success" });
       router.refresh();
     }
   }

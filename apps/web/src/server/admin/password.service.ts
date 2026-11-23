@@ -1,3 +1,4 @@
+import { requireOutboundEmail } from "@/server/admin/email-settings.service";
 /**
  * Admin password tools for a live system: every way a member can get back into their account when
  * self-service ("ลืมรหัสผ่าน") is not enough. Rules shared by all actions:
@@ -39,6 +40,7 @@ async function loadTarget(adminId: string, userId: string) {
 export async function adminSendResetEmail(adminId: string, userId: string, opts: { logout: boolean }, meta: Meta) {
   const { db, env } = ctx();
   const user = await loadTarget(adminId, userId);
+  await requireOutboundEmail();
   if (user.email.endsWith(".invalid")) throw new HttpError(409, "NO_EMAIL", "บัญชีนี้ไม่มีอีเมลที่ส่งได้ ใช้การสร้างลิงก์หรือรหัสผ่านชั่วคราวแทน");
   const token = generateToken();
   const expiresAt = new Date(Date.now() + EMAIL_LINK_TTL_MS);

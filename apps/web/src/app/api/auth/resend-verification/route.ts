@@ -1,3 +1,4 @@
+import { requireOutboundEmail } from "@/server/admin/email-settings.service";
 import { z } from "zod";
 import { RATE_LIMITS } from "@upskill/infra/rate-limit";
 import { route } from "@/server/http";
@@ -17,6 +18,7 @@ export const POST = route<typeof Body>(
     ],
   },
   async ({ body }) => {
+    await requireOutboundEmail();
     await resendVerification(body.email);
     return { ok: true };
   },

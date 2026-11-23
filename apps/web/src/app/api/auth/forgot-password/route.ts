@@ -1,7 +1,7 @@
-import { emailRequestsAvailable } from "@/server/admin/email-settings.service";
+import { requireOutboundEmail } from "@/server/admin/email-settings.service";
 import { z } from "zod";
 import { RATE_LIMITS } from "@upskill/infra/rate-limit";
-import { HttpError, route } from "@/server/http";
+import { route } from "@/server/http";
 import { emailKey } from "@/server/rate-keys";
 import { forgotPassword } from "@/server/auth/auth.service";
 
@@ -19,7 +19,7 @@ export const POST = route<typeof Body>(
     ],
   },
   async ({ body }) => {
-    if (!await emailRequestsAvailable()) throw new HttpError(503,"EMAIL_UNAVAILABLE","ขณะนี้ระบบอีเมลยังไม่พร้อมส่งลิงก์ กรุณาติดต่อผู้ดูแลระบบ");
+    await requireOutboundEmail();
     await forgotPassword(body.email);
     return { ok: true, message: "หากมีบัญชีนี้อยู่ ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลของบัญชี (ลิงก์ใช้ได้ 1 ชั่วโมง) หากไม่พบ ให้ดูในโฟลเดอร์จดหมายขยะ" };
   },
