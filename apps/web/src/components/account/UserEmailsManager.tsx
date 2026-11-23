@@ -1,5 +1,6 @@
 "use client";
 
+import { maskEmail } from "@/lib/mask-email";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock, Mail, Plus, Star, Trash2 } from "lucide-react";
@@ -46,7 +47,7 @@ export function UserEmailsManager({ initialEmails }: { initialEmails: UserEmailI
         setNewEmail("");
         toast({
           title: "เพิ่มอีเมลสำเร็จ",
-          description: "ระบบได้ส่งลิงก์ยืนยันไปยังอีเมลใหม่แล้ว กรุณากดยืนยันก่อนตั้งเป็นอีเมลหลัก",
+          description: `ระบบรับคำขอส่งลิงก์ยืนยันไปที่ ${maskEmail(newEmail)}`,
           variant: "success",
         });
         await reload();
@@ -78,15 +79,15 @@ export function UserEmailsManager({ initialEmails }: { initialEmails: UserEmailI
     }
   };
 
-  const handleResend = async (id: string) => {
+  const handleResend = async (id: string, email: string) => {
     setActionId(id);
     setError(null);
     try {
       const res = await api(`/api/user/emails/${id}/resend`, { method: "POST" });
       if (res.ok) {
         toast({
-          title: "ส่งลิงก์ยืนยันแล้ว",
-          description: "กรุณาตรวจสอบกล่องจดหมายของคุณ",
+          title: "รับคำขอส่งลิงก์ยืนยันแล้ว",
+          description: `ตรวจสอบกล่องอีเมล ${maskEmail(email)}`,
           variant: "success",
         });
       } else {
@@ -193,7 +194,7 @@ export function UserEmailsManager({ initialEmails }: { initialEmails: UserEmailI
                     variant="ghost"
                     size="sm"
                     loadingState="verify-email" loading={isWorking}
-                    onClick={() => handleResend(item.id)}
+                    onClick={() => handleResend(item.id, item.email)}
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
                     ส่งลิงก์ยืนยันอีกครั้ง

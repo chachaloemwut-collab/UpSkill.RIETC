@@ -1,4 +1,5 @@
 "use client";
+import { maskEmail } from "@/lib/mask-email";
 import { BrandSignal } from "@/components/brand/BrandActivity";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -194,7 +195,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
               setError(null);
               if (!response.ok) { setError(response.message); return; }
               setUnverifiedEmail(null);
-              toast({ brandState: "verify-email", title: "ส่งลิงก์ยืนยันใหม่แล้ว", description: "กรุณาตรวจสอบกล่องอีเมลของคุณ", variant: "success" });
+              toast({ brandState: "verify-email", title: "รับคำขอส่งลิงก์ยืนยันแล้ว", description: `ตรวจสอบกล่องอีเมล ${maskEmail(unverifiedEmail)}`, variant: "success" });
             }}
           >
             <MailCheck className="h-4 w-4" /> ส่งลิงก์ยืนยันอีเมลอีกครั้ง
@@ -568,7 +569,7 @@ export function ForgotPasswordForm({ googleEnabled, emailAvailable, initialIdent
           <div>
             <p className="font-semibold">ตรวจสอบอีเมลของคุณ</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              ถ้ามีบัญชี <span className="font-medium text-foreground">{sentTo}</span> ที่ใช้ช่องทางกู้คืนทางอีเมล ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้
+              หากข้อมูลตรงกับบัญชีที่กู้คืนได้ ระบบจะส่งลิงก์ไปที่ <span className="font-medium text-foreground">{maskEmail(sentTo)}</span>
             </p>
           </div>
         </div>
@@ -598,7 +599,7 @@ export function ForgotPasswordForm({ googleEnabled, emailAvailable, initialIdent
     <div className="grid gap-6">
       {emailAvailable && <form method="post" onSubmit={onSubmit} className="grid gap-4">
         {s.error && <Alert variant="destructive" title={wait > 0 ? `ขอลิงก์บ่อยเกินไป กรุณารออีก ${wait} วินาที` : s.error} />}
-        <Field label="อีเมลหรือชื่อผู้ใช้" hint="ใช้อีเมลหรือชื่อผู้ใช้เดียวกับตอนเข้าสู่ระบบ">
+        <Field label="อีเมลหรือชื่อผู้ใช้" hint="กรอกอีเมลหลัก อีเมลสำรองที่ยืนยันแล้ว หรือชื่อผู้ใช้ หากใช้ชื่อผู้ใช้ ระบบจะส่งไปอีเมลหลัก">
           <Input
             name="email"
             type="text"

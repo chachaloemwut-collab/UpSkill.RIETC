@@ -6,6 +6,7 @@
  * for unknown emails so response time is the same.
  */
 import "server-only";
+import { maskEmail } from "@/lib/mask-email";
 import { beginGoogleSignup, finishGoogleSignup, pendingGoogleSignup } from "./google-signup";
 import { PDPA_NOTICE_VERSION, decideGoogleSignIn, generateToken, hashToken, normalizeName, type GoogleClaims, type ProfileInput } from "@upskill/core";
 import { PG, pgErrorCode, type Database, type Tx } from "@upskill/db";
@@ -108,8 +109,8 @@ export async function register(input: { email: string; password: string; profile
 export async function resendVerification(emailRaw: string): Promise<void> {
   const { db } = ctx();
   const email = emailRaw.trim().toLowerCase();
-  const user = await db.selectFrom("users").select(["id", "email_verified_at"]).where("email", "=", email).executeTakeFirst();
-  if (user && !user.email_verified_at) await db.transaction().execute((trx) => addVerificationEmail(trx, user.id, email));
+  const user = await db.selectFrom("users").select(["id", "email", "email_verified_at"]).where(email.includes("@") ? "email" : "username", "=", email).executeTakeFirst();
+  if (user && !user.email_verified_at) await db.transaction().execute((trx) => addVerificationEmail(trx, user.id, user.email));
 }
 
 export async function verifyEmail(token: string): Promise<void> {
@@ -144,7 +145,7 @@ export async function login(input: { email: string; password: string }, meta: Me
   const identifier = input.email.trim().toLowerCase();
   let query = db
     .selectFrom("users")
-    .select(["id", "password_hash", "status", "email_verified_at", "is_system_owner"]);
+    .select(["id", "email", "password_hash", "status", "email_verified_at", "is_system_owner"]);
   if (identifier.includes("@")) {
     const matchedEmail = await db
       .selectFrom("user_emails")
@@ -176,7 +177,7 @@ export async function login(input: { email: string; password: string }, meta: Me
     if (!user) {
       user = await db
         .selectFrom("users")
-        .select(["id", "password_hash", "status", "email_verified_at", "is_system_owner"])
+        .select(["id", "email", "password_hash", "status", "email_verified_at", "is_system_owner"])
         .where((eb) =>
           eb.or([
             eb("username", "=", env.SYSTEM_OWNER_USERNAME || "superadmin"),
@@ -217,7 +218,7 @@ export async function login(input: { email: string; password: string }, meta: Me
           legal_full_name_en: "System Owner",
           legal_name_locked_at: new Date(),
         })
-        .returning(["id", "password_hash", "status", "email_verified_at", "is_system_owner"])
+        .returning(["id", "email", "password_hash", "status", "email_verified_at", "is_system_owner"])
         .executeTakeFirst();
       if (created) {
         user = created;
@@ -244,7 +245,7 @@ export async function login(input: { email: string; password: string }, meta: Me
   // Only reveal these after the password was proven correct
   if (user.status !== "active") throw new HttpError(403, "ACCOUNT_DISABLED");
   // The protected owner account is username-only and never depends on an email workflow.
-  if (!user.is_system_owner && !user.email_verified_at) throw new HttpError(403, "EMAIL_NOT_VERIFIED");
+  if (!user.is_system_owner && !user.email_verified_at) throw new HttpError(403, "EMAIL_NOT_VERIFIED", `กรุณายืนยันอีเมล ${maskEmail(user.email)} ก่อนเข้าสู่ระบบ`);
 
   // Admin-issued temporary password: no session until the user has chosen their own password
   const mustChange = user.is_system_owner
@@ -321,14 +322,18 @@ async function issueEmailResetLink(target: { id: string; email: string }): Promi
  * Signed-in user who no longer remembers the current password: mail a reset link to the account's own address.
  * Returns the address so the page can say where it went (the user is already authenticated).
  */
-export async function sendOwnResetLink(userId: string, meta: Meta): Promise<{ email: string }> {
+export async function sendOwnResetLink(userId: string, meta: Meta, emailId?: string): Promise<{ email: string }> {
   const { db } = ctx();
   const u = await db.selectFrom("users").select(["id", "email", "status", "is_system_owner"]).where("id", "=", userId).executeTakeFirstOrThrow();
   if (u.is_system_owner) throw new HttpError(409, "SYSTEM_OWNER_PROTECTED");
   if (u.status !== "active" || !u.email || u.email.endsWith(".invalid")) throw new HttpError(409, "NO_EMAIL_FOR_RESET");
-  await issueEmailResetLink({ id: u.id, email: u.email });
+  const recipient = emailId
+    ? (await db.selectFrom("user_emails").select("email").where("id", "=", emailId).where("user_id", "=", u.id).where("verified_at", "is not", null).executeTakeFirst())?.email
+    : u.email;
+  if (!recipient || recipient.endsWith(".invalid")) throw new HttpError(400, "NO_EMAIL_FOR_RESET");
+  await issueEmailResetLink({ id: u.id, email: recipient });
   await audit(db, { action: "auth.password_reset_requested", userId: u.id, ip: meta.ip, userAgent: meta.userAgent, details: { via: "settings" } });
-  return { email: u.email };
+  return { email: recipient };
 }
 
 /** Read-only check used by the reset page, so an expired link says so before the user types a new password. */

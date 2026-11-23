@@ -1,5 +1,6 @@
 "use client";
 
+import { maskEmail } from "@/lib/mask-email";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Check, Copy, KeyRound, Link2, LockOpen, Mail, RefreshCw } from "lucide-react";
@@ -35,8 +36,8 @@ export function PasswordAdminPanel({ userId, email, emailVerified, mustChange }:
 
   async function sendEmail(logout: boolean) {
     const msg = logout
-      ? `ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${email} และออกจากระบบทุกอุปกรณ์ของผู้ใช้ทันที?`
-      : `ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${email}? (ผู้ใช้ยังใช้งานต่อได้จนกว่าจะตั้งรหัสใหม่)`;
+      ? `ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${maskEmail(email)} และออกจากระบบทุกอุปกรณ์ของผู้ใช้ทันที?`
+      : `ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ${maskEmail(email)}? (ผู้ใช้ยังใช้งานต่อได้จนกว่าจะตั้งรหัสใหม่)`;
     if (!(await confirm({ title: msg, destructive: logout }))) return;
     const r = await call<{ sentTo: string }>(logout ? "email-logout" : "email", "reset-password", { logout });
     if (r.ok) {

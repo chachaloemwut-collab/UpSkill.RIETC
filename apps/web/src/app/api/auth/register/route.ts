@@ -1,3 +1,4 @@
+import { maskEmail } from "@/lib/mask-email";
 import { z } from "zod";
 import { RATE_LIMITS } from "@upskill/infra/rate-limit";
 import { route } from "@/server/http";
@@ -17,6 +18,6 @@ export const POST = route<typeof Body>(
   async ({ body, ip, userAgent }) => {
     await register(body, { ip, userAgent });
     // Same response whether or not the email already exists (anti-enumeration)
-    return { ok: true, message: "หากอีเมลนี้ยังไม่ได้ยืนยัน เราได้ส่งลิงก์ยืนยันไปให้แล้ว" };
+    return { ok: true, message: `หากอีเมลนี้ยังไม่ได้ยืนยัน ระบบจะส่งลิงก์ไปที่ ${maskEmail(body.email)}` };
   },
 );

@@ -1,3 +1,4 @@
+import { maskEmail } from "@/lib/mask-email";
 import { Suspense } from "react";
 import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import type { Metadata } from "next";
@@ -129,7 +130,7 @@ async function AccountDetails({ viewer, linked }: { viewer: NonNullable<Awaited<
           description={me.password_hash ? "เมื่อเปลี่ยนรหัสผ่าน อุปกรณ์อื่นจะถูกออกจากระบบ" : "บัญชีนี้เข้าสู่ระบบด้วย Google ตั้งรหัสผ่านเพื่อเข้าสู่ระบบด้วยอีเมลได้ด้วย"}
         >
           <Card className="p-5">
-            <ChangePasswordForm hasPassword={!!me.password_hash} canEmailReset={!me.is_system_owner && !me.email.endsWith(".invalid")} />
+            <ChangePasswordForm destinations={userEmails.filter(e => e.verified_at && !e.email.endsWith(".invalid")).map(e => ({ id: e.id, label: maskEmail(e.email), primary: e.is_primary }))} hasPassword={!!me.password_hash} canEmailReset={!me.is_system_owner && !me.email.endsWith(".invalid")} />
           </Card>
         </Section>
 
