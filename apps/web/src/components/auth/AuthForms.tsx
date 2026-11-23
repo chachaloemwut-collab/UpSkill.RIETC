@@ -150,7 +150,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
       setCountdown(null);
       setError(r.message);
     }
-    if (r.code === "EMAIL_NOT_VERIFIED") setUnverifiedEmail(String(f.get("email")));
+    setUnverifiedEmail(r.code === "EMAIL_NOT_VERIFIED" ? String(f.get("email")).trim() : null);
     setForgotFor(r.code === "INVALID_CREDENTIALS" ? String(f.get("email") ?? "").trim() : null);
   }
 
@@ -159,7 +159,10 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
       {scene}
       {googleEnabled && (
         <>
-          <GoogleButton label="เข้าสู่ระบบด้วย Google" />
+          <div className="grid gap-2">
+            <GoogleButton label="เข้าสู่ระบบด้วย Google" />
+            <p className="text-sm text-muted-foreground">หากเคยสมัครด้วย Google ให้เลือกบัญชี Google เดิมที่ใช้สมัคร</p>
+          </div>
           <OrDivider />
         </>
       )}
@@ -177,12 +180,12 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
             }
           />
         )}
-        {forgotFor && (
+        {(forgotFor || (initialError === "INVALID_CREDENTIALS" && error === errorMessage(initialError))) && (
           <div className="grid gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
             <p className="font-medium">จำรหัสผ่านไม่ได้?</p>
-            <p className="text-muted-foreground">รับลิงก์ตั้งรหัสผ่านใหม่ทางอีเมลของบัญชีนี้ได้ทันที ใช้เวลาไม่ถึง 1 นาที</p>
+            <p className="text-muted-foreground">หากเคยตั้งรหัสผ่านกับระบบ ให้ขอลิงก์ตั้งรหัสผ่านใหม่โดยใช้อีเมลหรือชื่อผู้ใช้เดิม</p>
             <Link href={`/forgot-password${forgotFor ? `?id=${encodeURIComponent(forgotFor)}` : ""}`} className={buttonClass("outline", "md", "w-full")}>
-              <MailCheck className="h-4 w-4" /> ส่งลิงก์ตั้งรหัสผ่านใหม่
+              <MailCheck className="h-4 w-4" /> ไปหน้าตั้งรหัสผ่านใหม่
             </Link>
           </div>
         )}
