@@ -14,7 +14,8 @@ import { emailKey } from "@/server/rate-keys";
 import { login } from "@/server/auth/auth.service";
 import { logger } from "@upskill/infra/logger";
 
-const Identifier = z.union([z.email().max(254), z.string().regex(/^[a-z][a-z0-9._-]{2,31}$/)]);
+import { LoginIdentifier } from "@/server/auth/login-identifier";
+
 const Password = z.string().min(1).max(256);
 
 /** 303 to a same-site path (relative Location: never an open redirect) */
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const text = await req.text();
   if (Buffer.byteLength(text) > 4096) return fail(req, "VALIDATION_FAILED");
   const form = new URLSearchParams(text);
-  const ident = Identifier.safeParse((form.get("email") ?? "").trim().toLowerCase());
+  const ident = LoginIdentifier.safeParse(form.get("email"));
   const password = Password.safeParse(form.get("password") ?? "");
   if (!ident.success || !password.success) return fail(req, "INVALID_CREDENTIALS");
 

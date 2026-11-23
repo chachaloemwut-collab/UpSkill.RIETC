@@ -94,6 +94,23 @@ describe("sign-up and login", () => {
     expect((await learner.req("/api/user/me")).json.email).toBe(learnerEmail);
   });
 
+  it("accepts normalized identifiers and requires verification of secondary addresses", async () => {
+    const username = "member" + run;
+    const alias = `secondary-${run}@e2e.test`;
+    await withDb(async (db) => {
+      const user = await db.query("update users set username = $1 where email = $2 returning id", [username, learnerEmail]);
+      await db.query("insert into user_emails (user_id, email) values ($1, $2)", [user.rows[0].id, alias]);
+    });
+    const pending = await new Client().req("/api/auth/login", { body: { email: alias, password: learnerPassword } });
+    expect(pending.json.error).toBe("INVALID_CREDENTIALS");
+    await withDb((db) => db.query("update user_emails set verified_at = now() where email = $1", [alias]));
+    for (const identifier of [learnerEmail, username, alias]) {
+      const client = new Client();
+      await client.login(" " + identifier.toUpperCase() + " ", learnerPassword);
+      expect((await client.req("/api/user/me")).json.email).toBe(learnerEmail);
+    }
+  });
+
   it("wrong password and unknown email return the same error", async () => {
     const a = await new Client().req("/api/auth/login", { body: { email: learnerEmail, password: "wrong password here" } });
     const b = await new Client().req("/api/auth/login", { body: { email: `nobody-${run}@e2e.test`, password: "wrong password here" } });

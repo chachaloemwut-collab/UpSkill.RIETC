@@ -45,7 +45,7 @@ describe("self-service", () => {
   });
 
   it("forgot-password accepts a username and mails the account's address", async () => {
-    expect((await new Client().req("/api/auth/forgot-password", { body: { email: username } })).status).toBe(200);
+    expect((await new Client().req("/api/auth/forgot-password", { body: { email: " " + username.toUpperCase() + " " } })).status).toBe(200);
     const link = await waitForEmailLink(email, "/reset-password");
     expect(new URL(link).searchParams.get("token")).toMatch(/^[A-Za-z0-9_-]{40,64}$/);
   });

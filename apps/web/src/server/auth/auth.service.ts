@@ -151,6 +151,7 @@ export async function login(input: { email: string; password: string }, meta: Me
       .selectFrom("user_emails")
       .select(["user_id"])
       .where("email", "=", identifier)
+      .where("verified_at", "is not", null)
       .executeTakeFirst();
     if (matchedEmail) {
       query = query.where("id", "=", matchedEmail.user_id);
