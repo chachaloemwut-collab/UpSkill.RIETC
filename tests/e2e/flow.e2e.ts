@@ -4,7 +4,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
-import { BASE, Client, SEED_PASSWORD, profileBody, resetRateLimits, sleep, waitForEmailLink, withDb } from "./helpers.ts";
+import { BASE, Client, SEED_PASSWORD, profileBody, resetRateLimits, sleep, waitForAttachment, waitForEmailLink, withDb } from "./helpers.ts";
 
 const run = randomBytes(4).toString("hex");
 const learnerEmail = `learner-${run}@e2e.test`;
@@ -82,6 +82,7 @@ describe("sign-up and login", () => {
     const link = await waitForEmailLink(learnerEmail, "/verify-email");
     const token = new URL(link).searchParams.get("token")!;
     expect((await learner.req("/api/auth/verify-email", { body: { token } })).status).toBe(200);
+    await waitForAttachment(learnerEmail, "membership-confirmation.txt");
     expect((await learner.req("/api/auth/verify-email", { body: { token } })).json.error).toBe("INVALID_OR_EXPIRED_TOKEN");
   });
 
@@ -375,6 +376,7 @@ describe("certificate", () => {
     expect(r.status).toBe(200);
     expect(r.headers.get("content-type")).toBe("application/pdf");
     expect(r.text.startsWith("%PDF")).toBe(true);
+    await waitForAttachment(learnerEmail, certCode + ".pdf");
   });
 
   it("admin revocation shows on the public page", async () => {

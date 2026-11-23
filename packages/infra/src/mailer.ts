@@ -4,6 +4,7 @@ import nodemailer from "nodemailer";
 export type EmailCategory = "security" | "transactional" | "course_update" | "learning_reminder" | "system";
 
 type EmailJobData =
+  | { template: "membership-confirmed"; to: string; name: string; registeredAt: string; verifiedAt: string; applicationLink: string }
   | { template: "verify-email"; to: string; link: string }
   | { template: "reset-password"; to: string; link: string }
   | { template: "password-changed"; to: string }
@@ -61,6 +62,7 @@ const optionalHtml = (label: string, value?: string) => (value ? `<p>${esc(label
 function renderEmailEn(job: EmailJob): { subject: string; text: string; html: string } {
   const result = (subject: string, text: string, link?: string, label = "Open") => ({ subject, text: `${text}${link ? `\n${link}` : ""}`, html: `<p>${esc(text)}</p>${link ? action(link, label) : ""}` });
   switch (job.template) {
+    case "membership-confirmed": return result("Membership application confirmed", `Applicant: ${job.name} · Registered: ${job.registeredAt} · Email verified: ${job.verifiedAt}`, job.applicationLink, "Open application");
     case "verify-email": return result("Verify your email", "Use this link within 24 hours to verify your email. If you did not register, no action is required.", job.link, "Verify email");
     case "reset-password": return result("Set a new password", "Use this link within 1 hour to set a new password. It works once; a newer link replaces older ones. If you did not request this, ignore this email: your current password remains valid.", job.link, "Set password");
     case "password-changed": return result("Your password was changed", "Your account password was changed and other devices were signed out. Contact an administrator if this was not you.");
@@ -100,6 +102,10 @@ function renderEmailEn(job: EmailJob): { subject: string; text: string; html: st
 
 function renderEmailTh(job: EmailJob): { subject: string; text: string; html: string } {
   switch (job.template) {
+    case "membership-confirmed": {
+      const text = `ผู้สมัคร ${job.name} · สมัครเมื่อ ${job.registeredAt} · ยืนยันอีเมลเมื่อ ${job.verifiedAt}`;
+      return { subject: "สำเนาการสมัครสมาชิก", text: text+"\n"+job.applicationLink, html: `<p>${esc(text)}</p>${action(job.applicationLink,"เปิดใบสมัครฉบับเต็ม")}` };
+    }
     case "verify-email":
       return { subject: "ยืนยันอีเมลของคุณ", text: `กดลิงก์เพื่อยืนยันอีเมล (หมดอายุใน 24 ชั่วโมง):\n${job.link}\n\nหากคุณไม่ได้สมัคร ไม่ต้องดำเนินการ`, html: `<p>กดลิงก์เพื่อยืนยันอีเมล (หมดอายุใน 24 ชั่วโมง)</p>${action(job.link, "ยืนยันอีเมล")}<p>หากคุณไม่ได้สมัคร ไม่ต้องดำเนินการ</p>` };
     case "reset-password":
@@ -179,9 +185,9 @@ export function renderEmail(job: EmailJob) {
 
 export function createMailer(smtpUrl: string, from: string, replyTo?: string | null) {
   const transport = nodemailer.createTransport(smtpUrl);
-  return async (job: EmailJob): Promise<{ messageId: string | null }> => {
+  return async (job: EmailJob, attachments?: { filename: string; content: Buffer; contentType: string }[]): Promise<{ messageId: string | null }> => {
     const message = renderEmail(job);
-    const result = await transport.sendMail({ from, ...(replyTo ? { replyTo } : {}), to: job.to, subject: message.subject, text: message.text, html: message.html });
+    const result = await transport.sendMail({ from, ...(replyTo ? { replyTo } : {}), to: job.to, attachments, subject: message.subject, text: message.text, html: message.html });
     return { messageId: typeof result.messageId === "string" ? result.messageId : null };
   };
 }

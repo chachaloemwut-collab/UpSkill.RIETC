@@ -1,3 +1,4 @@
+import { emailRequestsAvailable } from "@/server/admin/email-settings.service";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AuthHeading, ForgotPasswordForm } from "@/components/auth/AuthForms";
@@ -14,6 +15,7 @@ export default async function ForgotPasswordPage({ searchParams }: { searchParam
   return (
     <>
       <AuthHeading title="ลืมรหัสผ่าน" description="กรอกอีเมลหรือชื่อผู้ใช้ แล้วเราจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่อีเมลของบัญชี" />
+      {!await emailRequestsAvailable() && <p role="status" className="mb-4 rounded border p-3">ขณะนี้ช่องทางอีเมลยังไม่พร้อมส่งลิงก์ กรุณาติดต่อผู้ดูแลระบบ</p>}
       <ForgotPasswordForm googleEnabled={await isGoogleEnabled()} initialIdentifier={id || undefined} />
     </>
   );

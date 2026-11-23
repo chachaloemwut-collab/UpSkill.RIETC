@@ -71,7 +71,26 @@ export async function processEmailOutbox(db: Database, getSender: SenderProvider
   });
 
   for (const row of rows) {
-    if (await shouldSuppress(db, row)) {
+    let documentSuppressed = false;
+    if (row.template_key === "reset-password" || row.template_key === "verify-email") {
+      const tokenId = row.deduplication_key.split(":")[1];
+      if (row.user_id && tokenId && /^[0-9a-f-]{36}$/i.test(tokenId)) {
+        const table = row.template_key === "reset-password" ? "password_reset_tokens" : "email_verification_tokens";
+        const valid = await db.selectFrom(table).select("id")
+          .where("id", "=", tokenId).where("user_id", "=", row.user_id)
+          .where("used_at", "is", null).where("expires_at", ">", new Date()).executeTakeFirst();
+        documentSuppressed = !valid;
+      }
+    }
+    if (row.template_key === "credential-ready" || row.template_key === "membership-confirmed") {
+      const recipient = row.user_id && await db.selectFrom("users").select("id").where("id","=",row.user_id).where("email","=",row.recipient_email).where("email_verified_at","is not",null).where("deleted_at","is",null).executeTakeFirst();
+      documentSuppressed = !recipient;
+      const job = jobFromRow(row);
+      if (recipient && job.template === "credential-ready") {
+        documentSuppressed = !await db.selectFrom("certificates").select("id").where("certificate_code","=",job.code).where("user_id","=",recipient.id).where("revoked_at","is",null).executeTakeFirst();
+      }
+    }
+    if (documentSuppressed || await shouldSuppress(db, row)) {
       await db.updateTable("email_outbox").set({ status: "suppressed", claimed_at: null }).where("id", "=", row.id).execute();
       continue;
     }
