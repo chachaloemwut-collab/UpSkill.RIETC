@@ -2,6 +2,7 @@
  * Password recovery on a live system: self-service by username, and the admin tools
  * (emailed link, hand-over link, temporary password that must be replaced, login unlock).
  */
+import { chromium } from "playwright";
 import { randomBytes } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { BASE, Client, SEED_PASSWORD, profileBody, resetRateLimits, waitForEmailLink, withDb } from "./helpers.ts";
@@ -28,6 +29,21 @@ beforeAll(async () => {
 });
 
 describe("self-service", () => {
+  it("opens a manually pasted admin recovery link from the public recovery page", async () => {
+    const response = await admin.req(`/api/admin/users/${userId}/reset-link`, { body: {} });
+    expect(response.status).toBe(200);
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      await page.goto(BASE + "/forgot-password");
+      await page.getByText("มีลิงก์แล้วแต่กดเปิดไม่ได้", { exact: true }).click();
+      await page.locator('input[name="recovery"]').fill(response.json.link);
+      await page.getByRole("button", { name: "เปิดหน้าตั้งรหัสผ่าน" }).click();
+      await page.locator('input[name="password"]').waitFor();
+      expect(new URL(page.url()).pathname).toBe("/reset-password");
+    } finally { await browser.close(); }
+  });
+
   it("forgot-password accepts a username and mails the account's address", async () => {
     expect((await new Client().req("/api/auth/forgot-password", { body: { email: username } })).status).toBe(200);
     const link = await waitForEmailLink(email, "/reset-password");
