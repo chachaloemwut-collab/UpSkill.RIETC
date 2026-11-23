@@ -1,8 +1,9 @@
+import { formatStudyDurationTh } from "@upskill/core/study-hours";
 import Link from "next/link";
 import { CalendarDays, Clock, Layers } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { CourseCover } from "@/components/course/CourseCard";
-import { COHORT_PHASE, formatDateTh, formatDuration } from "@/lib/format";
+import { COHORT_PHASE, formatDateTh } from "@/lib/format";
 
 export interface ProgramCardData {
   slug: string;
@@ -35,7 +36,7 @@ export function ProgramCard({ program }: { program: ProgramCardData }) {
         {program.summary && <p className="line-clamp-2 text-sm text-muted-foreground">{program.summary}</p>}
         <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-2 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1"><Layers className="h-3.5 w-3.5" /> {program.course_count} รายวิชา</span>
-          <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {formatDuration(program.total_duration_sec)}</span>
+          <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {formatStudyDurationTh(program.total_duration_sec)}</span>
           {program.nextCohort && <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" /> {cohortWhen(program.nextCohort)}</span>}
         </div>
       </div>

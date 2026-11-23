@@ -1,3 +1,4 @@
+import { formatStudyDurationTh } from "@upskill/core/study-hours";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,7 +8,7 @@ import { EnrollButton } from "@/components/course/EnrollButton";
 import { ClampText } from "@/components/common/ClampText";
 import { CourseCover } from "@/components/course/CourseCard";
 import { LessonList } from "@/components/course/LessonList";
-import { VISIBILITY, formatDuration } from "@/lib/format";
+import { VISIBILITY } from "@/lib/format";
 import { getCurrentUser } from "@/server/auth/session";
 import { getCourseForViewer } from "@/server/courses/courses.service";
 import { COURSE_TYPE_INFO } from "@upskill/core/application";
@@ -96,7 +97,7 @@ export default async function CoursePage({ params }: Props) {
               <BookOpen className="h-4 w-4" /> {lessons.length} บทเรียน
             </span>
             <span className="inline-flex items-center gap-1.5 font-medium font-mono tabular-nums">
-              <Clock className="h-4 w-4" /> {formatDuration(course.total_duration_sec)}
+              <Clock className="h-4 w-4" /> {formatStudyDurationTh(course.total_duration_sec)}
             </span>
           </div>
 
@@ -192,7 +193,7 @@ export default async function CoursePage({ params }: Props) {
               <h2 className="font-semibold">เนื้อหาหลักสูตร</h2>
               <span className="text-sm text-muted-foreground">
                 {units.length > 0 ? `${units.length} หน่วย · ` : ""}
-                {lessons.length} คลิป · {formatDuration(course.total_duration_sec)}
+                {lessons.length} คลิป · {formatStudyDurationTh(course.total_duration_sec)}
               </span>
             </div>
             <LessonList slug={course.slug} lessons={lessons} units={units} enrolled={enrolled} />
@@ -331,7 +332,7 @@ export default async function CoursePage({ params }: Props) {
                   {lessons.length} คลิปวิดีโอ
                 </li>
                 <li className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" /> เนื้อหารวม {formatDuration(course.total_duration_sec)}
+                  <Clock className="h-4 w-4" /> เนื้อหารวม {formatStudyDurationTh(course.total_duration_sec)}
                 </li>
                 <li className="flex items-center gap-2">
                   <Award className="h-4 w-4" /> {course.credential_enabled ? `${course.credential_name_th}เมื่อผ่านเกณฑ์` : "ไม่มีเอกสารรับรองสำหรับหลักสูตรนี้"}

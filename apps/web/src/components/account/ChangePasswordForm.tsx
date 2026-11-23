@@ -9,7 +9,8 @@ import { useConfirm } from "@/components/common/ConfirmProvider";
  * Change the password with the current one, or — for someone who no longer remembers it — mail a reset link to
  * the account's own address (canEmailReset: false for the protected owner and accounts without a real address).
  */
-export function ChangePasswordForm({ hasPassword, canEmailReset = false }: { hasPassword: boolean; canEmailReset?: boolean }) {
+export function ChangePasswordForm({ hasPassword, canEmailReset = false, destinations }: { hasPassword: boolean; canEmailReset?: boolean; destinations: { id: string; label: string; primary: boolean }[] }) {
+  const [emailId, setEmailId] = useState(destinations.find(e => e.primary)?.id ?? destinations[0]?.id ?? "");
   const toast = useToast();
   const confirm = useConfirm();
   const [sending, setSending] = useState(false);
@@ -37,14 +38,14 @@ export function ChangePasswordForm({ hasPassword, canEmailReset = false }: { has
   async function emailMeALink() {
     const ok = await confirm({
       title: "ส่งลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล?",
-      description: "ระบบจะส่งลิงก์ไปที่อีเมลหลักของบัญชีนี้ ลิงก์ใช้ได้ 1 ชั่วโมง รหัสผ่านเดิมยังใช้ได้จนกว่าคุณจะตั้งรหัสใหม่",
+      description: `ระบบจะส่งลิงก์ไปที่ ${destinations.find(e => e.id === emailId)?.label ?? "อีเมลหลักของบัญชี"} ลิงก์ใช้ได้ 1 ชั่วโมง`,
       confirmLabel: "ส่งลิงก์",
     });
     if (!ok) return;
     setSending(true);
-    const r = await api<{ email: string }>("/api/user/password/reset-link", { body: {} });
+    const r = await api<{ email: string }>("/api/user/password/reset-link", { body: emailId ? { emailId } : {} });
     setSending(false);
-    if (r.ok) toast({ title: "ส่งลิงก์แล้ว", description: `ตรวจสอบอีเมล ${r.data.email} (รวมถึงโฟลเดอร์จดหมายขยะ)`, variant: "success" });
+    if (r.ok) toast({ title: "รับคำขอส่งลิงก์แล้ว", description: `ตรวจสอบอีเมล ${r.data.email} (รวมถึงโฟลเดอร์จดหมายขยะ)`, variant: "success" });
     else toast({ title: "ส่งลิงก์ไม่สำเร็จ", description: r.message, variant: "destructive" });
   }
 
@@ -64,6 +65,10 @@ export function ChangePasswordForm({ hasPassword, canEmailReset = false }: { has
           <PasswordInput name="confirm" autoComplete="new-password" minLength={12} required />
         </Field>
       </div>
+      {canEmailReset && destinations.length > 1 && <label>อีเมลสำหรับรับลิงก์ตั้งรหัสผ่าน
+        <select className="ml-2 rounded border p-2" value={emailId} onChange={e => setEmailId(e.target.value)}>
+          {destinations.map((dest, index) => <option key={dest.id} value={dest.id}>{dest.label} · {dest.primary ? "อีเมลหลัก" : `อีเมลสำรองลำดับ ${index + 1}`}</option>)}
+        </select></label>}
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" loadingState="saving" loading={busy}>
           {hasPassword ? "เปลี่ยนรหัสผ่าน" : "ตั้งรหัสผ่าน"}

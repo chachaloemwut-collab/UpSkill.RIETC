@@ -6,6 +6,8 @@
  * for unknown emails so response time is the same.
  */
 import "server-only";
+import { maskEmail } from "@/lib/mask-email";
+import { beginGoogleSignup, finishGoogleSignup, pendingGoogleSignup } from "./google-signup";
 import { PDPA_NOTICE_VERSION, decideGoogleSignIn, generateToken, hashToken, normalizeName, type GoogleClaims, type ProfileInput } from "@upskill/core";
 import { PG, pgErrorCode, type Database, type Tx } from "@upskill/db";
 import { hashPassword, validatePasswordPolicy, verifyPassword } from "@upskill/infra/password";
@@ -107,8 +109,8 @@ export async function register(input: { email: string; password: string; profile
 export async function resendVerification(emailRaw: string): Promise<void> {
   const { db } = ctx();
   const email = emailRaw.trim().toLowerCase();
-  const user = await db.selectFrom("users").select(["id", "email_verified_at"]).where("email", "=", email).executeTakeFirst();
-  if (user && !user.email_verified_at) await db.transaction().execute((trx) => addVerificationEmail(trx, user.id, email));
+  const user = await db.selectFrom("users").select(["id", "email", "email_verified_at"]).where(email.includes("@") ? "email" : "username", "=", email).executeTakeFirst();
+  if (user && !user.email_verified_at) await db.transaction().execute((trx) => addVerificationEmail(trx, user.id, user.email));
 }
 
 export async function verifyEmail(token: string): Promise<void> {
@@ -143,7 +145,7 @@ export async function login(input: { email: string; password: string }, meta: Me
   const identifier = input.email.trim().toLowerCase();
   let query = db
     .selectFrom("users")
-    .select(["id", "password_hash", "status", "email_verified_at", "is_system_owner"]);
+    .select(["id", "email", "password_hash", "status", "email_verified_at", "is_system_owner"]);
   if (identifier.includes("@")) {
     const matchedEmail = await db
       .selectFrom("user_emails")
@@ -175,7 +177,7 @@ export async function login(input: { email: string; password: string }, meta: Me
     if (!user) {
       user = await db
         .selectFrom("users")
-        .select(["id", "password_hash", "status", "email_verified_at", "is_system_owner"])
+        .select(["id", "email", "password_hash", "status", "email_verified_at", "is_system_owner"])
         .where((eb) =>
           eb.or([
             eb("username", "=", env.SYSTEM_OWNER_USERNAME || "superadmin"),
@@ -216,7 +218,7 @@ export async function login(input: { email: string; password: string }, meta: Me
           legal_full_name_en: "System Owner",
           legal_name_locked_at: new Date(),
         })
-        .returning(["id", "password_hash", "status", "email_verified_at", "is_system_owner"])
+        .returning(["id", "email", "password_hash", "status", "email_verified_at", "is_system_owner"])
         .executeTakeFirst();
       if (created) {
         user = created;
@@ -243,7 +245,7 @@ export async function login(input: { email: string; password: string }, meta: Me
   // Only reveal these after the password was proven correct
   if (user.status !== "active") throw new HttpError(403, "ACCOUNT_DISABLED");
   // The protected owner account is username-only and never depends on an email workflow.
-  if (!user.is_system_owner && !user.email_verified_at) throw new HttpError(403, "EMAIL_NOT_VERIFIED");
+  if (!user.is_system_owner && !user.email_verified_at) throw new HttpError(403, "EMAIL_NOT_VERIFIED", `กรุณายืนยันอีเมล ${maskEmail(user.email)} ก่อนเข้าสู่ระบบ`);
 
   // Admin-issued temporary password: no session until the user has chosen their own password
   const mustChange = user.is_system_owner
@@ -320,14 +322,18 @@ async function issueEmailResetLink(target: { id: string; email: string }): Promi
  * Signed-in user who no longer remembers the current password: mail a reset link to the account's own address.
  * Returns the address so the page can say where it went (the user is already authenticated).
  */
-export async function sendOwnResetLink(userId: string, meta: Meta): Promise<{ email: string }> {
+export async function sendOwnResetLink(userId: string, meta: Meta, emailId?: string): Promise<{ email: string }> {
   const { db } = ctx();
   const u = await db.selectFrom("users").select(["id", "email", "status", "is_system_owner"]).where("id", "=", userId).executeTakeFirstOrThrow();
   if (u.is_system_owner) throw new HttpError(409, "SYSTEM_OWNER_PROTECTED");
   if (u.status !== "active" || !u.email || u.email.endsWith(".invalid")) throw new HttpError(409, "NO_EMAIL_FOR_RESET");
-  await issueEmailResetLink({ id: u.id, email: u.email });
+  const recipient = emailId
+    ? (await db.selectFrom("user_emails").select("email").where("id", "=", emailId).where("user_id", "=", u.id).where("verified_at", "is not", null).executeTakeFirst())?.email
+    : u.email;
+  if (!recipient || recipient.endsWith(".invalid")) throw new HttpError(400, "NO_EMAIL_FOR_RESET");
+  await issueEmailResetLink({ id: u.id, email: recipient });
   await audit(db, { action: "auth.password_reset_requested", userId: u.id, ip: meta.ip, userAgent: meta.userAgent, details: { via: "settings" } });
-  return { email: u.email };
+  return { email: recipient };
 }
 
 /** Read-only check used by the reset page, so an expired link says so before the user types a new password. */
@@ -471,17 +477,9 @@ export async function applyGoogleSignIn(
       await revokeAllSessions(userId, "unverified_takeover");
       await audit(db, { action: "auth.unverified_account_taken_over", userId, ip: meta.ip, userAgent: meta.userAgent });
       break;
-    case "CREATE_USER_AND_LOGIN": {
-      const created = await db.transaction().execute(async (trx) => {
-        const u = await trx.insertInto("users").values({ email: claims.email, email_verified_at: new Date() }).returning(["id", "created_at"]).executeTakeFirstOrThrow();
-        await trx.insertInto("user_emails").values({ user_id: u.id, email: claims.email, is_primary: true, verified_at: new Date(), created_at: u.created_at }).execute();
-        // Google gives no profile: the member completes it (with the privacy notice) on the profile page
-        await trx.insertInto("user_oauth_accounts").values({ user_id: u.id, provider_user_id: claims.sub, provider_email: claims.email }).execute();
-        return u;
-      });
-      userId = created.id;
-      break;
-    }
+    case "CREATE_USER_AND_LOGIN":
+      await beginGoogleSignup(claims);
+      return { redirectTo: "/register/google" };
   }
 
   await createSession(userId, meta);
@@ -496,7 +494,36 @@ export async function applyGoogleSignIn(
       .execute();
     return { redirectTo: `/reset-password?token=${token}` };
   }
-  return { redirectTo: decision.action === "CREATE_USER_AND_LOGIN" ? "/me/profile?welcome=1" : "/" };
+  return { redirectTo: "/" };
+}
+
+/** A successful OAuth callback alone never creates a member. Unique constraints serialize concurrent submissions. */
+export async function completeGoogleSignup(input: ProfileInput & { pdpaConsent: boolean }, meta: Meta) {
+  const pending = await pendingGoogleSignup();
+  if (!pending) throw new HttpError(401, "GOOGLE_SIGNUP_EXPIRED", "การยืนยัน Google หมดอายุ กรุณากลับไปเข้าสู่ระบบด้วย Google อีกครั้ง");
+  if (!input.pdpaConsent) throw new HttpError(400, "PDPA_CONSENT_REQUIRED");
+  const profile = checkedProfile(input);
+  const { db, env } = ctx();
+  let userId: string;
+  try {
+    userId = await db.transaction().execute(async trx => {
+      const now = new Date();
+      const user = await trx.insertInto("users").values({ email: pending.email, email_verified_at: now }).returning("id").executeTakeFirstOrThrow();
+      await insertProfile(trx, user.id, profile);
+      await trx.insertInto("user_emails").values({ user_id: user.id, email: pending.email, is_primary: true, verified_at: now }).execute();
+      await trx.insertInto("user_oauth_accounts").values({ user_id: user.id, provider_user_id: pending.sub, provider_email: pending.email }).execute();
+      await audit(trx, { action: "user.pdpa_consent", userId: user.id, ...meta, details: { notice: PDPA_NOTICE_VERSION, via: "google_registration" } });
+      const timestamp = now.toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
+      await addEmailToOutbox(trx, { template: "membership-confirmed", to: pending.email, name: profile.firstNameTh + " " + profile.lastNameTh, registeredAt: timestamp, verifiedAt: timestamp, applicationLink: env.APP_ORIGIN + "/me/application" }, { userId: user.id, deduplicationKey: "membership-confirmed:" + user.id });
+      return user.id;
+    });
+  } catch (err) {
+    if (pgErrorCode(err) === PG.UNIQUE_VIOLATION) throw new HttpError(409, "ACCOUNT_EXISTS", "บัญชีนี้ลงทะเบียนแล้ว กรุณากลับไปเข้าสู่ระบบ");
+    throw err;
+  }
+  await finishGoogleSignup(pending.key);
+  await createSession(userId, meta);
+  await audit(db, { action: "auth.login", userId, ...meta, details: { method: "google", via: "registration" } });
 }
 
 /** Link Google to the logged-in account from the settings page */

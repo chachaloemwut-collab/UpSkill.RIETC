@@ -298,6 +298,7 @@ export async function publicStats() {
     .db.selectNoFrom([
       sql<number>`(select count(*)::int from courses where visibility = 'published')`.as("courses"),
       sql<number>`(select count(*)::int from lessons l join courses c on c.id = l.course_id where c.visibility = 'published')`.as("lessons"),
+      sql<number>`(select coalesce(sum(floor(total_duration_sec / 3600.0)), 0)::int from courses where visibility = 'published')`.as("courseHours"),
       sql<number>`(select coalesce(sum(total_duration_sec), 0)::int from courses where visibility = 'published')`.as("durationSec"),
       sql<number>`(select count(*)::int from certificates where revoked_at is null)`.as("certificates"),
       sql<number>`(select count(*)::int from courses where visibility = 'published' and course_type = 'certified_training')`.as("certifiedTraining"),

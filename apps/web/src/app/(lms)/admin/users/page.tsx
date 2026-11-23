@@ -29,17 +29,17 @@ function pageNumbers(current: number, total: number): number[] {
   return nums;
 }
 
-export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ q?: string; role?: string; status?: string; page?: string }> }) {
+export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ q?: string; idRecord?: string; role?: string; status?: string; page?: string }> }) {
   await requireAdminPage();
   return <Suspense fallback={<LoadingSkeleton label="กำลังโหลดรายชื่อสมาชิก" />}><MemberDirectory searchParams={searchParams} /></Suspense>;
 }
 
-async function MemberDirectory({ searchParams }: { searchParams: Promise<{ q?: string; role?: string; status?: string; page?: string }> }) {
+async function MemberDirectory({ searchParams }: { searchParams: Promise<{ q?: string; idRecord?: string; role?: string; status?: string; page?: string }> }) {
   const sp = await searchParams;
-  const data = await listUsersAdmin({ query: sp.q, role: sp.role, status: sp.status, page: Number(sp.page ?? 1) });
+  const data = await listUsersAdmin({ query: sp.q, idRecord: sp.idRecord, role: sp.role, status: sp.status, page: Number(sp.page ?? 1) });
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
   const pageLink = (p: number) =>
-    `/admin/users?${new URLSearchParams({ ...(sp.q ? { q: sp.q } : {}), ...(sp.role ? { role: sp.role } : {}), ...(sp.status ? { status: sp.status } : {}), page: String(p) }).toString()}`;
+    `/admin/users?${new URLSearchParams({ ...(sp.idRecord ? { idRecord: sp.idRecord } : {}), ...(sp.q ? { q: sp.q } : {}), ...(sp.role ? { role: sp.role } : {}), ...(sp.status ? { status: sp.status } : {}), page: String(p) }).toString()}`;
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -64,9 +64,14 @@ async function MemberDirectory({ searchParams }: { searchParams: Promise<{ q?: s
             <option value="banned">ระงับถาวร</option>
             <option value="deleted">ลบบัญชีแล้ว</option>
           </select>
+          <select aria-label="ข้อมูลเลขประจำตัวประชาชน" name="idRecord" defaultValue={sp.idRecord ?? ""} className="h-10 rounded-lg border bg-background px-3 text-sm">
+            <option value="">ข้อมูลบัตรประชาชนทั้งหมด</option>
+            <option value="missing">ยังไม่ได้บันทึกเลขบัตร</option>
+            <option value="recorded">บันทึกเลขบัตรแล้ว</option>
+          </select>
           <button type="submit" className={buttonClass("default", "md")}>ค้นหา</button>
           <Link
-            href={`/api/admin/users/export?${new URLSearchParams({ ...(sp.q ? { q: sp.q } : {}), ...(sp.role ? { role: sp.role } : {}), ...(sp.status ? { status: sp.status } : {}) }).toString()}`}
+            href={`/api/admin/users/export?${new URLSearchParams({ ...(sp.idRecord ? { idRecord: sp.idRecord } : {}), ...(sp.q ? { q: sp.q } : {}), ...(sp.role ? { role: sp.role } : {}), ...(sp.status ? { status: sp.status } : {}) }).toString()}`}
             className={buttonClass("outline", "md")}
             title="ดาวน์โหลดสมาชิกที่ตรงเงื่อนไขทั้งหมดเป็น CSV"
           >
@@ -102,6 +107,7 @@ async function MemberDirectory({ searchParams }: { searchParams: Promise<{ q?: s
                       {u.legal_full_name_th ?? u.legal_full_name_en ?? u.username ?? u.email}
                     </Link>
                     <p className="text-xs text-muted-foreground">{u.email}{u.deleted_at ? " · ลบบัญชีแล้ว" : ""}</p>
+                  <span className="block text-xs text-muted-foreground">{u.has_id_record ? "บันทึกเลขบัตรแล้ว" : "ยังไม่ได้บันทึกเลขบัตร"}</span>
                   </td>
                   <td className="px-4 py-3"><Badge variant="secondary">{ROLE_LABEL[u.role] ?? u.role}</Badge></td>
                   <td className="px-4 py-3">

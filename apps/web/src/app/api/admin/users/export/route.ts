@@ -10,7 +10,7 @@ const csvCell = (v: string) => `"${v.replaceAll('"', '""')}"`;
 
 export const GET = route({ auth: "required", roles: ["admin"] }, async ({ user, ip, req }) => {
   const sp = req.nextUrl.searchParams;
-  const rows = await exportUsersAdmin({ query: sp.get("q") ?? undefined, role: sp.get("role") ?? undefined, status: sp.get("status") ?? undefined });
+  const rows = await exportUsersAdmin({ idRecord: sp.get("idRecord") ?? undefined, query: sp.get("q") ?? undefined, role: sp.get("role") ?? undefined, status: sp.get("status") ?? undefined });
   await audit(ctx().db, { action: "admin.users_exported", userId: user!.id, ip, details: { rows: rows.length } });
 
   const header = ["อีเมล", "ชื่อ-นามสกุลไทย", "ชื่อภาษาอังกฤษ", "บทบาท", "สถานะ", "ยืนยันอีเมลแล้ว", "ลงทะเบียน (คอร์ส)", "วุฒิบัตร", "สมัครเมื่อ", "ใช้งานล่าสุด", "ลบบัญชีแล้ว"];

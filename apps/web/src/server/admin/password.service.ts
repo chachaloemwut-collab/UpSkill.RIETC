@@ -1,3 +1,4 @@
+import { maskEmail } from "@/lib/mask-email";
 import { requireOutboundEmail } from "@/server/admin/email-settings.service";
 /**
  * Admin password tools for a live system: every way a member can get back into their account when
@@ -58,7 +59,7 @@ export async function adminSendResetEmail(adminId: string, userId: string, opts:
   });
   if (opts.logout) await revokeAllSessions(user.id, "admin_password_reset");
   await audit(db, { action: "auth.password_reset", userId: adminId, entityType: "user", entityId: user.id, ip: meta.ip, details: { forcedByAdmin: true, via: "email", logout: opts.logout } });
-  return { sentTo: user.email, expiresAt: expiresAt.toISOString() };
+  return { sentTo: maskEmail(user.email), expiresAt: expiresAt.toISOString() };
 }
 
 /** A single-use reset link the admin hands over (chat, phone, in person) when email does not reach the user. */

@@ -64,8 +64,18 @@ describe("self-service", () => {
     await member.login(email, `first password ${run}`);
     const r = await member.req("/api/user/password/reset-link", { body: {} });
     expect(r.status).toBe(200);
-    expect(r.json.email).toBe(email);
+    expect(r.json.email).toBe("pXXX@eXXX.test");
     expect((await new Client().req("/api/user/password/reset-link", { body: {} })).status).toBe(401);
+  });
+
+  it("sends to the selected verified address of the signed-in account and masks the confirmation", async () => {
+    const member = new Client();
+    await member.login(email, `first password ${run}`);
+    const secondary = `alternate-${run}@e2e.test`;
+    const id = await withDb(async c => (await c.query("insert into user_emails(user_id,email,verified_at) values ($1,$2,now()) returning id", [userId,secondary])).rows[0].id);
+    const result = await member.req("/api/user/password/reset-link", { body: { emailId: id } });
+    expect(result.json.email).toBe("aXXX@eXXX.test");
+    expect(await waitForEmailLink(secondary, "/reset-password")).toContain("/reset-password");
   });
 
   it("the reset page says a dead link is dead before asking for a password", async () => {
@@ -95,7 +105,7 @@ describe("admin tools", () => {
   it("emails a reset link without signing the user out", async () => {
     const r = await admin.req(`/api/admin/users/${userId}/reset-password`, { body: { logout: false } });
     expect(r.status).toBe(200);
-    expect(r.json.sentTo).toBe(email);
+    expect(r.json.sentTo).toBe("pXXX@eXXX.test");
   });
 
   it("creates a single-use hand-over link", async () => {

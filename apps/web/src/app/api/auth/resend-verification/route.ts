@@ -5,7 +5,7 @@ import { route } from "@/server/http";
 import { emailKey } from "@/server/rate-keys";
 import { resendVerification } from "@/server/auth/auth.service";
 
-const Body = z.strictObject({ email: z.email().max(254) });
+const Body = z.strictObject({ email: z.union([z.email().max(254), z.string().regex(/^[a-z][a-z0-9._-]{2,31}$/i)]) });
 
 // The per-account limit applies whether or not the account exists, so a 429 reveals nothing
 export const POST = route<typeof Body>(

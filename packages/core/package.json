@@ -5,6 +5,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./study-hours": "./src/study-hours.ts",
     "./heartbeat": "./src/heartbeat.ts",
     "./user-agent": "./src/user-agent.ts",
     "./youtube": "./src/youtube.ts",

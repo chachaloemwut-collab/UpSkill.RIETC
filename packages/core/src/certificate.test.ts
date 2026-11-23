@@ -131,7 +131,10 @@ describe("certificate", () => {
   });
 
   it("formats Thai durations", () => {
-    expect(formatStudyDurationTh(8100)).toBe("2 ชั่วโมง 15 นาที");
-    expect(formatStudyDurationTh(600)).toBe("10 นาที");
+    expect(formatStudyDurationTh(8100)).toBe("2 ชั่วโมง");
+    expect(formatStudyDurationTh(3599)).toBe("0 ชั่วโมง");
+    expect(formatStudyDurationTh(3600)).toBe("1 ชั่วโมง");
+    expect(formatStudyDurationTh(7199)).toBe("1 ชั่วโมง");
+    expect(formatStudyDurationTh(600)).toBe("0 ชั่วโมง");
   });
 });

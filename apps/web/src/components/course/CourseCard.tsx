@@ -1,10 +1,11 @@
+import { formatStudyDurationTh } from "@upskill/core/study-hours";
 import Image from "next/image";
 import Link from "next/link";
 import { COURSE_TYPE_INFO, asCourseType } from "@upskill/core/application";
 import { BadgeCheck, BookOpen, Clock, PlayCircle, Users, Award } from "lucide-react";
 import { Avatar, Badge, Progress } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { formatDuration, youtubeThumb } from "@/lib/format";
+import { youtubeThumb } from "@/lib/format";
 
 export function CourseCover({ videoId, title, className }: { videoId: string | null; title: string; className?: string }) {
   const src = youtubeThumb(videoId);
@@ -72,7 +73,7 @@ export function CourseCard({
         <div className="relative sm:w-64 sm:shrink-0">
           <CourseCover videoId={course.cover_video_id} title={course.title} className="h-full" />
           <span className="absolute bottom-2 right-2 rounded-md bg-black/80 px-2 py-0.5 font-mono text-[11px] font-medium text-white backdrop-blur-xs tabular-nums">
-            {formatDuration(course.total_duration_sec)}
+            {formatStudyDurationTh(course.total_duration_sec)}
           </span>
           <div className="absolute left-2.5 top-2.5 flex gap-1.5">
             {course.is_verified_course ? (
@@ -98,7 +99,7 @@ export function CourseCard({
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground border-t border-border/50 pt-2.5">
             <span className="inline-flex items-center gap-1 font-medium"><BookOpen className="h-3.5 w-3.5" /> {course.lesson_count} บท</span>
-            <span className="inline-flex items-center gap-1 font-medium"><Clock className="h-3.5 w-3.5" /> {formatDuration(course.total_duration_sec)}</span>
+            <span className="inline-flex items-center gap-1 font-medium"><Clock className="h-3.5 w-3.5" /> {formatStudyDurationTh(course.total_duration_sec)}</span>
             {course.learner_count !== undefined && (
               <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" /> {course.learner_count.toLocaleString("th-TH")} คน</span>
             )}
@@ -118,7 +119,7 @@ export function CourseCard({
       <div className="relative">
         <CourseCover videoId={course.cover_video_id} title={course.title} />
         <span className="absolute bottom-2.5 right-2.5 rounded-md bg-black/80 px-2 py-0.5 font-mono text-[11px] font-medium text-white backdrop-blur-xs tabular-nums">
-          {formatDuration(course.total_duration_sec)}
+          {formatStudyDurationTh(course.total_duration_sec)}
         </span>
         <div className="absolute left-3 top-3 flex gap-1.5">
           {course.is_verified_course ? (
@@ -145,7 +146,7 @@ export function CourseCard({
             <BookOpen className="h-3.5 w-3.5" /> {course.lesson_count} บท
           </span>
           <span className="inline-flex items-center gap-1 font-medium">
-            <Clock className="h-3.5 w-3.5" /> {formatDuration(course.total_duration_sec)}
+            <Clock className="h-3.5 w-3.5" /> {formatStudyDurationTh(course.total_duration_sec)}
           </span>
           {course.learner_count !== undefined && (
             <span className="inline-flex items-center gap-1">

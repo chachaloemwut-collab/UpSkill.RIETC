@@ -17,6 +17,6 @@ export const POST = route<typeof Body>(
   async ({ body, ip, userAgent }) => {
     await register(body, { ip, userAgent });
     // Same response whether or not the email already exists (anti-enumeration)
-    return { ok: true, message: "หากอีเมลนี้ยังไม่ได้ยืนยัน เราได้ส่งลิงก์ยืนยันไปให้แล้ว" };
+    return { ok: true, message: "หากอีเมลนี้ยังไม่ได้ยืนยัน ระบบจะส่งลิงก์ยืนยันไปยังอีเมลที่กรอก" };
   },
 );
