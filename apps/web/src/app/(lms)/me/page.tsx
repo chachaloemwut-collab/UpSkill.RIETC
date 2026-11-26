@@ -51,11 +51,9 @@ async function AccountDetails({ viewer, linked }: { viewer: NonNullable<Awaited<
     isGoogleEnabled(),
   ]);
 
-  const grant = await db.selectFrom("management_grants").select("id").where("user_id","=",viewer.id).where("revoked_at","is",null)
-    .where("starts_at","<=",new Date()).where(eb=>eb.or([eb("expires_at","is",null),eb("expires_at",">",new Date())])).executeTakeFirst();
   return (
     <div className="mx-auto max-w-4xl">
-      {(grant || viewer.role==="admin") && <Link href="/management" className={buttonClass("outline")}>เปิดตารางจัดการงานที่รับผิดชอบ</Link>}
+      {viewer.canManage && <Link href="/management" className={buttonClass("outline")}>เปิดตารางจัดการงานที่รับผิดชอบ</Link>}
       <PageHeader title="ตั้งค่าบัญชี" description="ข้อมูลส่วนตัว ชื่อบนวุฒิบัตร และความปลอดภัยของบัญชี" />
       {linked === "google" && (
         <div className="mb-6">

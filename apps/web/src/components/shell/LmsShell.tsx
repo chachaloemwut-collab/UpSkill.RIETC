@@ -16,6 +16,7 @@ import { api } from "@/lib/api";
 import { ROLE_LABEL } from "@/lib/format";
 
 export interface ShellUser {
+  canManage?: boolean;
   name: string;
   email: string;
   role: "member" | "instructor" | "admin";
@@ -43,6 +44,7 @@ function buildNav(user: ShellUser | null): ShellNavGroup[] {
   if (user && (user.role === "instructor" || user.role === "admin")) {
     groups.push({ label: "ผู้สอน", items: [{ id: "/instructor", href: "/instructor", label: "จัดการหลักสูตร", icon: <Presentation /> }, { id: "/assignments", href: "/assignments", label: "มอบหมายหลักสูตร", icon: <UsersRound /> }] });
   }
+  if (user?.canManage) groups.push({ label: "งานที่รับผิดชอบ", items: [{ id: "/management", href: "/management", label: "ตารางจัดการงาน", icon: <FileSpreadsheet /> }] });
   if (user?.role === "admin") {
     groups.push({
       label: "ผู้ดูแลระบบ",
@@ -103,7 +105,7 @@ function getBreadcrumbs(pathname: string, navTitle: string): { label: string; hr
   return [{ label: navTitle }];
 }
 
-export function LmsShell({ user, children }: { user: ShellUser | null; children: ReactNode }) {
+export function LmsShell({ user, children, profileBanner }: { profileBanner?: ReactNode; user: ShellUser | null; children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const toast = useToast();
@@ -284,7 +286,8 @@ export function LmsShell({ user, children }: { user: ShellUser | null; children:
         }
       >
         <div key={pathname} className={cn("mx-auto max-w-7xl animate-slide-up", !hideBottomNav && "pb-16 md:pb-0")}>
-          {children}
+          {pathname !== "/me/profile" && profileBanner}
+      {children}
         </div>
       </AppShell>
     </>

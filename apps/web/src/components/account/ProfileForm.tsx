@@ -27,7 +27,12 @@ export function ProfileForm({ defaults, exists, namesLocked, googleSignup = fals
     const consent = f.get("pdpaConsent") === "on";
     setErrors(errs);
     setConsentError(exists || consent ? undefined : "ต้องยอมรับประกาศความเป็นส่วนตัวก่อนบันทึก");
-    if (Object.keys(errs).length || (!exists && !consent)) return setError("กรุณาตรวจสอบข้อมูลที่ไฮไลต์");
+    if (Object.keys(errs).length || (!exists && !consent)) {
+      const form = e.currentTarget;
+      setError("กรุณาตรวจสอบข้อมูลที่ไฮไลต์");
+      requestAnimationFrame(() => form.querySelector<HTMLElement>('[aria-invalid="true"]:not([type="hidden"]), input[name="pdpaConsent"]:not(:checked)')?.focus());
+      return;
+    }
     setNeedsRecovery(false);
     setBusy(true);
     setError(null);
@@ -45,7 +50,12 @@ export function ProfileForm({ defaults, exists, namesLocked, googleSignup = fals
   return (
     <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
       {error && <Alert variant="destructive" title={error} />}
-      {needsRecovery && <Link href="/recovery" className="underline">ขอกู้บัญชีเดิมผ่านงานทะเบียน</Link>}
+      {needsRecovery && (
+        <nav aria-label="กู้คืนบัญชีเดิม" className="grid gap-2">
+          <Link href="/forgot-password" className="inline-flex min-h-11 items-center underline">ตั้งรหัสผ่านใหม่ทางอีเมลเดิม</Link>
+          <Link href="/recovery" className="inline-flex min-h-11 items-center underline">เข้าอีเมลเดิมไม่ได้ ติดต่อเจ้าหน้าที่เพื่อกู้บัญชี</Link>
+        </nav>
+      )}
       <ProfileFields defaults={defaults} errors={errors} namesLocked={namesLocked} />
       {!exists && <PdpaNotice error={consentError} />}
       <div><Button type="submit" loadingState="saving" loading={busy}><Save className="h-4 w-4" /> {googleSignup ? "ยืนยันการสมัครสมาชิก" : "บันทึกข้อมูล"}</Button></div>

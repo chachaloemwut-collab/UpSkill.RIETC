@@ -55,11 +55,19 @@ export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLab
 }
 
 export function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
+  const generatedId = React.useId();
+  const control = React.isValidElement<React.AriaAttributes & { id?: string }>(children) && children.type !== React.Fragment ? children : null;
+  const id = control?.props.id ?? generatedId;
+  const description = error || hint ? id + "-description" : undefined;
   return (
     <div className="grid gap-1.5">
-      <Label>{label}</Label>
-      {children}
-      {error ? <p key={error} className="animate-slide-up text-xs text-destructive">{error}</p> : hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      <Label htmlFor={control ? id : undefined}>{label}</Label>
+      {control ? React.cloneElement(control, {
+        id,
+        "aria-invalid": error ? true : control.props["aria-invalid"],
+        "aria-describedby": [control.props["aria-describedby"], description].filter(Boolean).join(" ") || undefined,
+      }) : children}
+      {description && <p id={description} className={error ? "animate-slide-up text-xs text-destructive" : "text-xs text-muted-foreground"}>{error || hint}</p>}
     </div>
   );
 }

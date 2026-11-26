@@ -130,7 +130,7 @@ export function AdminInvitations() {
           <p className="px-5 py-6 text-sm text-muted-foreground">ยังไม่มีคำเชิญ</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[640px] w-full text-sm">
+            <table className="mobile-records min-w-[640px] w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
                   <th className="px-5 py-2">อีเมล</th>
@@ -143,13 +143,13 @@ export function AdminInvitations() {
               <tbody>
                 {list.map((inv) => (
                   <tr key={inv.id} className="border-b last:border-0">
-                    <td className="px-5 py-2.5 font-medium">{inv.email}</td>
-                    <td className="px-5 py-2.5 text-muted-foreground">{inv.inviterName}</td>
-                    <td className="px-5 py-2.5">
+                    <td data-label="อีเมล" className="px-5 py-2.5 font-medium">{inv.email}</td>
+                    <td data-label="เชิญโดย" className="px-5 py-2.5 text-muted-foreground">{inv.inviterName}</td>
+                    <td data-label="สถานะ" className="px-5 py-2.5">
                       <Badge variant={STATUS_BADGE[inv.status].variant}>{STATUS_BADGE[inv.status].label}</Badge>
                     </td>
-                    <td className="px-5 py-2.5 text-xs text-muted-foreground">{formatDateTimeTh(inv.expiresAt)}</td>
-                    <td className="px-5 py-2.5 text-right">
+                    <td data-label="หมดอายุ" className="px-5 py-2.5 text-xs text-muted-foreground">{formatDateTimeTh(inv.expiresAt)}</td>
+                    <td data-label="ดำเนินการ" className="px-5 py-2.5 text-right">
                       {inv.status === "pending" ? (
                         <Button variant="outline" size="sm" onClick={() => void revoke(inv.id)}>
                           <Trash2 className="h-4 w-4" /> ยกเลิก

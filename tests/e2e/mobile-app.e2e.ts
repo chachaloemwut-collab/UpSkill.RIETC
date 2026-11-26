@@ -23,6 +23,31 @@ it("opens the mobile task menu and lets a member navigate into and back from dev
     expect(await page.locator("#emails").isVisible()).toBe(false);
     await page.goBack();
     await devices.waitFor({ state: "visible" });
+    await page.setViewportSize({ width: 320, height: 700 });
+    for (const path of ["/courses", "/my-courses", "/certificates", "/programs", "/me"]) {
+      const response = await page.goto(BASE + path);
+      expect(response?.status(), path).toBe(200);
+      expect(await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), path).toBe(true);
+    }
+    await page.goto(BASE + "/me/profile");
+    const phone = page.getByLabel("เบอร์โทรศัพท์มือถือ", { exact: true });
+    await phone.waitFor({ state: "visible" });
+    for (const width of [320, 390, 768]) {
+      await page.setViewportSize({ width, height: 844 });
+      expect(await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")).toBe(true);
+      await phone.focus();
+      expect(await page.evaluate("parseFloat(getComputedStyle(document.activeElement).fontSize)")).toBeGreaterThanOrEqual(16);
+    }
+    await phone.fill("0812345678");
+    await page.context().setOffline(true);
+    await page.getByText("ไม่มีการเชื่อมต่ออินเทอร์เน็ต", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "บันทึกข้อมูล" }).click();
+    await page.getByText("ยังไม่ได้ส่งข้อมูล", { exact: true }).waitFor();
+    expect(await phone.inputValue()).toBe("0812345678");
+    await page.context().setOffline(false);
+    await page.getByText("ไม่มีการเชื่อมต่ออินเทอร์เน็ต", { exact: true }).waitFor({ state: "hidden" });
+    expect(await phone.inputValue()).toBe("0812345678");
+    await page.goto(BASE + "/me");
     await page.setViewportSize({ width: 1366, height: 960 });
     await page.reload();
     // React may briefly stage streamed markup outside the active main landmark.

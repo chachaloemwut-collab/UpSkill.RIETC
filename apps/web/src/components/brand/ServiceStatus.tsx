@@ -25,6 +25,17 @@ export function ServiceStatus() {
     window.addEventListener("rietc:service-unavailable", notify);
     return () => window.removeEventListener("rietc:service-unavailable", notify);
   }, [toast]);
+  useEffect(() => {
+    const keepForm = (event: SubmitEvent) => {
+      const form = event.target;
+      if (navigator.onLine || !(form instanceof HTMLFormElement) || form.method.toLowerCase() !== "post") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      toast({ brandState: "offline", title: "ยังไม่ได้ส่งข้อมูล", description: "ข้อมูลยังอยู่ในหน้านี้ เมื่อเชื่อมต่อแล้วกรุณากดส่งอีกครั้ง" });
+    };
+    document.addEventListener("submit", keepForm, true);
+    return () => document.removeEventListener("submit", keepForm, true);
+  }, [toast]);
   if (online) return null;
   return (
     <div role="status" className="flex items-center justify-center gap-2 bg-muted p-2 text-sm print:hidden">

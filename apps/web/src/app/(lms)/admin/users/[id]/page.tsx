@@ -154,7 +154,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
             <p className="text-sm text-muted-foreground">ยังไม่ลงทะเบียนเรียน</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="mobile-records w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs text-muted-foreground">
                     <th className="py-2 pr-4">หลักสูตร</th>
@@ -168,12 +168,12 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                 <tbody>
                   {d.enrollments.map((e) => (
                     <tr key={e.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4 font-medium"><Link href={`/courses/${e.slug}`} className="hover:underline">{e.title}</Link><EnrollmentLinks id={e.id} code={d.certificates.find(c=>c.enrollment_id===e.id)?.certificate_code} completed={e.status==="completed" && !d.certificates.some(c=>c.enrollment_id===e.id && c.revoked_at)}/></td>
-                      <td className="py-2 pr-4">{e.status === "completed" ? <Badge variant="success">จบแล้ว</Badge> : e.status === "revoked" ? <Badge variant="destructive">ถูกเพิกถอน</Badge> : <Badge variant="secondary">กำลังเรียน</Badge>}</td>
-                      <td className="py-2 pr-4 text-right">{e.study_sec ? `${Math.floor(e.study_sec / 60)} นาที` : "—"}</td>
-                      <td className="py-2 pr-4 text-right">{e.lessons_done}/{e.lessons_total}</td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{formatDateTimeTh(e.enrolled_at)}</td>
-                      <td className="py-2 text-right">
+                      <td data-label="หลักสูตร" className="py-2 pr-4 font-medium"><Link href={`/courses/${e.slug}`} className="hover:underline">{e.title}</Link><EnrollmentLinks id={e.id} code={d.certificates.find(c=>c.enrollment_id===e.id)?.certificate_code} completed={e.status==="completed" && !d.certificates.some(c=>c.enrollment_id===e.id && c.revoked_at)}/></td>
+                      <td data-label="สถานะ" className="py-2 pr-4">{e.status === "completed" ? <Badge variant="success">จบแล้ว</Badge> : e.status === "revoked" ? <Badge variant="destructive">ถูกเพิกถอน</Badge> : <Badge variant="secondary">กำลังเรียน</Badge>}</td>
+                      <td data-label="เวลาเรียน" className="py-2 pr-4 text-right">{e.study_sec ? `${Math.floor(e.study_sec / 60)} นาที` : "—"}</td>
+                      <td data-label="บทที่ผ่าน" className="py-2 pr-4 text-right">{e.lessons_done}/{e.lessons_total}</td>
+                      <td data-label="ลงทะเบียน" className="py-2 pr-4 text-xs text-muted-foreground">{formatDateTimeTh(e.enrolled_at)}</td>
+                      <td data-label="ดำเนินการ" className="py-2 text-right">
                         <EnrollmentAdminActions
                           userId={u.id}
                           enrollmentId={e.id}
