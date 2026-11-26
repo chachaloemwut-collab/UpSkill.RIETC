@@ -1,7 +1,7 @@
 "use server";
 import {redirect} from "next/navigation";
 import {revokeCertificate,retryEmailDelivery} from "@/server/admin/admin.service";
-import {authorizeRecord,resourceKey} from "@/server/management/access";
+import {authorizeRecord,resourceKey,supportsScope} from "@/server/management/access";
 import {setFilter} from "@/server/management/filter";
 import {headers} from "next/headers";
 import {revalidatePath} from "next/cache";
@@ -9,7 +9,7 @@ import {z} from "zod";
 import {getCurrentUser} from "@/server/auth/session";
 import {ctx} from "@/server/context";
 import {HttpError} from "@/server/http";
-import {duties} from "@/server/management/catalog";
+import {duties,resources,type Resource} from "@/server/management/catalog";
 import {decideRegistrations} from "@/server/programs/cohorts.service";
 import {reviewApplication} from "@/server/courses/applications.service";
 import {audit} from "@/server/audit";
@@ -31,6 +31,9 @@ export async function grantDuty(_:string,f:FormData) {
   const until=date ? new Date(date+"T23:59:59.999+07:00") : null;
   if (!target.success || !kind.success || !Object.hasOwn(duties,duty) || !reason || reason.length>500 || (kind.data!=="global" && !scope.success) ||
     (until && !(until.getTime()>Date.now()))) return "กรุณาตรวจรหัสสมาชิก ขอบเขต เหตุผล และวันสิ้นสุด";
+  const eligible = (Object.keys(resources) as Resource[]).some(k =>
+    (duty === "auditor" || resources[k].duty === duty) && supportsScope(k,kind.data));
+  if (!eligible) return "หน้าที่นี้ไม่มีทะเบียนสำหรับขอบเขตที่เลือก กรุณาเลือกขอบเขตใหม่";
   const {db}=ctx();
   const message=await db.transaction().execute(async trx=>{
     const user=await trx.selectFrom("users").select(["role","status","is_system_owner","scoped_management"]).where("id","=",target.data).forUpdate().executeTakeFirst();
@@ -40,6 +43,12 @@ export async function grantDuty(_:string,f:FormData) {
       const table=kind.data==="course"?"courses":"program_cohorts";
       if (!(await trx.selectFrom(table).select("id").where("id","=",scope.data!).forShare().executeTakeFirst())) return "ไม่พบขอบเขตที่ระบุ";
     }
+    let existing = trx.selectFrom("management_grants").select("id").where("user_id","=",target.data)
+      .where("duty","=",duty).where("revoked_at","is",null)
+      .where(eb=>eb.or([eb("expires_at","is",null),eb("expires_at",">",new Date())]));
+    existing = kind.data==="course" ? existing.where("course_id","=",scope.data!) : existing.where("course_id","is",null);
+    existing = kind.data==="cohort" ? existing.where("cohort_id","=",scope.data!) : existing.where("cohort_id","is",null);
+    if (await existing.executeTakeFirst()) return "มีการมอบหน้าที่นี้ในขอบเขตเดียวกันแล้ว กรุณาตรวจรายการสิทธิ์เดิม";
     if (user.role==="admin" && !user.scoped_management) await trx.updateTable("users").set({scoped_management:true}).where("id","=",target.data).execute();
     const grant=await trx.insertInto("management_grants").values({
       user_id:target.data,duty,course_id:kind.data==="course"?scope.data!:null,cohort_id:kind.data==="cohort"?scope.data!:null,
@@ -145,4 +154,22 @@ export async function restoreAdmin(_: string, form: FormData) {
   });
   revalidatePath("/management");
   return restored ? "คืนสิทธิ์ผู้ดูแลทั้งระบบแล้ว" : "ไม่พบบัญชีผู้ดูแลที่จำกัดขอบเขตและเปิดใช้งาน";
+}
+
+export async function findGrantTarget(kind: "user" | "course" | "cohort", term: string) {
+  const owner = await actor();
+  if (!owner.isSystemOwner) throw new HttpError(403, "FORBIDDEN");
+  const needle = z.string().trim().min(2).max(100).parse(term);
+  const starts = needle.replace(/[\\%_]/g, "\\$&") + "%";
+  const db = ctx().db;
+  if (kind === "user") {
+    const rows = await db.selectFrom("users").select(["id", "username", "legal_full_name_th"])
+      .where("status", "=", "active").where("is_system_owner", "=", false)
+      .where(eb => eb.or([eb("username", "ilike", starts), eb("legal_full_name_th", "ilike", starts)]))
+      .orderBy("username").orderBy("id").limit(20).execute();
+    return rows.map(row => ({id:row.id,label:[row.legal_full_name_th,row.username].filter(Boolean).join(" · ") || row.id}));
+  }
+  const table = z.enum(["course","cohort"]).parse(kind) === "course" ? "courses" : "program_cohorts";
+  return db.selectFrom(table).select(["id","title as label"]).where("title","ilike",starts)
+    .orderBy("title").orderBy("id").limit(20).execute();
 }

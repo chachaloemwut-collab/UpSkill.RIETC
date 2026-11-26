@@ -20,6 +20,7 @@ function scopeColumns(key:Resource) {
   let course = none, cohort = none;
   if (scope === "course") course = direct(table === "courses" ? "id" : "course_id");
   if (scope === "cohort" || table === "enrollments" || table === "certificates") cohort = direct(table === "program_cohorts" ? "id" : "cohort_id");
+  if (table === "course_applications") cohort = sql`(SELECT cohort_id FROM enrollments WHERE id=r.enrollment_id)`;
   if (scope === "lesson") course = sql`(SELECT course_id FROM lessons WHERE id=r.lesson_id)`;
   if (scope === "assignment") course = sql`(SELECT course_id FROM course_assignments WHERE id=r.assignment_id)`;
   if (scope === "enrollment" || scope === "attempt") {
@@ -41,6 +42,14 @@ export function accessPredicate(actor:CurrentUser,key:Resource,operation:Operati
     AND ((g.course_id IS NULL AND g.cohort_id IS NULL) OR g.course_id=${course} OR g.cohort_id=${cohort}))`;
 }
 
+export function supportsScope(key: Resource, kind: "course" | "cohort" | "global") {
+  const r = resources[key];
+  if (kind === "course") return ["course","lesson","enrollment","assignment","attempt"].includes(r.scope);
+  if (kind === "cohort") return ["cohort","enrollment","attempt"].includes(r.scope) ||
+    ["certificates","enrollments","course_applications"].includes(r.table);
+  return true;
+}
+
 export async function accessibleKeys(actor:CurrentUser,op:Operation="read") {
   const keys = Object.keys(resources) as Resource[];
   if (actor.isSystemOwner || actor.role === "admin") return keys;
@@ -50,9 +59,7 @@ export async function accessibleKeys(actor:CurrentUser,op:Operation="read") {
   return keys.filter(k=>grants.some(g=>{
     const r=resources[k];
     if ((g.duty!==r.duty && !(g.duty==="auditor" && op!=="act")) || (op==="act" && !g.can_act) || (op==="export" && !g.can_export)) return false;
-    if (g.course_id) return ["course","lesson","enrollment","assignment","attempt"].includes(r.scope);
-    if (g.cohort_id) return ["cohort","enrollment","attempt"].includes(r.scope) || r.table==="certificates" || r.table==="enrollments";
-    return true;
+    return supportsScope(k,g.course_id ? "course" : g.cohort_id ? "cohort" : "global");
   }));
 }
 

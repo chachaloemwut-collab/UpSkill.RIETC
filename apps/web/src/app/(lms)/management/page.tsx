@@ -6,6 +6,7 @@ import {ctx} from "@/server/context";
 import {duties,resources,deskActions,type Resource} from "@/server/management/catalog";
 import {accessibleKeys,records} from "@/server/management/access";
 import {filterFor} from "@/server/management/filter";
+import {GrantFields} from "./GrantFields";
 import {DeskForm} from "./forms";
 import {search} from "./actions";
 
@@ -53,10 +54,9 @@ export default async function ManagementPage({searchParams}:{searchParams:Promis
   return <section className="management-desk mx-auto grid min-w-0 max-w-7xl gap-4">
     <h1 className="text-2xl font-semibold">ตารางจัดการงาน</h1>
     {actor.isSystemOwner && <details className="rounded border p-3"><summary>มอบหมายและถอนสิทธิ์</summary>
-      <DeskForm kind="grant" label="มอบสิทธิ์"><label>รหัสสมาชิก UUID <input name="user" required/></label>
+      <DeskForm kind="grant" label="มอบสิทธิ์"><GrantFields/>
         <label>หน้าที่ <select name="duty">{Object.entries(duties).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
-        <label>ขอบเขต <select name="kind" defaultValue="course"><option value="course">รายวิชา</option><option value="cohort">รอบอบรม</option><option value="global">ทุกข้อมูลในหน้าที่นี้</option></select></label>
-        <label>รหัสรายวิชาหรือรอบ UUID <input name="scope"/></label><label>วันสิ้นสุดตามเวลาไทย <input type="date" name="until"/></label>
+        <label>วันสิ้นสุดตามเวลาไทย <input type="date" name="until"/></label>
         <label><input type="checkbox" name="act"/> พิจารณารายการในหน้าที่</label><label><input type="checkbox" name="export"/> ส่งออกข้อมูล</label>
         <label><input type="checkbox" name="restrictAdmin"/> เมื่อเลือกผู้ดูแลเดิม ให้ใช้เฉพาะสิทธิ์ที่มอบหมาย การถอนสิทธิ์ครั้งสุดท้ายจะคงข้อจำกัดนี้ไว้</label>
         <label>เหตุผล <input name="reason" required maxLength={500}/></label></DeskForm>
