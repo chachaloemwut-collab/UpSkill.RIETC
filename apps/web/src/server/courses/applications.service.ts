@@ -30,6 +30,7 @@ import { audit } from "../audit";
 import type { CurrentUser } from "../auth/session";
 import { assertProfileComplete, toIsoDate } from "../auth/profile.service";
 import { insertEnrollment, loadEnrollableCourse } from "./courses.service";
+import { authorizeRecord } from "../management/access";
 import { loadOwnedCourse } from "./instructor.service";
 
 /** Calendar date of a timestamp in Thailand (YYYY-MM-DD); DATE columns use toIsoDate instead. */
@@ -328,20 +329,26 @@ export interface ApplicationReview {
   documentsVerified?: Record<string, boolean | null> | undefined;
 }
 
-export async function reviewApplication(manager: CurrentUser, courseId: string, applicationId: string, r: ApplicationReview, meta: { ip: string }) {
-  const course = await loadOwnedCourse(manager, courseId);
+export async function reviewApplication(manager: CurrentUser, courseId: string, applicationId: string, r: ApplicationReview, meta: { ip: string }, desk?: { mode: "payments"|"applications"; version:string; reason:string }) {
+  if (!desk) await loadOwnedCourse(manager, courseId);
   const { db } = ctx();
   await db.transaction().execute(async (trx) => {
+    if (desk) {
+      await authorizeRecord(trx, manager, desk.mode, applicationId);
+      const permitted = desk.mode === "payments" ? ["paymentStatus","receiptNo"] : ["action","verificationStatus","staffNote","documentsVerified"];
+      if (!Object.keys(r).every(k=>permitted.includes(k))) throw new HttpError(403,"FORBIDDEN");
+    }
     const app = await trx
       .selectFrom("course_applications as a")
       .innerJoin("users as u", "u.id", "a.user_id")
-      .select(["a.id", "a.status", "a.user_id", "a.documents", "u.email", "u.deleted_at"])
+      .select(["a.id", "a.updated_at", "a.status", "a.user_id", "a.documents", "u.email", "u.deleted_at"])
       .where("a.id", "=", applicationId)
       .where("a.course_id", "=", courseId)
       .forUpdate("a")
       .executeTakeFirst();
     if (!app) throw new HttpError(404, "NOT_FOUND");
 
+    if (desk && app.updated_at.toISOString() !== desk.version) throw new HttpError(409,"STALE_RECORD","รายการเปลี่ยนแล้ว กรุณาตรวจสอบข้อมูลล่าสุด");
     const set: Record<string, unknown> = { updated_at: new Date(), reviewed_by: manager.id, reviewed_at: new Date() };
     if (r.action === "approve" && app.status !== "approved") {
       if (app.deleted_at) throw new HttpError(409, "ACCOUNT_DELETED", "บัญชีผู้สมัครถูกลบแล้ว");
@@ -362,8 +369,8 @@ export async function reviewApplication(manager: CurrentUser, courseId: string, 
       set.documents = JSON.stringify(docs);
     }
     await trx.updateTable("course_applications").set(set).where("id", "=", app.id).execute();
+    await audit(trx, { action: "course.application_reviewed", userId: manager.id, entityType: "course", entityId: courseId, ip: meta.ip, details: { applicationId, action: r.action ?? r.paymentStatus ?? null, ...(desk && { reason: desk.reason }) } });
   });
-  await audit(db, { action: "course.application_reviewed", userId: manager.id, entityType: "course", entityId: course.id, ip: meta.ip, details: { applicationId, action: r.action ?? null } });
 }
 
 const STATUS_TH: Record<string, string> = { submitted: "รอพิจารณา", approved: "ลงทะเบียนแล้ว", rejected: "ไม่ผ่านการพิจารณา" };

@@ -1,12 +1,13 @@
 /** Admin operations. Routes using these must declare roles: ["admin"]. Every change is audited. */
 import "server-only";
 import { CERTIFICATE_CODE_RE } from "@upskill/core";
-import { sql } from "@upskill/db";
+import { sql, type Database, type Tx } from "@upskill/db";
 import { ctx } from "../context";
 import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import { audit } from "../audit";
-import { revokeAllSessions } from "../auth/session";
+import { authorizeRecord } from "../management/access";
+import { revokeAllSessions, type CurrentUser } from "../auth/session";
 
 export async function adminOverview() {
   const { db } = ctx();
@@ -58,9 +59,8 @@ export async function adminOverview() {
   return { courses, flags, topFlagged, stats, emails, suppressions };
 }
 
-export async function retryEmailDelivery(id: string) {
-  const result = await ctx()
-    .db.updateTable("email_outbox")
+export async function retryEmailDelivery(id: string, db:Database|Tx=ctx().db) {
+  const result = await db.updateTable("email_outbox")
     .set({ status: "pending", attempt_count: 0, next_attempt_at: new Date(), claimed_at: null, failed_at: null, last_error_code: null, last_error_message: null })
     .where("id", "=", id)
     .where("status", "in", ["failed", "suppressed"])
@@ -124,19 +124,21 @@ export async function adminUpdateCourse(
   }
 }
 
-export async function revokeCertificate(adminId: string, rawCode: string, reason: string, meta: { ip: string }) {
+export async function revokeCertificate(adminId: string, rawCode: string, reason: string, meta: { ip: string }, desk?:{actor:CurrentUser;id:string}) {
   const code = rawCode.trim().toUpperCase();
   if (!CERTIFICATE_CODE_RE.test(code)) throw new HttpError(404, "NOT_FOUND");
   const { db, env } = ctx();
-  const certificate = await db
+  await db.transaction().execute(async (trx) => {
+    if (desk) await authorizeRecord(trx,desk.actor,"certificates",desk.id);
+    const certificate = await trx
     .selectFrom("certificates as c")
     .innerJoin("users as u", "u.id", "c.user_id")
     .select(["c.id", "c.user_id", "c.course_title_snapshot", "u.email"])
     .where("c.certificate_code", "=", code)
+    .$if(!!desk, q=>q.where("c.id","=",desk!.id))
     .where("c.revoked_at", "is", null)
     .executeTakeFirst();
   if (!certificate) throw new HttpError(409, "NOT_FOUND_OR_ALREADY_REVOKED");
-  const r = await db.transaction().execute(async (trx) => {
     const updated = await trx
       .updateTable("certificates")
       .set({ revoked_at: new Date(), revoked_reason: reason.trim() })
@@ -144,16 +146,14 @@ export async function revokeCertificate(adminId: string, rawCode: string, reason
       .where("revoked_at", "is", null)
       .returning("id")
       .executeTakeFirst();
-    if (!updated) return null;
+    if (!updated) throw new HttpError(409, "NOT_FOUND_OR_ALREADY_REVOKED");
     await addEmailToOutbox(
       trx,
       { template: "credential-revoked", to: certificate.email, documentName: "วุฒิบัตร", courseTitle: certificate.course_title_snapshot, code, reason: reason.trim(), verifyLink: `${env.APP_ORIGIN}/verify/${encodeURIComponent(code)}` },
       { userId: certificate.user_id, deduplicationKey: `credential-revoked:${certificate.id}` },
     );
-    return updated;
+    await audit(trx, { action: "certificate.revoked", userId: adminId, entityType: "certificate", entityId: updated.id, ip: meta.ip, details: { code, reason } });
   });
-  if (!r) throw new HttpError(409, "NOT_FOUND_OR_ALREADY_REVOKED");
-  await audit(db, { action: "certificate.revoked", userId: adminId, entityType: "certificate", entityId: r.id, ip: meta.ip, details: { code, reason } });
 }
 
 export async function adminUpdateUser(

@@ -200,7 +200,7 @@ export function AssignmentManager({ courses, groups, assignments }: Props) {
 
       <TabsContent value="history" className="mt-5">
         <Card className="overflow-hidden">
-          <Table>
+          <Table className="mobile-records">
             <thead>
               <tr>
                 <th>หลักสูตร</th>
@@ -214,14 +214,14 @@ export function AssignmentManager({ courses, groups, assignments }: Props) {
             <tbody>
               {assignments.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.course_title}</td>
-                  <td>{item.target_name}</td>
-                  <td>{item.completed_count}/{item.recipient_count}</td>
-                  <td className="whitespace-nowrap">
+                  <td data-label="หลักสูตร">{item.course_title}</td>
+                  <td data-label="ผู้รับ">{item.target_name}</td>
+                  <td data-label="ความคืบหน้า">{item.completed_count}/{item.recipient_count}</td>
+                  <td data-label="กำหนดเวลา" className="whitespace-nowrap">
                     {item.due_at ? formatDateTimeTh(item.due_at) : "—"}
                   </td>
-                  <td><Badge variant={item.status === "active" ? "success" : "secondary"}>{item.status === "active" ? "ใช้งาน" : "ยกเลิก"}</Badge></td>
-                  <td className="text-right">
+                  <td data-label="สถานะ"><Badge variant={item.status === "active" ? "success" : "secondary"}>{item.status === "active" ? "ใช้งาน" : "ยกเลิก"}</Badge></td>
+                  <td data-label="ดำเนินการ" className="text-right">
                     <div className="flex justify-end gap-1">
                       {item.status === "active" && (
                         <>

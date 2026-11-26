@@ -8,6 +8,7 @@
  *    the Origin check in http.ts instead.
  */
 import "server-only";
+import { effectiveRole } from "./effective-role";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { generateToken, hashToken } from "@upskill/core";
@@ -66,7 +67,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const row = await db
     .selectFrom("user_sessions as s")
     .innerJoin("users as u", "u.id", "s.user_id")
-    .select(["s.id as sessionId", "s.last_seen_at", "s.created_at", "u.id", "u.email", "u.username", "u.is_system_owner", "u.role"])
+    .select(["s.id as sessionId", "s.last_seen_at", "s.created_at", "u.id", "u.email", "u.username", "u.is_system_owner", "u.role", "u.scoped_management"])
     .where("s.token_hash", "=", hashToken(token))
     .where("s.revoked_at", "is", null)
     .where("s.expires_at", ">", new Date())
@@ -90,7 +91,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     email: row.email,
     username: row.username,
     isSystemOwner: row.is_system_owner,
-    role: row.role as CurrentUser["role"],
+    role: effectiveRole(row),
     sessionCreatedAt: new Date(row.created_at),
   };
 });

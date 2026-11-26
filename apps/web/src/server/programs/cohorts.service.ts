@@ -21,6 +21,7 @@ import { addEmailToOutbox } from "../email/outbox.service";
 import { HttpError } from "../http";
 import { audit } from "../audit";
 import type { CurrentUser } from "../auth/session";
+import { authorizeRecord } from "../management/access";
 import { assertAdmin, cohortTimeline, formatThaiDateTime } from "./shared";
 import { assertProfileComplete } from "../auth/profile.service";
 import { getAutomationFlags } from "../automation.service";
@@ -494,11 +495,16 @@ export async function decideRegistrations(
   cohortId: string,
   input: { ids: string[]; decision: "approve" | "reject"; note?: string | undefined },
   meta: { ip: string },
+  expectedStatus?: string,
 ) {
-  assertAdmin(user);
+  if (expectedStatus === undefined) assertAdmin(user);
   const { db } = ctx();
   const changed = await db.transaction().execute(async (trx) => {
     const c = await loadCohort(trx, cohortId, true);
+    if (expectedStatus !== undefined) {
+      if (input.ids.length !== 1) throw new HttpError(400,"VALIDATION_FAILED");
+      await authorizeRecord(trx,user,"registrations",input.ids[0]!);
+    }
     if (c.status === "cancelled") throw new HttpError(409, "COHORT_CANCELLED");
     const program = await loadProgramOf(trx, c.program_id);
     const from: RegistrationStatus[] = input.decision === "approve" ? ["pending", "waitlisted"] : ["pending", "waitlisted", "approved"];
@@ -510,6 +516,11 @@ export async function decideRegistrations(
       .where("r.id", "in", input.ids)
       .where("r.status", "in", from)
       .execute();
+    if (expectedStatus !== undefined) {
+      const record = regs[0];
+      if (!record || record.status !== expectedStatus) throw new HttpError(409,"STALE_RECORD","สถานะเปลี่ยนแล้ว กรุณาตรวจสอบรายการล่าสุด");
+      if (input.decision === "approve" && record.status === "waitlisted" && c.capacity !== null && await seatsTaken(trx,cohortId) >= c.capacity) throw new HttpError(409,"COHORT_FULL");
+    }
     const now = new Date();
     const note = input.note?.trim() || null;
     for (const r of regs) {

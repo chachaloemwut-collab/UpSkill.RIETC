@@ -342,7 +342,7 @@ export function CourseLearnersRoster({
       {/* Learners Table */}
       <Card className="overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="mobile-records w-full text-left text-sm">
             <thead className="border-b bg-muted/40 text-xs font-medium uppercase text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">ผู้เรียน</th>
@@ -387,7 +387,7 @@ export function CourseLearnersRoster({
                       className="hover:bg-muted/20 transition-colors"
                     >
                       {/* Learner Name & Email */}
-                      <td className="px-4 py-3">
+                      <td data-label="ผู้เรียน" className="px-4 py-3">
                         <div className="flex flex-col">
                           <span className="font-medium text-foreground">
                             {displayName}
@@ -399,7 +399,7 @@ export function CourseLearnersRoster({
                       </td>
 
                       {/* Status */}
-                      <td className="px-4 py-3">
+                      <td data-label="สถานะ" className="px-4 py-3">
                         {learner.status === "completed" ? (
                           <div className="flex flex-col gap-1">
                             <Badge variant="success" className="w-fit text-[11px] gap-1">
@@ -419,7 +419,7 @@ export function CourseLearnersRoster({
                       </td>
 
                       {/* Lesson Progress */}
-                      <td className="px-4 py-3 min-w-[160px]">
+                      <td data-label="ความคืบหน้าบทเรียน" className="px-4 py-3 min-w-[160px]">
                         <div className="space-y-1">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">
@@ -442,7 +442,7 @@ export function CourseLearnersRoster({
                       </td>
 
                       {/* Quiz Score */}
-                      <td className="px-4 py-3">
+                      <td data-label="คะแนน Post-test" className="px-4 py-3">
                         {learner.best_quiz_score ? (
                           <div className="flex items-center gap-1.5">
                             <Award className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -456,7 +456,7 @@ export function CourseLearnersRoster({
                       </td>
 
                       {/* 24h Attempts */}
-                      <td className="px-4 py-3">
+                      <td data-label="การสอบ 24 ชม." className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span
                             className={cn(
@@ -477,7 +477,7 @@ export function CourseLearnersRoster({
                       </td>
 
                       {/* Actions */}
-                      <td className="px-4 py-3 text-right">
+                      <td data-label="ดำเนินการ" className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {isLocked && (
                             <Button

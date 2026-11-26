@@ -53,6 +53,7 @@ async function AccountDetails({ viewer, linked }: { viewer: NonNullable<Awaited<
 
   return (
     <div className="mx-auto max-w-4xl">
+      {viewer.canManage && <Link href="/management" className={buttonClass("outline")}>เปิดตารางจัดการงานที่รับผิดชอบ</Link>}
       <PageHeader title="ตั้งค่าบัญชี" description="ข้อมูลส่วนตัว ชื่อบนวุฒิบัตร และความปลอดภัยของบัญชี" />
       {linked === "google" && (
         <div className="mb-6">

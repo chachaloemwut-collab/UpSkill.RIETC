@@ -37,7 +37,7 @@ async function TrainingPrograms({ user }: { user: NonNullable<Awaited<ReturnType
           <div className="p-5"><EmptyState icon={<GraduationCap className="h-5 w-5" />} title="ยังไม่มีหลักสูตรอบรม" description="กด “สร้างหลักสูตรอบรม” เพื่อเริ่มต้น" /></div>
         ) : (
           <div className="overflow-x-auto p-3">
-            <Table className="[&_td]:py-2.5">
+            <Table className="mobile-records [&_td]:py-2.5">
               <thead>
                 <tr>
                   <th>หลักสูตร</th>
@@ -55,7 +55,7 @@ async function TrainingPrograms({ user }: { user: NonNullable<Awaited<ReturnType
                   const thumb = youtubeThumb(p.cover_video_id);
                   return (
                     <tr key={p.id}>
-                      <td>
+                      <td data-label="หลักสูตร">
                         <Link href={`/admin/programs/${p.id}`} className="group flex items-center gap-3">
                           <span className="relative block h-10 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
                             {thumb ? <Image src={thumb} alt="" fill sizes="64px" className="object-cover" /> : <GraduationCap className="m-auto mt-3 h-4 w-4 text-muted-foreground" />}
@@ -66,12 +66,12 @@ async function TrainingPrograms({ user }: { user: NonNullable<Awaited<ReturnType
                           </span>
                         </Link>
                       </td>
-                      <td><Badge variant={vis?.variant ?? "secondary"}>{vis?.label ?? p.visibility}</Badge></td>
-                      <td className="text-right tabular-nums">{p.course_count}</td>
-                      <td className="text-right tabular-nums">{p.cohort_count}</td>
-                      <td className="text-right tabular-nums">{p.pending_count > 0 ? <Badge variant="warning">{p.pending_count}</Badge> : 0}</td>
-                      <td className="text-muted-foreground">{p.next_start ? formatDateTh(p.next_start) : "—"}</td>
-                      <td className="text-muted-foreground">{formatDateTh(p.updated_at)}</td>
+                      <td data-label="สถานะ"><Badge variant={vis?.variant ?? "secondary"}>{vis?.label ?? p.visibility}</Badge></td>
+                      <td data-label="รายวิชา" className="text-right tabular-nums">{p.course_count}</td>
+                      <td data-label="รอบอบรม" className="text-right tabular-nums">{p.cohort_count}</td>
+                      <td data-label="รอพิจารณา" className="text-right tabular-nums">{p.pending_count > 0 ? <Badge variant="warning">{p.pending_count}</Badge> : 0}</td>
+                      <td data-label="รอบถัดไป" className="text-muted-foreground">{p.next_start ? formatDateTh(p.next_start) : "—"}</td>
+                      <td data-label="แก้ไขล่าสุด" className="text-muted-foreground">{formatDateTh(p.updated_at)}</td>
                     </tr>
                   );
                 })}

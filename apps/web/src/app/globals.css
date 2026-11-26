@@ -454,3 +454,24 @@
     pointer-events: none;
   }
 }
+
+@media screen and (max-width: 767px), screen and (pointer: coarse) and (max-width: 1100px) {
+  .portal-shell :is(input, textarea, select):not([type=checkbox], [type=radio], [type=hidden]),
+  form :is(input, textarea, select):focus { font-size: max(16px, 1em); }
+  .portal-shell :is(input, textarea, select, button, summary, a):focus {
+    scroll-margin-block: calc(4rem + env(safe-area-inset-top)) calc(6rem + env(safe-area-inset-bottom));
+  }
+  .management-desk :is(label, select, input, form) { min-width: 0; max-width: 100%; }
+  .management-desk form label { display: block; overflow-wrap: anywhere; }
+  .management-desk :is(button, summary, select, a, input:not([type=checkbox], [type=hidden])) {
+    min-height: 44px;
+  }
+  .mobile-records, .mobile-records tbody { display: block; width: 100%; min-width: 0; white-space: normal; }
+  .mobile-records thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .mobile-records tbody tr { display: block; margin-block: .75rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: .5rem; }
+  .mobile-records tbody td[data-label] { display: grid; grid-template-columns: minmax(6rem, 34%) minmax(0, 1fr); gap: .5rem; white-space: normal; overflow-wrap: anywhere; max-width: none; }
+  .mobile-records tbody td[data-label]::before { content: attr(data-label); color: hsl(var(--muted-foreground)); font-size: .85em; }
+  .mobile-records tbody td[data-label] > * { min-width: 0; }
+  .mobile-records tbody td[data-label="ดำเนินการ"] { display: block; }
+  .mobile-records tbody td[data-label="ดำเนินการ"]::before { content: none; }
+}

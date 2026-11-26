@@ -2,7 +2,7 @@
 //  - HTML pages and /api/* are NEVER cached (they hold personal data and must be fresh; shared school computers),
 //  - immutable build assets and icons are cached so the app opens fast on weak connections,
 //  - when a page cannot load offline, an offline notice is shown instead of the browser's error page.
-const VERSION = "v2";
+const VERSION = "v3";
 const STATIC_CACHE = `upskill-static-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
