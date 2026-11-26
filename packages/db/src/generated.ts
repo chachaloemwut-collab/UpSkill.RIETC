@@ -81,11 +81,6 @@ export interface AuditLogs {
   user_id: string | null;
 }
 
-export interface CertificateArtworkRenders {
-  certificate_id: string;
-  revision: string;
-}
-
 export interface Certificates {
   achievement_snapshot: string | null;
   background_url_snapshot: string | null;
@@ -523,6 +518,7 @@ export interface PasswordResetTokens {
   expires_at: Timestamp;
   id: Generated<string>;
   recipient_email: string | null;
+  recovery_case_id: string | null;
   reset_method: string;
   token_hash: Buffer;
   used_at: Timestamp | null;
@@ -635,15 +631,29 @@ export interface RecoveryCaseEvents {
 }
 
 export interface RecoveryCases {
+  approved_by: string | null;
   assignee_id: string | null;
   category: string;
   contact: string;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   identifier: string;
+  issued_until: Timestamp | null;
+  proof_method: string | null;
+  record_comparison: Json | null;
+  related_user_id: string | null;
+  reviewed_by: string | null;
   status: Generated<string>;
+  target_user_id: string | null;
   tracking_hash: string;
   updated_at: Generated<Timestamp>;
+}
+
+export interface RecoveryStaff {
+  delegated_by: string;
+  duty: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
 }
 
 export interface SupportMessages {
@@ -732,6 +742,7 @@ export interface Users {
   must_change_password: Generated<boolean>;
   password_hash: string | null;
   password_updated_at: Timestamp | null;
+  registrar_recovered_at: Timestamp | null;
   role: Generated<string>;
   status: Generated<string>;
   updated_at: Generated<Timestamp>;
@@ -766,7 +777,6 @@ export interface DB {
   anticheat_events: AnticheatEvents;
   assessment_focus_events: AssessmentFocusEvents;
   audit_logs: AuditLogs;
-  certificate_artwork_renders: CertificateArtworkRenders;
   certificates: Certificates;
   checkpoint_attempts: CheckpointAttempts;
   cohort_registrations: CohortRegistrations;
@@ -806,6 +816,7 @@ export interface DB {
   quiz_score_corrections: QuizScoreCorrections;
   recovery_case_events: RecoveryCaseEvents;
   recovery_cases: RecoveryCases;
+  recovery_staff: RecoveryStaff;
   support_messages: SupportMessages;
   system_settings: SystemSettings;
   user_api_tokens: UserApiTokens;

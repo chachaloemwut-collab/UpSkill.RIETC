@@ -130,6 +130,10 @@ export async function startLearningSession(input: { userId: string; lessonId: st
       .returning(["max_watched_sec", "last_position_sec", "watched_chunks", "is_completed"])
       .executeTakeFirstOrThrow();
 
+    const recovered = await trx.updateTable("recovery_cases").set({status:"resolved",updated_at:new Date()})
+      .where("target_user_id","=",input.userId).where("status","=","recovered").returning("id").execute();
+    if (recovered.length) await trx.insertInto("recovery_case_events")
+      .values(recovered.map(row => ({case_id:row.id,actor_id:input.userId,status:"resolved",note:"lesson_started"}))).execute();
     return { sessionId: session.id, progress };
   });
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Check, Copy, KeyRound, Link2, LockOpen, Mail, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
-import { Alert, Button, Checkbox, Dialog, Field, Input, useToast } from "@/components/ui";
+import { Alert, Button, Dialog, Field, Input, useToast } from "@/components/ui";
 import { useConfirm } from "@/components/common/ConfirmProvider";
 
 type Result = { title: string; secret: string; lines: string[] } | null;
@@ -64,7 +64,7 @@ export function PasswordAdminPanel({ userId, email, emailVerified, mustChange }:
     setTempError(null);
     setBusy("temp");
     const r = await api<{ password: string; loginId: string }>(`/api/admin/users/${userId}/temporary-password`, {
-      body: { password: String(f.get("password") ?? ""), verifyEmail: f.get("verifyEmail") === "on" },
+      body: { password: String(f.get("password") ?? "") },
     });
     setBusy(null);
     if (!r.ok) return setTempError(r.message);
@@ -114,7 +114,7 @@ export function PasswordAdminPanel({ userId, email, emailVerified, mustChange }:
           <Field label="รหัสผ่านชั่วคราว" hint="เว้นว่างเพื่อให้ระบบสุ่มรหัสที่อ่านออกเสียงง่าย (อย่างน้อย 12 ตัวอักษร)">
             <Input name="password" type="text" autoComplete="off" spellCheck={false} maxLength={256} className="font-mono" />
           </Field>
-          {!emailVerified && <Checkbox name="verifyEmail" label="ยืนยันอีเมลให้ด้วย (บัญชีนี้ยังไม่ได้ยืนยันอีเมล จึงยังเข้าสู่ระบบไม่ได้)" />}
+          {!emailVerified && <p>หากผู้เรียนเข้าอีเมลไม่ได้ ให้ตรวจตัวตนผ่านเรื่องขอกู้บัญชีกับงานทะเบียน</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setTempOpen(false)}>ยกเลิก</Button>
             <Button type="submit" loading={busy === "temp"}><RefreshCw className="h-4 w-4" /> ตั้งรหัสชั่วคราว</Button>
