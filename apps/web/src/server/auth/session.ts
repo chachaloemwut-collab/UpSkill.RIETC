@@ -8,6 +8,7 @@
  *    the Origin check in http.ts instead.
  */
 import "server-only";
+import { effectiveRole } from "./effective-role";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { generateToken, hashToken } from "@upskill/core";
@@ -90,7 +91,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     email: row.email,
     username: row.username,
     isSystemOwner: row.is_system_owner,
-    role: row.role === "admin" && row.scoped_management && !row.is_system_owner ? "member" : row.role as CurrentUser["role"],
+    role: effectiveRole(row),
     sessionCreatedAt: new Date(row.created_at),
   };
 });

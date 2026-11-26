@@ -3,6 +3,7 @@
  * The plaintext token is generated once and shown once; only its SHA-256 hash is stored.
  */
 import "server-only";
+import { effectiveRole } from "../auth/effective-role";
 import { createHash, randomBytes } from "node:crypto";
 import { ctx } from "../context";
 import { HttpError } from "../http";
@@ -50,11 +51,11 @@ export async function userForToken(token: string) {
   const row = await ctx()
     .db.selectFrom("user_api_tokens as t")
     .innerJoin("users as u", "u.id", "t.user_id")
-    .select(["u.id", "u.role", "u.status", "u.deleted_at", "u.email", "u.username", "u.is_system_owner", "t.id as token_id"])
+    .select(["u.id", "u.role", "u.scoped_management", "u.status", "u.deleted_at", "u.email", "u.username", "u.is_system_owner", "t.id as token_id"])
     .where("t.token_hash", "=", hashToken(token))
     .where("t.revoked_at", "is", null)
     .executeTakeFirst();
   if (!row || row.status !== "active" || row.deleted_at) return null;
   await ctx().db.updateTable("user_api_tokens").set({ last_used_at: new Date() }).where("id", "=", row.token_id).execute().catch(() => {});
-  return { id: row.id, role: row.role as "member" | "instructor" | "admin", isSystemOwner: row.is_system_owner, email: row.email, username: row.username };
+  return { id: row.id, role: effectiveRole(row), isSystemOwner: row.is_system_owner, email: row.email, username: row.username };
 }
