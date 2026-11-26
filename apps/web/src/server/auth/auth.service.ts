@@ -405,12 +405,11 @@ export async function resetPassword(input: { token: string; newPassword: string 
       })
       .where("id", "=", t.user_id)
       .execute();
+    await trx.updateTable("user_sessions").set({revoked_at:new Date(),revoked_reason:"password_reset"}).where("user_id","=",t.user_id).where("revoked_at","is",null).execute();
     await addEmailToOutbox(trx, { template: "password-changed", to: t.email }, { userId: t.user_id, deduplicationKey: `password-changed:reset:${t.id}` });
     return { userId: t.user_id, email: t.email };
   });
 
-  // Spec: kick every device out after a password change
-  await revokeAllSessions(userId, "password_reset");
   await audit(db, { action: "auth.password_reset", userId, ip: meta.ip, userAgent: meta.userAgent });
 }
 

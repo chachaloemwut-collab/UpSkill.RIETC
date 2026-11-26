@@ -73,11 +73,14 @@ it("hands an existing learner back to the same account after independent registr
     const result = registrar.card.getByRole("status");
     await result.waitFor();
     const link = (await result.textContent())!.match(/https?:\/\/\S+$/)![0];
-    const token = new URL(link).searchParams.get("token");
     const password = "regained "+ref;
+    const plain = await browser.newPage({javaScriptEnabled:false});
+    await plain.goto(link);
+    await plain.locator('[name="password"]').fill(password);
+    await plain.locator('[name="confirm"]').fill(password);
+    await plain.getByRole("button",{name:"ตั้งรหัสผ่านใหม่",exact:true}).click();
+    await plain.waitForURL(BASE+"/login?reset=1");
     const learner = new Client();
-    const reset = await learner.req("/api/auth/reset-password",{body:{token,new_password:password}});
-    expect(reset.status).toBe(200);
     await learner.login("learner-"+ref+"@e2e.test",password);
     const row = await withDb(async c=>(await c.query("select r.status, u.id, u.email_verified_at from recovery_cases r join users u on u.id=r.target_user_id where r.id=$1",[caseId])).rows[0]);
     expect(row).toEqual({status:"recovered",id:setup["learner"],email_verified_at:null});

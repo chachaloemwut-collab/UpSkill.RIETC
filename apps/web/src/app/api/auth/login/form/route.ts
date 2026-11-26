@@ -1,3 +1,4 @@
+import { learnerReturn } from "@/lib/learner-return";
 /**
  * Plain HTML form login: the fallback when the page's JavaScript did not run (older iPad/iPhone Safari,
  * some in-app browsers, slow networks). The JS login form posts JSON to /api/auth/login; this accepts the
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   try {
     const { redirectTo } = await login({ email: ident.data, password: password.data }, { ip, userAgent: req.headers.get("user-agent") ?? "" });
     // redirectTo is built by login() (internal paths only)
+    if (redirectTo === "/") return back(learnerReturn(form.get("next")) ?? "/");
     return back(redirectTo.startsWith("/") ? redirectTo : "/");
   } catch (err) {
     if (err instanceof HttpError) return fail(req, err.code);
