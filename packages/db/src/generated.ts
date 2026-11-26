@@ -622,7 +622,7 @@ export interface QuizScoreCorrections {
 }
 
 export interface RecoveryCaseEvents {
-  actor_id: string;
+  actor_id: string | null;
   case_id: string;
   created_at: Generated<Timestamp>;
   id: Generated<string>;

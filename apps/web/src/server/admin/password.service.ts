@@ -27,7 +27,7 @@ type Meta = { ip: string };
 async function loadTarget(adminId: string, userId: string) {
   const user = await ctx()
     .db.selectFrom("users")
-    .select(["id", "email", "username", "status", "is_system_owner", "email_verified_at"])
+    .select(["id", "email", "username", "status", "is_system_owner", "email_verified_at", "registrar_recovered_at"])
     .where("id", "=", userId)
     .executeTakeFirst();
   if (!user) throw new HttpError(404, "NOT_FOUND");
@@ -41,11 +41,13 @@ async function loadTarget(adminId: string, userId: string) {
 
 async function requireDirectHandover(actor: string, target: string) {
   const {db} = ctx();
-  const [delegated, pending] = await Promise.all([
+  const [delegated, pending, account] = await Promise.all([
     db.selectFrom("recovery_staff").select("duty").where("user_id","=",actor).executeTakeFirst(),
     db.selectFrom("recovery_cases").select("id").where("target_user_id","=",target).where("status","in",["approval","approved","issued"]).executeTakeFirst(),
+    db.selectFrom("users").select(["role","email","email_verified_at","registrar_recovered_at"]).where("id","=",target).executeTakeFirstOrThrow(),
   ]);
-  if (pending || delegated) throw new HttpError(409,"CASE_REQUIRED","กรุณาดำเนินการผ่านเรื่องขอกู้บัญชี");
+  if (account.role === "admin") throw new HttpError(403,"FORBIDDEN","กรุณาประสานเจ้าของระบบสำหรับบัญชีผู้ดูแล");
+  if (pending || delegated || process.env.RECOVERY_CASE_ONLY === "on" || !account.email_verified_at || account.email.endsWith(".invalid") || account.registrar_recovered_at) throw new HttpError(409,"CASE_REQUIRED","กรุณาดำเนินการผ่านเรื่องขอกู้บัญชี");
 }
 
 /** Email the user a reset link. `logout` also signs them out everywhere right away. */
@@ -53,7 +55,7 @@ export async function adminSendResetEmail(adminId: string, userId: string, opts:
   const { db, env } = ctx();
   const user = await loadTarget(adminId, userId);
   await requireOutboundEmail();
-  if (user.email.endsWith(".invalid")) throw new HttpError(409, "NO_EMAIL", "บัญชีนี้ไม่มีอีเมลที่ส่งได้ ใช้การสร้างลิงก์หรือรหัสผ่านชั่วคราวแทน");
+  if ((user.registrar_recovered_at && !user.email_verified_at) || user.email.endsWith(".invalid")) throw new HttpError(409, "NO_EMAIL", "บัญชีนี้ไม่มีอีเมลที่ส่งได้ ใช้การสร้างลิงก์หรือรหัสผ่านชั่วคราวแทน");
   const token = generateToken();
   const expiresAt = new Date(Date.now() + EMAIL_LINK_TTL_MS);
   await db.transaction().execute(async (trx) => {

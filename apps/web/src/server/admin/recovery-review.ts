@@ -43,7 +43,7 @@ export async function reviewCase(actor: CurrentUser, id: string, target: string,
         (SELECT count(*)::int FROM quiz_attempts q JOIN enrollments e ON e.id=q.enrollment_id WHERE e.user_id=u.id) AS assessments
       FROM users u WHERE u.id=${target}::uuid OR u.id=${related}::uuid ORDER BY u.id
     `.execute(trx);
-    await trx.updateTable("recovery_cases").set({related_user_id:related,record_comparison:JSON.stringify(history.rows),target_user_id:target, reviewed_by:actor.id, proof_method:proof,status:"approval",updated_at:new Date()}).where("id","=",id).execute();
+    await trx.updateTable("recovery_cases").set({approved_by:null,issued_until:null,related_user_id:related,record_comparison:JSON.stringify(history.rows),target_user_id:target, reviewed_by:actor.id, proof_method:proof,status:"approval",updated_at:new Date()}).where("id","=",id).execute();
     await trx.insertInto("recovery_case_events").values({case_id:id,actor_id:actor.id,status:"approval",note:proof}).execute();
     return true;
   });

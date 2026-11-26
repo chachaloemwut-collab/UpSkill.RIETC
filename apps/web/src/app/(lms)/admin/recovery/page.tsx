@@ -11,7 +11,7 @@ import { categories, states } from "@/lib/recovery";
 import { ctx } from "@/server/context";
 import { requireAdminPage } from "@/server/programs/admin-page";
 
-const moves: Record<string,string[]> = { open: ["review"], review: ["waiting","declined"], waiting: ["review","declined"], recovered: ["resolved"], issued: ["cancelled"], approved: ["cancelled"], approval: ["declined"] };
+const moves: Record<string,string[]> = { open: ["review"], review: ["waiting","declined"], waiting: ["review","declined"], recovered: ["resolved"], issued: ["cancelled"], approved: ["cancelled"], approval: ["declined"], expired: ["review","declined"] };
 
 async function update(form: FormData) {
   "use server";
@@ -42,8 +42,8 @@ export default async function RecoveryQueue({searchParams}: {searchParams: Promi
     .$if(!!params.reference,q=>q.where("id","=",z.uuid().safeParse(params.reference).success ? params.reference! : "00000000-0000-0000-0000-000000000000"))
     .orderBy("created_at","desc").orderBy("id","desc").limit(26).offset((page-1)*25).execute();
   const ids = rows.slice(0,25).map(r => r.id);
-  const events = ids.length ? await db.selectFrom("recovery_case_events as e").innerJoin("users as u","u.id","e.actor_id")
-    .select(["e.case_id","e.status","e.created_at","u.username"]).where("e.case_id","in",ids).orderBy("e.created_at").execute() : [];
+  const events = ids.length ? await db.selectFrom("recovery_case_events as e").leftJoin("users as u","u.id","e.actor_id")
+    .select(["e.case_id","e.status","e.created_at","e.actor_id","u.username"]).where("e.case_id","in",ids).orderBy("e.created_at").execute() : [];
   return <main className="mx-auto grid max-w-3xl gap-4"><h1 className="text-2xl font-semibold">เรื่องขอกู้บัญชีผู้เรียน</h1>
     <p>รับเรื่องก่อนเปิดข้อมูลติดต่อ ตรวจสอบตัวตนตามขั้นตอนของงานทะเบียนก่อนใช้เครื่องมือกู้บัญชี</p>
     <form action="/admin/recovery"><label>ค้นหาด้วยเลขเรื่อง <input name="reference" defaultValue={params.reference}/></label><Button type="submit">ค้นหาเรื่อง</Button></form>
@@ -56,7 +56,7 @@ export default async function RecoveryQueue({searchParams}: {searchParams: Promi
     {rows.slice(0,25).map(row => <article className="grid gap-2 rounded border p-4" key={row.id}>
       <h2 className="font-semibold">{categories[row.category as keyof typeof categories]}</h2>
       <p>เลขเรื่อง {row.id}</p><p>{states[row.status]} · {row.created_at.toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}</p>
-      {(row.assignee_id === actor.id || duty === "registrar" || duty === "owner") && duty !== "auditor" && <p>ช่องทางติดต่อ {decryptSettingSecret(row.contact,env.SETTINGS_ENCRYPTION_KEY)}</p>}
+      {(row.assignee_id === actor.id || duty === "registrar" || duty === "owner") && duty !== "auditor" && <p>ช่องทางติดต่อ {row.contact ? decryptSettingSecret(row.contact,env.SETTINGS_ENCRYPTION_KEY) : "พ้นกำหนดเก็บข้อมูลติดต่อ"}</p>}
       {row.assignee_id && row.assignee_id !== actor.id && <p>มีเจ้าหน้าที่รับผิดชอบแล้ว</p>}
       {duty !== "auditor" && (!row.assignee_id || row.assignee_id === actor.id) && <div className="flex flex-wrap gap-2">{moves[row.status]?.map(next =>
         <form action={update} key={next}><input type="hidden" name="id" value={row.id}/><input type="hidden" name="previous" value={row.status}/>
@@ -73,7 +73,7 @@ export default async function RecoveryQueue({searchParams}: {searchParams: Promi
       {row.status === "approval" && ["approver","owner"].includes(duty) && actor.id !== row.reviewed_by && actor.id !== row.assignee_id &&
         <form action={approve}><input type="hidden" name="id" value={row.id}/><p>วิธีตรวจที่บันทึก {row.proof_method}</p><Button type="submit">อนุมัติให้ทะเบียนออกลิงก์</Button></form>}
       {row.status === "approved" && actor.id === row.reviewed_by && <IssueLink id={row.id}/>}
-      <details><summary>ประวัติการดำเนินการ</summary><ol>{events.filter(e=>e.case_id===row.id).map((e,i)=><li key={i}>{states[e.status]} · {e.username ?? "ผู้ใช้งาน"} · {e.created_at.toLocaleString("th-TH",{timeZone:"Asia/Bangkok"})}</li>)}</ol></details>
+      <details><summary>ประวัติการดำเนินการ</summary><ol>{events.filter(e=>e.case_id===row.id).map((e,i)=><li key={i}>{states[e.status]} · {e.username ?? (e.actor_id ? "ผู้ใช้งาน" : "ระบบ")} · {e.created_at.toLocaleString("th-TH",{timeZone:"Asia/Bangkok"})}</li>)}</ol></details>
     </article>)}
     <nav className="flex gap-4">{page > 1 && <Link href={`?page=${page-1}`}>หน้าก่อน</Link>}{rows.length > 25 && <Link href={`?page=${page+1}`}>หน้าถัดไป</Link>}</nav>
   </main>;

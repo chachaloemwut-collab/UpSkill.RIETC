@@ -84,5 +84,9 @@ it("hands an existing learner back to the same account after independent registr
     await learner.login("learner-"+ref+"@e2e.test",password);
     const row = await withDb(async c=>(await c.query("select r.status, u.id, u.email_verified_at from recovery_cases r join users u on u.id=r.target_user_id where r.id=$1",[caseId])).rows[0]);
     expect(row).toEqual({status:"recovered",id:setup["learner"],email_verified_at:null});
+    const identifier = "learner-"+ref+"@e2e.test";
+    expect((await new Client().req("/api/auth/forgot-password",{body:{email:identifier}})).status).toBe(200);
+    const retired = await withDb(async c=>(await c.query("select count(*)::int as total from password_reset_tokens where user_id=$1 and reset_method='email_link'",[setup["learner"]])).rows[0]);
+    expect(retired.total).toBe(0);
   } finally {await browser.close();}
 });
