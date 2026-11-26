@@ -37,6 +37,7 @@ async function AdminOverview({ user }: { user: NonNullable<Awaited<ReturnType<ty
   return (
     <>
       <PageHeader title="ภาพรวมระบบ" description="ดูแลหลักสูตร ผู้ใช้ วุฒิบัตร และพฤติกรรมผิดปกติ">
+        <Link href="/management" className={buttonClass("outline")}>ตารางจัดการงานและสิทธิ์</Link>
         <Link href="/admin/users" className={buttonClass("outline")}><Users className="h-4 w-4" /> สมาชิก</Link>
         <Link href="/admin/certificates" className={buttonClass("outline")}><Award className="h-4 w-4" /> วุฒิบัตร</Link>
         <Link href="/admin/programs" className={buttonClass("outline")}><GraduationCap className="h-4 w-4" /> หลักสูตรอบรม</Link>

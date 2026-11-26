@@ -2,6 +2,9 @@ import "server-only";
 import type { Database } from "@upskill/db";
 
 export type AuditAction =
+  | "management.granted"
+  | "management.revoked"
+  | "management.exported"
   | "recovery.staff_delegated"
   | "enrollment.portrait_added"
   | "enrollment.document_served"

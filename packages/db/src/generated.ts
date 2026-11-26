@@ -484,6 +484,22 @@ export interface Lessons {
   youtube_video_id: string;
 }
 
+export interface ManagementGrants {
+  can_act: Generated<boolean>;
+  can_export: Generated<boolean>;
+  cohort_id: string | null;
+  course_id: string | null;
+  duty: string;
+  expires_at: Timestamp | null;
+  granted_by: string;
+  id: Generated<string>;
+  reason: string;
+  revoked_at: Timestamp | null;
+  revoked_by: string | null;
+  starts_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface PartnerApiClients {
   allowed_ips: string[];
   created_at: Generated<Timestamp>;
@@ -804,6 +820,7 @@ export interface DB {
   lesson_activity_results: LessonActivityResults;
   lesson_progress: LessonProgress;
   lessons: Lessons;
+  management_grants: ManagementGrants;
   partner_api_clients: PartnerApiClients;
   partner_api_requests: PartnerApiRequests;
   password_reset_tokens: PasswordResetTokens;
