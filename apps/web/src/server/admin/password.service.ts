@@ -48,7 +48,7 @@ export async function adminSendResetEmail(adminId: string, userId: string, opts:
   await db.transaction().execute(async (trx) => {
     const reset = await trx
       .insertInto("password_reset_tokens")
-      .values({ user_id: user.id, token_hash: hashToken(token), reset_method: "email_link", expires_at: expiresAt })
+      .values({ user_id: user.id, recipient_email: user.email, token_hash: hashToken(token), reset_method: "email_link", expires_at: expiresAt })
       .returning("id")
       .executeTakeFirstOrThrow();
     await addEmailToOutbox(

@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Save } from "lucide-react";
@@ -14,6 +15,7 @@ export function ProfileForm({ defaults, exists, namesLocked, googleSignup = fals
   const [errors, setErrors] = useState<ProfileErrors>({});
   const [consentError, setConsentError] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
+  const [needsRecovery, setNeedsRecovery] = useState(false);
   const [busy, setBusy] = useState(false);
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -26,6 +28,7 @@ export function ProfileForm({ defaults, exists, namesLocked, googleSignup = fals
     setErrors(errs);
     setConsentError(exists || consent ? undefined : "ต้องยอมรับประกาศความเป็นส่วนตัวก่อนบันทึก");
     if (Object.keys(errs).length || (!exists && !consent)) return setError("กรุณาตรวจสอบข้อมูลที่ไฮไลต์");
+    setNeedsRecovery(false);
     setBusy(true);
     setError(null);
     const r = await api(googleSignup ? "/api/auth/google/register" : "/api/user/profile", { method: googleSignup ? "POST" : "PUT", body: { ...profile, ...(exists ? {} : { pdpaConsent: consent }) } });
@@ -34,11 +37,15 @@ export function ProfileForm({ defaults, exists, namesLocked, googleSignup = fals
       toast({ title: "บันทึกข้อมูลแล้ว", variant: "success" });
       router.push("/me");
       router.refresh();
-    } else setError(r.message);
+    } else {
+      setError(r.message);
+      setNeedsRecovery(r.code === "NATIONAL_ID_IN_USE");
+    }
   }
   return (
     <form method="post" onSubmit={onSubmit} className="grid gap-4" noValidate>
       {error && <Alert variant="destructive" title={error} />}
+      {needsRecovery && <Link href="/recovery" className="underline">ขอกู้บัญชีเดิมผ่านงานทะเบียน</Link>}
       <ProfileFields defaults={defaults} errors={errors} namesLocked={namesLocked} />
       {!exists && <PdpaNotice error={consentError} />}
       <div><Button type="submit" loadingState="saving" loading={busy}><Save className="h-4 w-4" /> {googleSignup ? "ยืนยันการสมัครสมาชิก" : "บันทึกข้อมูล"}</Button></div>

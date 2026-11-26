@@ -308,7 +308,7 @@ async function issueEmailResetLink(target: { id: string; email: string }): Promi
     const token = generateToken();
     const reset = await trx
       .insertInto("password_reset_tokens")
-      .values({ user_id: target.id, token_hash: hashToken(token), reset_method: "email_link", expires_at: new Date(Date.now() + RESET_EMAIL_TTL_MS) })
+      .values({ user_id: target.id, recipient_email: target.email, token_hash: hashToken(token), reset_method: "email_link", expires_at: new Date(Date.now() + RESET_EMAIL_TTL_MS) })
       .returning("id")
       .executeTakeFirstOrThrow();
     await addEmailToOutbox(
@@ -343,12 +343,12 @@ export async function inspectResetToken(token: string): Promise<{ valid: boolean
   const t = await db
     .selectFrom("password_reset_tokens as t")
     .innerJoin("users as u", "u.id", "t.user_id")
-    .select(["t.expires_at", "t.reset_method", "u.status"])
+    .select(["t.expires_at", "t.reset_method", "t.recipient_email", "u.status"])
     .where("t.token_hash", "=", hashToken(token))
     .where("t.used_at", "is", null)
     .where("t.expires_at", ">", new Date())
     .executeTakeFirst();
-  if (!t || t.status !== "active") return { valid: false };
+  if (!t || t.status !== "active" || (t.reset_method === "email_link" && !t.recipient_email)) return { valid: false };
   return { valid: true, expiresAt: t.expires_at, method: t.reset_method };
 }
 
@@ -361,7 +361,7 @@ export async function resetPassword(input: { token: string; newPassword: string 
     const t = await trx
       .selectFrom("password_reset_tokens as t")
       .innerJoin("users as u", "u.id", "t.user_id")
-      .select(["t.id", "t.user_id", "t.reset_method", "u.email", "u.status"])
+      .select(["t.id", "t.user_id", "t.reset_method", "t.recipient_email", "u.email", "u.status"])
       .where("t.token_hash", "=", hashToken(input.token))
       .where("t.used_at", "is", null)
       .where("t.expires_at", ">", new Date())
@@ -369,6 +369,17 @@ export async function resetPassword(input: { token: string; newPassword: string 
       .executeTakeFirst();
     if (!t || t.status !== "active") throw new HttpError(400, "INVALID_OR_EXPIRED_TOKEN");
 
+    const provesPrimary = t.reset_method === "email_link" && t.recipient_email === t.email;
+    if (t.reset_method === "email_link" && !provesPrimary) {
+      const alias = t.recipient_email && await trx.selectFrom("user_emails").select("id")
+        .where("user_id", "=", t.user_id).where("email", "=", t.recipient_email)
+        .where("verified_at", "is not", null).forShare().executeTakeFirst();
+      if (!alias) throw new HttpError(400, "INVALID_OR_EXPIRED_TOKEN");
+    }
+    if (provesPrimary) {
+      await trx.updateTable("user_emails").set({ verified_at: new Date() })
+        .where("user_id", "=", t.user_id).where("email", "=", t.email).execute();
+    }
     // Burn this token and every other outstanding token for the user
     await trx.updateTable("password_reset_tokens").set({ used_at: new Date() }).where("user_id", "=", t.user_id).where("used_at", "is", null).execute();
     await trx
@@ -378,7 +389,7 @@ export async function resetPassword(input: { token: string; newPassword: string 
         password_updated_at: new Date(),
         must_change_password: false,
         // Clicking an emailed link proves ownership of the address
-        ...(t.reset_method === "email_link" ? { email_verified_at: new Date() } : {}),
+        ...(provesPrimary ? { email_verified_at: new Date() } : {}),
       })
       .where("id", "=", t.user_id)
       .execute();
@@ -453,6 +464,9 @@ export async function applyGoogleSignIn(
       : null,
   });
 
+  if (mode === "reset" && decision.action !== "LOGIN" && decision.action !== "REJECT") {
+    throw new HttpError(403, "LINK_REQUIRES_LOGIN");
+  }
   let userId: string;
   switch (decision.action) {
     case "REJECT":

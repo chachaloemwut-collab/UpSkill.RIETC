@@ -81,6 +81,11 @@ export interface AuditLogs {
   user_id: string | null;
 }
 
+export interface CertificateArtworkRenders {
+  certificate_id: string;
+  revision: string;
+}
+
 export interface Certificates {
   achievement_snapshot: string | null;
   background_url_snapshot: string | null;
@@ -517,6 +522,7 @@ export interface PasswordResetTokens {
   created_at: Generated<Timestamp>;
   expires_at: Timestamp;
   id: Generated<string>;
+  recipient_email: string | null;
   reset_method: string;
   token_hash: Buffer;
   used_at: Timestamp | null;
@@ -617,6 +623,27 @@ export interface QuizScoreCorrections {
   old_is_passed: boolean;
   old_score_percentage: Numeric;
   question_id: string;
+}
+
+export interface RecoveryCaseEvents {
+  actor_id: string;
+  case_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  note: string;
+  status: string;
+}
+
+export interface RecoveryCases {
+  assignee_id: string | null;
+  category: string;
+  contact: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  identifier: string;
+  status: Generated<string>;
+  tracking_hash: string;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface SupportMessages {
@@ -739,6 +766,7 @@ export interface DB {
   anticheat_events: AnticheatEvents;
   assessment_focus_events: AssessmentFocusEvents;
   audit_logs: AuditLogs;
+  certificate_artwork_renders: CertificateArtworkRenders;
   certificates: Certificates;
   checkpoint_attempts: CheckpointAttempts;
   cohort_registrations: CohortRegistrations;
@@ -776,6 +804,8 @@ export interface DB {
   quiz_lockout_resets: QuizLockoutResets;
   quiz_questions: QuizQuestions;
   quiz_score_corrections: QuizScoreCorrections;
+  recovery_case_events: RecoveryCaseEvents;
+  recovery_cases: RecoveryCases;
   support_messages: SupportMessages;
   system_settings: SystemSettings;
   user_api_tokens: UserApiTokens;

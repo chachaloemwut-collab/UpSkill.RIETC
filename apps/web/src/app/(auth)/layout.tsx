@@ -48,6 +48,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           {/* The brand panel is hidden below lg: show the logo above the form instead */}
           <BrandLogo mode="unfold" className="mb-8 lg:hidden print:hidden" />
           {children}
+          <Link className="mt-6 block text-sm underline" href="/recovery">ติดต่อทะเบียนเพื่อกู้บัญชีเดิม หรือติดตามเรื่อง</Link>
         </div>
       </main>
     </div>

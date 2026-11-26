@@ -114,7 +114,7 @@ export function PasswordAdminPanel({ userId, email, emailVerified, mustChange }:
           <Field label="รหัสผ่านชั่วคราว" hint="เว้นว่างเพื่อให้ระบบสุ่มรหัสที่อ่านออกเสียงง่าย (อย่างน้อย 12 ตัวอักษร)">
             <Input name="password" type="text" autoComplete="off" spellCheck={false} maxLength={256} className="font-mono" />
           </Field>
-          {!emailVerified && <Checkbox name="verifyEmail" defaultChecked label="ยืนยันอีเมลให้ด้วย (บัญชีนี้ยังไม่ได้ยืนยันอีเมล จึงยังเข้าสู่ระบบไม่ได้)" />}
+          {!emailVerified && <Checkbox name="verifyEmail" label="ยืนยันอีเมลให้ด้วย (บัญชีนี้ยังไม่ได้ยืนยันอีเมล จึงยังเข้าสู่ระบบไม่ได้)" />}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setTempOpen(false)}>ยกเลิก</Button>
             <Button type="submit" loading={busy === "temp"}><RefreshCw className="h-4 w-4" /> ตั้งรหัสชั่วคราว</Button>
