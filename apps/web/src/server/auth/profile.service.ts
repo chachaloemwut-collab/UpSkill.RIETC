@@ -71,6 +71,12 @@ const names = (p: Profile) => ({
 /** Insert the profile in the caller's transaction; also fills the certificate names while they are unlocked */
 export async function insertProfile(trx: Tx, userId: string, p: Profile) {
   const now = new Date();
+  await trx.selectFrom("users").select("id").where("id", "=", userId).forUpdate().executeTakeFirstOrThrow();
+  const current = await trx.selectFrom("user_profiles").select("national_id_hmac").where("user_id", "=", userId).executeTakeFirst();
+  if (current) {
+    if (current.national_id_hmac?.equals(digestOf(p.nationalId))) return;
+    throw new HttpError(409, "PROFILE_ALREADY_EXISTS", "ข้อมูลผู้เรียนเปลี่ยนแปลงแล้ว กรุณาโหลดหน้าใหม่");
+  }
   try {
     await trx
       .insertInto("user_profiles")

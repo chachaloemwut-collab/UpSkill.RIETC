@@ -34,6 +34,9 @@ function assertPassword(pw: string) {
 
 export async function addVerificationEmail(db: Database | Tx, userId: string, email: string) {
   const { env } = ctx();
+  const retired = await db.selectFrom("users").select("id").where("id","=",userId).where("email","=",email)
+    .where("registrar_recovered_at","is not",null).where("email_verified_at","is",null).executeTakeFirst();
+  if (retired) return;
   const token = generateToken();
   const row = await db
     .insertInto("email_verification_tokens")
@@ -119,14 +122,14 @@ export async function verifyEmail(token: string): Promise<void> {
     const t = await trx
       .selectFrom("email_verification_tokens as t")
       .innerJoin("users as u", "u.id", "t.user_id")
-      .select(["t.id", "t.user_id", "t.email as token_email", "u.email as user_email", "u.created_at", "u.legal_full_name_th"])
+      .select(["t.id", "t.user_id", "t.email as token_email", "u.email as user_email", "u.created_at", "u.legal_full_name_th", "u.registrar_recovered_at", "u.email_verified_at"])
       .where("t.token_hash", "=", hashToken(token))
       .where("t.used_at", "is", null)
       .where("t.expires_at", ">", new Date())
       .forUpdate("t")
       .executeTakeFirst();
     // The link verifies the token and marks the corresponding email as verified
-    if (!t) throw new HttpError(400, "INVALID_OR_EXPIRED_TOKEN");
+    if (!t || (t.registrar_recovered_at && !t.email_verified_at && t.token_email.toLowerCase() === t.user_email.toLowerCase())) throw new HttpError(400, "INVALID_OR_EXPIRED_TOKEN");
     await trx.updateTable("email_verification_tokens").set({ used_at: new Date() }).where("id", "=", t.id).execute();
     await trx.updateTable("user_emails").set({ verified_at: new Date() }).where("user_id", "=", t.user_id).where("email", "=", t.token_email).execute();
     if (t.token_email.toLowerCase() === t.user_email.toLowerCase()) {
@@ -246,7 +249,10 @@ export async function login(input: { email: string; password: string }, meta: Me
   // Only reveal these after the password was proven correct
   if (user.status !== "active") throw new HttpError(403, "ACCOUNT_DISABLED");
   // The protected owner account is username-only and never depends on an email workflow.
-  if (!user.is_system_owner && !user.email_verified_at) throw new HttpError(403, "EMAIL_NOT_VERIFIED", `กรุณายืนยันอีเมล ${maskEmail(user.email)} ก่อนเข้าสู่ระบบ`);
+  if (!user.is_system_owner && !user.email_verified_at) {
+    const identity = await db.selectFrom("users").select("registrar_recovered_at").where("id","=",user.id).executeTakeFirst();
+    if (!identity?.registrar_recovered_at) throw new HttpError(403, "EMAIL_NOT_VERIFIED", `กรุณายืนยันอีเมล ${maskEmail(user.email)} ก่อนเข้าสู่ระบบ`);
+  }
 
   // Admin-issued temporary password: no session until the user has chosen their own password
   const mustChange = user.is_system_owner
@@ -301,14 +307,22 @@ export async function forgotPassword(identifierRaw: string): Promise<void> {
 }
 
 /** Mail a single-use set-a-new-password link (stored as a SHA-256 only). */
-async function issueEmailResetLink(target: { id: string; email: string }): Promise<void> {
+async function issueEmailResetLink(target: { id: string; email: string }): Promise<boolean> {
   const { db, env } = ctx();
   // Spec: 32 random bytes; only the SHA-256 is stored
-  await db.transaction().execute(async (trx) => {
+  return db.transaction().execute(async (trx) => {
+    const owner = await trx.selectFrom("users").select(["email","status","is_system_owner","registrar_recovered_at","email_verified_at"]).where("id","=",target.id).forShare().executeTakeFirst();
+    if (!owner || owner.status !== "active" || owner.is_system_owner) return false;
+    if (target.email.toLowerCase() === owner.email.toLowerCase()) {
+      if (owner.registrar_recovered_at && !owner.email_verified_at) return false;
+    } else {
+      const alias = await trx.selectFrom("user_emails").select("id").where("user_id","=",target.id).where("email","=",target.email).where("verified_at","is not",null).forShare().executeTakeFirst();
+      if (!alias) return false;
+    }
     const token = generateToken();
     const reset = await trx
       .insertInto("password_reset_tokens")
-      .values({ user_id: target.id, token_hash: hashToken(token), reset_method: "email_link", expires_at: new Date(Date.now() + RESET_EMAIL_TTL_MS) })
+      .values({ user_id: target.id, recipient_email: target.email, token_hash: hashToken(token), reset_method: "email_link", expires_at: new Date(Date.now() + RESET_EMAIL_TTL_MS) })
       .returning("id")
       .executeTakeFirstOrThrow();
     await addEmailToOutbox(
@@ -316,6 +330,7 @@ async function issueEmailResetLink(target: { id: string; email: string }): Promi
       { template: "reset-password", to: target.email, link: `${env.APP_ORIGIN}/reset-password?token=${token}` },
       { userId: target.id, deduplicationKey: `reset-password:${reset.id}` },
     );
+    return true;
   });
 }
 
@@ -332,7 +347,7 @@ export async function sendOwnResetLink(userId: string, meta: Meta, emailId?: str
     ? (await db.selectFrom("user_emails").select("email").where("id", "=", emailId).where("user_id", "=", u.id).where("verified_at", "is not", null).executeTakeFirst())?.email
     : u.email;
   if (!recipient || recipient.endsWith(".invalid")) throw new HttpError(400, "NO_EMAIL_FOR_RESET");
-  await issueEmailResetLink({ id: u.id, email: recipient });
+  if (!await issueEmailResetLink({ id: u.id, email: recipient })) throw new HttpError(409,"NO_EMAIL_FOR_RESET");
   await audit(db, { action: "auth.password_reset_requested", userId: u.id, ip: meta.ip, userAgent: meta.userAgent, details: { via: "settings" } });
   return { email: recipient };
 }
@@ -343,12 +358,12 @@ export async function inspectResetToken(token: string): Promise<{ valid: boolean
   const t = await db
     .selectFrom("password_reset_tokens as t")
     .innerJoin("users as u", "u.id", "t.user_id")
-    .select(["t.expires_at", "t.reset_method", "u.status"])
+    .select(["t.expires_at", "t.reset_method", "t.recipient_email", "u.status"])
     .where("t.token_hash", "=", hashToken(token))
     .where("t.used_at", "is", null)
     .where("t.expires_at", ">", new Date())
     .executeTakeFirst();
-  if (!t || t.status !== "active") return { valid: false };
+  if (!t || t.status !== "active" || (t.reset_method === "email_link" && !t.recipient_email)) return { valid: false };
   return { valid: true, expiresAt: t.expires_at, method: t.reset_method };
 }
 
@@ -361,7 +376,7 @@ export async function resetPassword(input: { token: string; newPassword: string 
     const t = await trx
       .selectFrom("password_reset_tokens as t")
       .innerJoin("users as u", "u.id", "t.user_id")
-      .select(["t.id", "t.user_id", "t.reset_method", "u.email", "u.status"])
+      .select(["t.id", "t.user_id", "t.recovery_case_id", "u.role", "u.is_system_owner", "u.registrar_recovered_at", "u.email_verified_at", "t.reset_method", "t.recipient_email", "u.email", "u.status"])
       .where("t.token_hash", "=", hashToken(input.token))
       .where("t.used_at", "is", null)
       .where("t.expires_at", ">", new Date())
@@ -369,6 +384,25 @@ export async function resetPassword(input: { token: string; newPassword: string 
       .executeTakeFirst();
     if (!t || t.status !== "active") throw new HttpError(400, "INVALID_OR_EXPIRED_TOKEN");
 
+    if (t.is_system_owner || (t.recovery_case_id && t.role === "admin")) throw new HttpError(400,"INVALID_OR_EXPIRED_TOKEN");
+    if (t.recovery_case_id) {
+      const record = await trx.updateTable("recovery_cases").set({status:"recovered",updated_at:new Date()})
+        .where("id","=",t.recovery_case_id).where("target_user_id","=",t.user_id).where("status","=","issued").returning("id").executeTakeFirst();
+      if (!record) throw new HttpError(400,"INVALID_OR_EXPIRED_TOKEN");
+      await trx.insertInto("recovery_case_events").values({case_id:record.id,actor_id:t.user_id,status:"recovered",note:""}).execute();
+    }
+    const provesPrimary = t.reset_method === "email_link" && t.recipient_email?.toLowerCase() === t.email.toLowerCase();
+    if (provesPrimary && t.registrar_recovered_at && !t.email_verified_at) throw new HttpError(400, "INVALID_OR_EXPIRED_TOKEN");
+    if (t.reset_method === "email_link" && !provesPrimary) {
+      const alias = t.recipient_email && await trx.selectFrom("user_emails").select("id")
+        .where("user_id", "=", t.user_id).where("email", "=", t.recipient_email)
+        .where("verified_at", "is not", null).forShare().executeTakeFirst();
+      if (!alias) throw new HttpError(400, "INVALID_OR_EXPIRED_TOKEN");
+    }
+    if (provesPrimary) {
+      await trx.updateTable("user_emails").set({ verified_at: new Date() })
+        .where("user_id", "=", t.user_id).where("email", "=", t.email).execute();
+    }
     // Burn this token and every other outstanding token for the user
     await trx.updateTable("password_reset_tokens").set({ used_at: new Date() }).where("user_id", "=", t.user_id).where("used_at", "is", null).execute();
     await trx
@@ -378,16 +412,16 @@ export async function resetPassword(input: { token: string; newPassword: string 
         password_updated_at: new Date(),
         must_change_password: false,
         // Clicking an emailed link proves ownership of the address
-        ...(t.reset_method === "email_link" ? { email_verified_at: new Date() } : {}),
+        ...(t.recovery_case_id ? { registrar_recovered_at: new Date() } : {}),
+        ...(provesPrimary ? { email_verified_at: new Date() } : {}),
       })
       .where("id", "=", t.user_id)
       .execute();
+    await trx.updateTable("user_sessions").set({revoked_at:new Date(),revoked_reason:"password_reset"}).where("user_id","=",t.user_id).where("revoked_at","is",null).execute();
     await addEmailToOutbox(trx, { template: "password-changed", to: t.email }, { userId: t.user_id, deduplicationKey: `password-changed:reset:${t.id}` });
     return { userId: t.user_id, email: t.email };
   });
 
-  // Spec: kick every device out after a password change
-  await revokeAllSessions(userId, "password_reset");
   await audit(db, { action: "auth.password_reset", userId, ip: meta.ip, userAgent: meta.userAgent });
 }
 
@@ -443,8 +477,9 @@ export async function applyGoogleSignIn(
     .executeTakeFirst();
   const byEmail = linked
     ? null
-    : await db.selectFrom("users").select(["id", "email_verified_at", "status"]).where("email", "=", claims.email).executeTakeFirst();
+    : await db.selectFrom("users").select(["id", "email_verified_at", "registrar_recovered_at", "status"]).where("email", "=", claims.email).executeTakeFirst();
 
+  if (byEmail?.registrar_recovered_at && !byEmail.email_verified_at) throw new HttpError(403,"LINK_REQUIRES_LOGIN");
   const decision = decideGoogleSignIn({
     claims,
     linkedUser: linked ? { id: linked.id, status: linked.status as "active" } : null,
@@ -453,6 +488,9 @@ export async function applyGoogleSignIn(
       : null,
   });
 
+  if (mode === "reset" && decision.action !== "LOGIN" && decision.action !== "REJECT") {
+    throw new HttpError(403, "LINK_REQUIRES_LOGIN");
+  }
   let userId: string;
   switch (decision.action) {
     case "REJECT":

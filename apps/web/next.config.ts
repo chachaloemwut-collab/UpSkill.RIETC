@@ -98,6 +98,9 @@ const config: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      ...["/recovery", "/admin/recovery", "/reset-password", "/forgot-password", "/verify-email"].map(source => ({
+        source, headers: [{ key: "Cache-Control", value: "private, no-store" }, { key: "Referrer-Policy", value: "strict-origin" }],
+      })),
       // APIs must never be cached by a proxy/CDN
       { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
     ];

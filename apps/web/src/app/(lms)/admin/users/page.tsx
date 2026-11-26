@@ -45,6 +45,7 @@ async function MemberDirectory({ searchParams }: { searchParams: Promise<{ q?: s
     <div className="mx-auto max-w-6xl">
       <PageHeader title="จัดการสมาชิก" description={`สมาชิกทั้งหมด ${data.total} คน · ค้นหา กรอง เปลี่ยนบทบาท/สถานะ ดูประวัติอย่างละเอียด`} />
 
+      <Link href="/admin/recovery" className={buttonClass("outline", "md")}>จัดการเรื่องขอกู้บัญชี</Link>
       <Card className="mb-4 p-4">
         <form action="/admin/users" method="get" className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-56 flex-1">

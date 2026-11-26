@@ -517,6 +517,8 @@ export interface PasswordResetTokens {
   created_at: Generated<Timestamp>;
   expires_at: Timestamp;
   id: Generated<string>;
+  recipient_email: string | null;
+  recovery_case_id: string | null;
   reset_method: string;
   token_hash: Buffer;
   used_at: Timestamp | null;
@@ -619,6 +621,41 @@ export interface QuizScoreCorrections {
   question_id: string;
 }
 
+export interface RecoveryCaseEvents {
+  actor_id: string | null;
+  case_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  note: string;
+  status: string;
+}
+
+export interface RecoveryCases {
+  approved_by: string | null;
+  assignee_id: string | null;
+  category: string;
+  contact: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  identifier: string;
+  issued_until: Timestamp | null;
+  proof_method: string | null;
+  record_comparison: Json | null;
+  related_user_id: string | null;
+  reviewed_by: string | null;
+  status: Generated<string>;
+  target_user_id: string | null;
+  tracking_hash: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface RecoveryStaff {
+  delegated_by: string;
+  duty: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface SupportMessages {
   author_id: string;
   body: string;
@@ -705,6 +742,7 @@ export interface Users {
   must_change_password: Generated<boolean>;
   password_hash: string | null;
   password_updated_at: Timestamp | null;
+  registrar_recovered_at: Timestamp | null;
   role: Generated<string>;
   status: Generated<string>;
   updated_at: Generated<Timestamp>;
@@ -776,6 +814,9 @@ export interface DB {
   quiz_lockout_resets: QuizLockoutResets;
   quiz_questions: QuizQuestions;
   quiz_score_corrections: QuizScoreCorrections;
+  recovery_case_events: RecoveryCaseEvents;
+  recovery_cases: RecoveryCases;
+  recovery_staff: RecoveryStaff;
   support_messages: SupportMessages;
   system_settings: SystemSettings;
   user_api_tokens: UserApiTokens;

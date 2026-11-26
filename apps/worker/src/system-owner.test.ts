@@ -13,8 +13,13 @@ import { ensureSystemOwner } from "./system-owner.ts";
 
 const MIGRATION_URL = process.env.DATABASE_MIGRATION_URL ?? "postgres://upskill_owner:dev_owner_password@127.0.0.1:55432/upskill";
 const TEST_DB = "upskill_system_owner_test";
-const testUrl = MIGRATION_URL.replace(/upskill$/, TEST_DB);
-const adminUrl = MIGRATION_URL.replace(/upskill$/, "postgres");
+function databaseUrl(name: string) {
+  const url = new URL(MIGRATION_URL);
+  url.pathname = "/" + name;
+  return url.href;
+}
+const testUrl = databaseUrl(TEST_DB);
+const adminUrl = databaseUrl("postgres");
 
 const db = createDb(testUrl);
 const admin = createDb(adminUrl);

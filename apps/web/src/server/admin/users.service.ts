@@ -307,9 +307,10 @@ export async function adminRevokeUserSessions(adminId: string, userId: string, m
 /** Manual email verification: for accounts the admin created offline or when outbound email is not yet configured. */
 export async function adminVerifyEmail(adminId: string, userId: string, meta: { ip: string }) {
   const { db } = ctx();
-  const user = await db.selectFrom("users").select(["id", "email_verified_at"]).where("id", "=", userId).executeTakeFirst();
+  const user = await db.selectFrom("users").select(["id", "email_verified_at","registrar_recovered_at"]).where("id", "=", userId).executeTakeFirst();
   if (!user) throw new HttpError(404, "NOT_FOUND");
   if (user.email_verified_at) return;
+  if (user.registrar_recovered_at) throw new HttpError(409,"EMAIL_PROOF_REQUIRED","ผู้เรียนต้องเพิ่มอีเมลที่เข้าถึงได้และยืนยันด้วยตนเอง");
   await db.updateTable("users").set({ email_verified_at: new Date() }).where("id", "=", userId).execute();
   await audit(db, { action: "user.admin_updated", userId: adminId, entityType: "user", entityId: userId, ip: meta.ip, details: { emailVerifiedManually: true } });
 }

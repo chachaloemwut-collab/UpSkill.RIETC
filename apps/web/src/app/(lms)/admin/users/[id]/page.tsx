@@ -51,6 +51,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           {u.email_verified_at && <Badge variant="outline">ยืนยันอีเมลแล้ว</Badge>}
         </div>
       </PageHeader>
+      <p className="mb-3 text-sm">รหัสบัญชีสำหรับงานทะเบียน <code>{u.id}</code></p>
 
       <div className="grid gap-6">
         <Card className="p-6">

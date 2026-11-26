@@ -1,9 +1,10 @@
 "use client";
+import { mailForm, passwordForm } from "@/app/(auth)/recovery/mail-actions";
 import { maskEmail } from "@/lib/mask-email";
 import { BrandSignal } from "@/components/brand/BrandActivity";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { ChevronLeft, ChevronRight, MailCheck, Printer } from "lucide-react";
 import { api } from "@/lib/api";
 import { validateProfile, type ProfileErrors } from "@upskill/core/profile";
@@ -92,7 +93,7 @@ export function AuthHeading({ title, description }: { title: string; description
   );
 }
 
-export function LoginForm({ googleEnabled, initialError, notice, initialIdentifier }: { googleEnabled: boolean; initialError?: string | undefined; notice?: string | undefined; initialIdentifier?: string | undefined }) {
+export function LoginForm({ googleEnabled, initialError, notice, initialIdentifier, returnTo }: { returnTo?:string | null; googleEnabled: boolean; initialError?: string | undefined; notice?: string | undefined; initialIdentifier?: string | undefined }) {
   const router = useRouter();
   const toast = useToast();
   const [scene, runScene] = useActionScene();
@@ -136,7 +137,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
         },
         1100,
       );
-      router.replace(r.data.redirectTo);
+      router.replace(r.data.redirectTo === "/" && returnTo ? returnTo : r.data.redirectTo);
       router.refresh();
       return;
     }
@@ -168,6 +169,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
       )}
       {/* action: plain-form fallback when JavaScript did not run (older Safari / in-app browsers); onSubmit handles the normal case */}
       <form method="post" action="/api/auth/login/form" onSubmit={onSubmit} className="grid gap-4">
+        {returnTo && <input type="hidden" name="next" value={returnTo}/>}
         {notice && !error && <Alert variant="success" title={notice} />}
         {error && (
           <Alert
@@ -184,7 +186,7 @@ export function LoginForm({ googleEnabled, initialError, notice, initialIdentifi
           <div className="grid gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
             <p className="font-medium">จำรหัสผ่านไม่ได้?</p>
             <p className="text-muted-foreground">หากเคยตั้งรหัสผ่านกับระบบ ให้ขอลิงก์ตั้งรหัสผ่านใหม่โดยใช้อีเมลหรือชื่อผู้ใช้เดิม</p>
-            <Link href={`/forgot-password${forgotFor ? `?id=${encodeURIComponent(forgotFor)}` : ""}`} className={buttonClass("outline", "md", "w-full")}>
+            <Link href="/forgot-password" className={buttonClass("outline", "md", "w-full")}>
               <MailCheck className="h-4 w-4" /> ไปหน้าตั้งรหัสผ่านใหม่
             </Link>
           </div>
@@ -491,7 +493,8 @@ export function RegisterForm({ googleEnabled }: { googleEnabled: boolean }) {
 function AccountRecoveryHelp() {
   return <section className="grid gap-2 rounded-lg border p-4">
     <h2 className="font-semibold">จำอีเมลเดิมไม่ได้หรือเข้าอีเมลไม่ได้</h2>
-    <p className="text-sm">ติดต่อครูผู้สอน หรือโทรหาวิทยาลัยเพื่อขอประสานผู้ดูแลระบบ แจ้งชื่อและหลักสูตรที่สมัคร เมื่อเจ้าหน้าที่ตรวจสอบตัวตนแล้ว จะออกชื่อเข้าสู่ระบบและรหัสผ่านชั่วคราวให้สำหรับบัญชีเดิม</p>
+    <p className="text-sm">แจ้งงานทะเบียนผ่านแบบฟอร์มได้แม้ยังเข้าสู่ระบบไม่ได้ เก็บเลขเรื่องและรหัสติดตามเพื่อดูผล เจ้าหน้าที่จะนัดตรวจตัวตนก่อนคืนสิทธิ์บัญชีเดิม</p>
+    <Link href="/recovery" className="font-medium underline">แจ้งเรื่องหรือติดตามการกู้บัญชี</Link>
     <a className="text-sm underline" href="tel:038685383">โทรหาวิทยาลัย 038-685383</a>
   </section>;
 }
@@ -533,6 +536,7 @@ const RESEND_AFTER_SEC = 60;
  */
 export function ForgotPasswordForm({ googleEnabled, emailAvailable, initialIdentifier }: { googleEnabled: boolean; emailAvailable: boolean; initialIdentifier?: string | undefined }) {
   const s = useSubmit();
+  const [fallbackMessage, fallback] = useActionState(mailForm,"");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [wait, setWait] = useState(0);
 
@@ -600,7 +604,8 @@ export function ForgotPasswordForm({ googleEnabled, emailAvailable, initialIdent
 
   return (
     <div className="grid gap-6">
-      {emailAvailable && <form method="post" onSubmit={onSubmit} className="grid gap-4">
+      {emailAvailable && <form action={fallback} onSubmit={onSubmit} className="grid gap-4">
+        {fallbackMessage && <p role="status">{fallbackMessage}</p>}
         {s.error && <Alert variant="destructive" title={wait > 0 ? `ขอลิงก์บ่อยเกินไป กรุณารออีก ${wait} วินาที` : s.error} />}
         <Field label="อีเมลหรือชื่อผู้ใช้" hint="กรอกอีเมลหลัก อีเมลสำรองที่ยืนยันแล้ว หรือชื่อผู้ใช้ หากใช้ชื่อผู้ใช้ ระบบจะส่งไปอีเมลหลัก">
           <Input
@@ -640,6 +645,7 @@ export function ForgotPasswordForm({ googleEnabled, emailAvailable, initialIdent
 }
 
 export function ResetPasswordForm({ token }: { token: string }) {
+  const [fallbackMessage,fallback] = useActionState(passwordForm,"");
   const router = useRouter();
   const s = useSubmit();
   const [pwd, setPwd] = useState("");
@@ -668,7 +674,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
   if (s.notice) return <Alert variant="success" title="ตั้งรหัสผ่านใหม่แล้ว">กำลังพาไปหน้าเข้าสู่ระบบ ใช้รหัสผ่านใหม่เข้าสู่ระบบได้เลย</Alert>;
   if (expired) return <ResetLinkExpired />;
   return (
-    <form method="post" onSubmit={onSubmit} className="grid gap-4">
+    <form action={fallback} onSubmit={onSubmit} className="grid gap-4">
+      <input type="hidden" name="token" value={token}/>
+      {fallbackMessage && <p role="alert">{fallbackMessage}</p>}
       {s.error && <Alert variant="destructive" title={s.error} />}
       <Field label="รหัสผ่านใหม่" hint="อย่างน้อย 12 ตัวอักษร ใช้วลีที่จำง่ายได้ เช่น ‘ลอยกระทงปี2569สนุกมาก’">
         <PasswordInput name="password" autoComplete="new-password" minLength={12} required autoFocus className="h-11" value={pwd} onChange={(e) => setPwd(e.target.value)} />

@@ -27,14 +27,27 @@ type Meta = { ip: string };
 async function loadTarget(adminId: string, userId: string) {
   const user = await ctx()
     .db.selectFrom("users")
-    .select(["id", "email", "username", "status", "is_system_owner", "email_verified_at"])
+    .select(["id", "email", "username", "status", "is_system_owner", "email_verified_at", "registrar_recovered_at"])
     .where("id", "=", userId)
     .executeTakeFirst();
   if (!user) throw new HttpError(404, "NOT_FOUND");
   if (user.is_system_owner) throw new HttpError(409, "SYSTEM_OWNER_PROTECTED");
   if (user.id === adminId) throw new HttpError(409, "FORBIDDEN", "จัดการรหัสผ่านของบัญชีตัวเองได้ที่หน้าความปลอดภัยของบัญชี");
   if (user.status !== "active") throw new HttpError(409, "USER_NOT_ACTIVE", "เปิดใช้งานบัญชีก่อน จึงจะรีเซ็ตรหัสผ่านได้");
+  const assigned = await ctx().db.selectFrom("recovery_staff").select("duty").where("user_id","=",adminId).executeTakeFirst();
+  if (assigned?.duty === "auditor") throw new HttpError(403,"FORBIDDEN");
   return user;
+}
+
+async function requireDirectHandover(actor: string, target: string) {
+  const {db} = ctx();
+  const [delegated, pending, account] = await Promise.all([
+    db.selectFrom("recovery_staff").select("duty").where("user_id","=",actor).executeTakeFirst(),
+    db.selectFrom("recovery_cases").select("id").where("target_user_id","=",target).where("status","in",["approval","approved","issued"]).executeTakeFirst(),
+    db.selectFrom("users").select(["role","email","email_verified_at","registrar_recovered_at"]).where("id","=",target).executeTakeFirstOrThrow(),
+  ]);
+  if (account.role === "admin") throw new HttpError(403,"FORBIDDEN","กรุณาประสานเจ้าของระบบสำหรับบัญชีผู้ดูแล");
+  if (pending || delegated || process.env.RECOVERY_CASE_ONLY === "on" || !account.email_verified_at || account.email.endsWith(".invalid") || account.registrar_recovered_at) throw new HttpError(409,"CASE_REQUIRED","กรุณาดำเนินการผ่านเรื่องขอกู้บัญชี");
 }
 
 /** Email the user a reset link. `logout` also signs them out everywhere right away. */
@@ -42,13 +55,13 @@ export async function adminSendResetEmail(adminId: string, userId: string, opts:
   const { db, env } = ctx();
   const user = await loadTarget(adminId, userId);
   await requireOutboundEmail();
-  if (user.email.endsWith(".invalid")) throw new HttpError(409, "NO_EMAIL", "บัญชีนี้ไม่มีอีเมลที่ส่งได้ ใช้การสร้างลิงก์หรือรหัสผ่านชั่วคราวแทน");
+  if ((user.registrar_recovered_at && !user.email_verified_at) || user.email.endsWith(".invalid")) throw new HttpError(409, "NO_EMAIL", "บัญชีนี้ไม่มีอีเมลที่ส่งได้ ใช้การสร้างลิงก์หรือรหัสผ่านชั่วคราวแทน");
   const token = generateToken();
   const expiresAt = new Date(Date.now() + EMAIL_LINK_TTL_MS);
   await db.transaction().execute(async (trx) => {
     const reset = await trx
       .insertInto("password_reset_tokens")
-      .values({ user_id: user.id, token_hash: hashToken(token), reset_method: "email_link", expires_at: expiresAt })
+      .values({ user_id: user.id, recipient_email: user.email, token_hash: hashToken(token), reset_method: "email_link", expires_at: expiresAt })
       .returning("id")
       .executeTakeFirstOrThrow();
     await addEmailToOutbox(
@@ -67,6 +80,7 @@ export async function adminCreateResetLink(adminId: string, userId: string, meta
   const { db, env } = ctx();
   const user = await loadTarget(adminId, userId);
   const token = generateToken();
+  await requireDirectHandover(adminId,userId);
   const expiresAt = new Date(Date.now() + ADMIN_LINK_TTL_MS);
   await db
     .insertInto("password_reset_tokens")
@@ -95,6 +109,8 @@ export async function adminSetTemporaryPassword(
 ) {
   const { db } = ctx();
   const user = await loadTarget(adminId, userId);
+  await requireDirectHandover(adminId,userId);
+  if (input.verifyEmail) throw new HttpError(409,"EMAIL_PROOF_REQUIRED","เจ้าของอีเมลต้องยืนยันด้วยตนเอง");
   const password = input.password?.trim() || generateTemporaryPassword();
   const problem = validatePasswordPolicy(password);
   if (problem) throw new HttpError(400, "WEAK_PASSWORD", problem);
@@ -108,7 +124,6 @@ export async function adminSetTemporaryPassword(
         password_hash: passwordHash,
         password_updated_at: now,
         must_change_password: true,
-        ...(input.verifyEmail && !user.email_verified_at ? { email_verified_at: now } : {}),
       })
       .where("id", "=", user.id)
       .execute();
@@ -124,7 +139,7 @@ export async function adminSetTemporaryPassword(
     entityType: "user",
     entityId: user.id,
     ip: meta.ip,
-    details: { generated: !input.password?.trim(), verifiedEmail: input.verifyEmail && !user.email_verified_at },
+    details: { generated: !input.password?.trim(), verifiedEmail: false },
   });
   return { password, loginId: user.username ?? user.email };
 }

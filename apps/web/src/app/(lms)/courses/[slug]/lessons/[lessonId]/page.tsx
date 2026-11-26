@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "บทเรียน" };
 export default async function LessonPage({ params }: { params: Promise<{ slug: string; lessonId: string }> }) {
   const { slug, lessonId } = await params;
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?next=" + encodeURIComponent(`/courses/${slug}/lessons/${lessonId}`));
   const data = await getCourseForViewer(slug, user);
   if (!data) notFound();
   const lesson = data.lessons.find((l) => l.id === lessonId);

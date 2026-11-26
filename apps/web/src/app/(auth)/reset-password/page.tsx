@@ -4,7 +4,7 @@ import { AuthHeading, ResetLinkExpired, ResetPasswordForm } from "@/components/a
 import { inspectResetToken } from "@/server/auth/auth.service";
 
 // The token is in the URL: never send it to other sites via Referer
-export const metadata: Metadata = { title: "ตั้งรหัสผ่านใหม่", referrer: "no-referrer", robots: { index: false } };
+export const metadata: Metadata = { title: "ตั้งรหัสผ่านใหม่", referrer: "strict-origin", robots: { index: false } };
 
 export default async function ResetPasswordPage({ searchParams }: { searchParams: Promise<{ token?: string; required?: string }> }) {
   const { token, required } = await searchParams;

@@ -17,6 +17,7 @@ import {
 import { enqueueCohortOpenEmails, enqueueCohortStartingEmails } from "./jobs/cohort-notifications.ts";
 import { checkAnticheatAnomaly } from "./jobs/anticheat-anomaly.ts";
 import { processScheduledBroadcasts } from "./jobs/process-scheduled-broadcasts.ts";
+import { maintainRecoveryCases } from "./jobs/recovery-maintenance.ts";
 import { expireWaitlistOffers } from "./jobs/expire-waitlist-offers.ts";
 import { ensureSystemOwner } from "./system-owner.ts";
 import { ensureDeveloperTestCertificate } from "./developer-test.ts";
@@ -41,6 +42,7 @@ const schedulerQueues = [
   new Queue("ops-health", schedulerQueueOptions),           // [5]
   new Queue("scheduled-broadcasts", schedulerQueueOptions), // [6]
   new Queue("waitlist-expire", schedulerQueueOptions),      // [7]
+  new Queue("recovery-maintenance", schedulerQueueOptions), // [8]
 ];
 
 const workers = [
@@ -86,10 +88,12 @@ const workers = [
   }, { connection, concurrency: 1 }),
   new Worker("ops-health", () => checkAnticheatAnomaly(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
   new Worker("scheduled-broadcasts", () => processScheduledBroadcasts(db, env.APP_ORIGIN), { connection, concurrency: 1 }),
+  new Worker("recovery-maintenance", () => maintainRecoveryCases(db), { connection, concurrency: 1 }),
   new Worker("waitlist-expire", () => expireWaitlistOffers(db), { connection, concurrency: 1 }),
 ];
 
 // Daily cron: re-check every lesson's video (catches broken videos before learners hit them)
+await schedulerQueues[8]!.upsertJobScheduler("recovery-expiry", { every: 300_000 }, { name: "expire" });
 await schedulerQueues[3]!.upsertJobScheduler("daily-stale", { pattern: "0 3 * * *", tz: "Asia/Bangkok" }, { name: "stale" });
 await schedulerQueues[0]!.upsertJobScheduler("outbox-poll", { every: 1_000 }, { name: "poll" });
 await schedulerQueues[1]!.upsertJobScheduler("due-reminders", { pattern: "0 * * * *", tz: "Asia/Bangkok" }, { name: "due" });
