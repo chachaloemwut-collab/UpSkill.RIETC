@@ -3,7 +3,7 @@ import {sql, type Database, type Tx} from "@upskill/db";
 import {ctx} from "../context";
 import type {CurrentUser} from "../auth/session";
 import {HttpError} from "../http";
-import {resources, type Resource} from "./catalog";
+import {resources, deskActions, type Resource} from "./catalog";
 
 export type Operation = "read"|"act"|"export";
 type Executor = Database|Tx;
@@ -71,7 +71,9 @@ export async function records(db:Executor,actor:CurrentUser,key:Resource,options
   const find=options.q.trim().slice(0,100);
   const search=find ? sql` AND (${sql.join(projection.map(f=>sql`strpos(lower(${f}::text),lower(${find}))>0`),sql` OR `)})` : sql``;
   const source=sql`FROM ${sql.table(resource.table)} r WHERE ${accessPredicate(actor,key,options.exporting?"export":"read")}${search}`;
+  const rowAction = !options.exporting && deskActions.includes(key)
+    ? sql`, ${accessPredicate(actor,key,"act")} AS _can_act` : sql``;
   const limit=options.exporting?5001:26;
   const order=sql.join([sql`${sql.ref("r."+sort)} ${options.desc?sql`DESC`:sql`ASC`} NULLS LAST`,...projection]);
-  return (await sql<Record<string,unknown>>`SELECT ${sql.join(projection)} ${source} ORDER BY ${order} LIMIT ${limit} OFFSET ${options.exporting?0:(options.page-1)*25}`.execute(db)).rows;
+  return (await sql<Record<string,unknown>>`SELECT ${sql.join(projection)}${rowAction} ${source} ORDER BY ${order} LIMIT ${limit} OFFSET ${options.exporting?0:(options.page-1)*25}`.execute(db)).rows;
 }

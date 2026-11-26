@@ -66,7 +66,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const row = await db
     .selectFrom("user_sessions as s")
     .innerJoin("users as u", "u.id", "s.user_id")
-    .select(["s.id as sessionId", "s.last_seen_at", "s.created_at", "u.id", "u.email", "u.username", "u.is_system_owner", "u.role"])
+    .select(["s.id as sessionId", "s.last_seen_at", "s.created_at", "u.id", "u.email", "u.username", "u.is_system_owner", "u.role", "u.scoped_management"])
     .where("s.token_hash", "=", hashToken(token))
     .where("s.revoked_at", "is", null)
     .where("s.expires_at", ">", new Date())
@@ -90,7 +90,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     email: row.email,
     username: row.username,
     isSystemOwner: row.is_system_owner,
-    role: row.role as CurrentUser["role"],
+    role: row.role === "admin" && row.scoped_management && !row.is_system_owner ? "member" : row.role as CurrentUser["role"],
     sessionCreatedAt: new Date(row.created_at),
   };
 });

@@ -329,7 +329,7 @@ export interface ApplicationReview {
   documentsVerified?: Record<string, boolean | null> | undefined;
 }
 
-export async function reviewApplication(manager: CurrentUser, courseId: string, applicationId: string, r: ApplicationReview, meta: { ip: string }, desk?: { mode: "payments"|"applications"; version:string }) {
+export async function reviewApplication(manager: CurrentUser, courseId: string, applicationId: string, r: ApplicationReview, meta: { ip: string }, desk?: { mode: "payments"|"applications"; version:string; reason:string }) {
   if (!desk) await loadOwnedCourse(manager, courseId);
   const { db } = ctx();
   await db.transaction().execute(async (trx) => {
@@ -369,8 +369,8 @@ export async function reviewApplication(manager: CurrentUser, courseId: string, 
       set.documents = JSON.stringify(docs);
     }
     await trx.updateTable("course_applications").set(set).where("id", "=", app.id).execute();
+    await audit(trx, { action: "course.application_reviewed", userId: manager.id, entityType: "course", entityId: courseId, ip: meta.ip, details: { applicationId, action: r.action ?? r.paymentStatus ?? null, ...(desk && { reason: desk.reason }) } });
   });
-  await audit(db, { action: "course.application_reviewed", userId: manager.id, entityType: "course", entityId: courseId, ip: meta.ip, details: { applicationId, action: r.action ?? null } });
 }
 
 const STATUS_TH: Record<string, string> = { submitted: "รอพิจารณา", approved: "ลงทะเบียนแล้ว", rejected: "ไม่ผ่านการพิจารณา" };

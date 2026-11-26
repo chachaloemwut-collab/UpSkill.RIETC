@@ -1,6 +1,7 @@
 "use server";
 import {redirect} from "next/navigation";
-import {resourceKey} from "@/server/management/access";
+import {revokeCertificate,retryEmailDelivery} from "@/server/admin/admin.service";
+import {authorizeRecord,resourceKey} from "@/server/management/access";
 import {setFilter} from "@/server/management/filter";
 import {headers} from "next/headers";
 import {revalidatePath} from "next/cache";
@@ -32,17 +33,19 @@ export async function grantDuty(_:string,f:FormData) {
     (until && !(until.getTime()>Date.now()))) return "กรุณาตรวจรหัสสมาชิก ขอบเขต เหตุผล และวันสิ้นสุด";
   const {db}=ctx();
   const message=await db.transaction().execute(async trx=>{
-    const user=await trx.selectFrom("users").select(["role","status"]).where("id","=",target.data).forShare().executeTakeFirst();
-    if (!user || user.role==="admin" || user.status!=="active") return "กรุณาเลือกบัญชีผู้เรียนหรือผู้สอนที่เปิดใช้งาน ผู้ดูแลระบบมีสิทธิ์ส่วนกลางอยู่แล้ว";
+    const user=await trx.selectFrom("users").select(["role","status","is_system_owner","scoped_management"]).where("id","=",target.data).forUpdate().executeTakeFirst();
+    if (!user || user.is_system_owner || user.status!=="active") return "กรุณาเลือกบัญชีที่เปิดใช้งาน";
+    if (user.role==="admin" && !user.scoped_management && f.get("restrictAdmin")!=="on") return "กรุณายืนยันการเปลี่ยนผู้ดูแลเดิมเป็นผู้ดูแลตามขอบเขต";
     if (kind.data!=="global") {
       const table=kind.data==="course"?"courses":"program_cohorts";
       if (!(await trx.selectFrom(table).select("id").where("id","=",scope.data!).forShare().executeTakeFirst())) return "ไม่พบขอบเขตที่ระบุ";
     }
+    if (user.role==="admin" && !user.scoped_management) await trx.updateTable("users").set({scoped_management:true}).where("id","=",target.data).execute();
     const grant=await trx.insertInto("management_grants").values({
       user_id:target.data,duty,course_id:kind.data==="course"?scope.data!:null,cohort_id:kind.data==="cohort"?scope.data!:null,
       expires_at:until,reason,granted_by:owner.id,can_act:duty!=="auditor" && f.get("act")==="on",can_export:f.get("export")==="on",
     }).returning("id").executeTakeFirstOrThrow();
-    await audit(trx,{action:"management.granted",userId:owner.id,entityType:"management_grant",entityId:grant.id,details:{duty,target:target.data,scope:kind.data}});
+    await audit(trx,{action:"management.granted",userId:owner.id,entityType:"management_grant",entityId:grant.id,details:{duty,target:target.data,scope:kind.data,restrictedAdmin:user.role==="admin" && !user.scoped_management}});
     return "บันทึกการมอบสิทธิ์แล้ว";
   });
   revalidatePath("/management");
@@ -66,7 +69,7 @@ export async function revokeDuty(_:string,f:FormData) {
 export async function reviewRecord(_:string,f:FormData) {
   const user=await actor();
   const id=z.uuid().parse(f.get("id"));
-  const parent=z.uuid().parse(f.get("parent"));
+  const parent=()=>z.uuid().parse(f.get("parent"));
   const action=String(f.get("decision"));
   const expected=String(f.get("expected"));
   const note=String(f.get("note")??"").trim();
@@ -75,16 +78,38 @@ export async function reviewRecord(_:string,f:FormData) {
   try {
     switch (f.get("resource")) {
       case "registrations":
-        await decideRegistrations(user,parent,{ids:[id],decision:z.enum(["approve","reject"]).parse(action),note},{ip},expected);
+        await decideRegistrations(user,parent(),{ids:[id],decision:z.enum(["approve","reject"]).parse(action),note},{ip},expected);
         break;
       case "applications":
-        await reviewApplication(user,parent,id,{action:z.enum(["approve","reject"]).parse(action),staffNote:note},{ip},{mode:"applications",version:expected});
+        await reviewApplication(user,parent(),id,{action:z.enum(["approve","reject"]).parse(action),staffNote:note},{ip},{mode:"applications",version:expected,reason:note});
         break;
       case "payments": {
         const status=z.enum(["pending","paid","waived","not_required"]).parse(action);
         const receiptNo=String(f.get("receipt")??"").trim();
         if (receiptNo.length>100 || (status==="paid" && !receiptNo)) return "กรุณาระบุเลขที่ใบเสร็จเมื่อบันทึกการชำระ";
-        await reviewApplication(user,parent,id,{paymentStatus:status,receiptNo},{ip},{mode:"payments",version:expected});
+        await reviewApplication(user,parent(),id,{paymentStatus:status,receiptNo},{ip},{mode:"payments",version:expected,reason:note});
+        break;
+      }
+      case "certificates":
+        if (action !== "revoke" || note.length < 5) return "กรุณายืนยันการเพิกถอนและระบุเหตุผลอย่างน้อย 5 ตัวอักษร";
+        await revokeCertificate(user.id,String(f.get("code")),note,{ip},{actor:user,id});
+        break;
+      case "announcements":
+      case "outbox": {
+        const key = resourceKey(f.get("resource"));
+        await ctx().db.transaction().execute(async trx => {
+          await authorizeRecord(trx,user,key,id);
+          if (key === "outbox") {
+            if (action !== "retry") throw new HttpError(400,"INVALID_ACTION");
+            await retryEmailDelivery(id,trx);
+          } else {
+            const pin = z.enum(["pin","unpin"]).parse(action);
+            const current = await trx.selectFrom("announcements").select("updated_at").where("id","=",id).executeTakeFirstOrThrow();
+            if (current.updated_at.toISOString() !== expected) throw new HttpError(409,"STALE_RECORD","รายการเปลี่ยนแล้ว กรุณาเปิดข้อมูลล่าสุด");
+            await trx.updateTable("announcements").set({is_pinned:pin==="pin"}).where("id","=",id).execute();
+          }
+          await audit(trx,{action:"management.updated",userId:user.id,entityType:key,entityId:id,ip,details:{action,reason:note}});
+        });
         break;
       }
       default: throw new HttpError(403,"FORBIDDEN");
@@ -102,4 +127,22 @@ export async function search(f:FormData) {
   const key=resourceKey(f.get("resource"));
   await setFilter(user,key,String(f.get("q")??""));
   redirect("/management?"+new URLSearchParams({resource:key,sort:String(f.get("sort")??""),direction:f.get("direction")==="asc"?"asc":"desc"}));
+}
+
+export async function restoreAdmin(_: string, form: FormData) {
+  const owner = await actor();
+  if (!owner.isSystemOwner) throw new HttpError(403, "FORBIDDEN");
+  const target = z.uuid().safeParse(form.get("target"));
+  const reason = z.string().trim().min(1).max(500).safeParse(form.get("reason"));
+  if (!target.success || !reason.success || form.get("confirmed") !== "on") return "กรุณาระบุบัญชี เหตุผล และยืนยันการคืนสิทธิ์";
+  const restored = await ctx().db.transaction().execute(async trx => {
+    const changed = await trx.updateTable("users").set({scoped_management:false})
+      .where("id","=",target.data).where("scoped_management","=",true).where("role","=","admin")
+      .where("is_system_owner","=",false).where("status","=","active").returning("id").executeTakeFirst();
+    if (!changed) return false;
+    await audit(trx,{action:"management.granted",userId:owner.id,entityType:"user",entityId:changed.id,details:{access:"global_admin_restored",reason:reason.data}});
+    return true;
+  });
+  revalidatePath("/management");
+  return restored ? "คืนสิทธิ์ผู้ดูแลทั้งระบบแล้ว" : "ไม่พบบัญชีผู้ดูแลที่จำกัดขอบเขตและเปิดใช้งาน";
 }

@@ -760,6 +760,7 @@ export interface Users {
   password_updated_at: Timestamp | null;
   registrar_recovered_at: Timestamp | null;
   role: Generated<string>;
+  scoped_management: Generated<boolean>;
   status: Generated<string>;
   updated_at: Generated<Timestamp>;
   username: string | null;

@@ -4,6 +4,7 @@ import type { Database } from "@upskill/db";
 export type AuditAction =
   | "management.granted"
   | "management.revoked"
+  | "management.updated"
   | "management.exported"
   | "recovery.staff_delegated"
   | "enrollment.portrait_added"

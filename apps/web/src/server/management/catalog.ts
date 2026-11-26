@@ -57,7 +57,7 @@ export const resources = {
   anticheat:entry("anticheat_events","เหตุการณ์ระหว่างเรียน","academic","lesson",["id","lesson_id","user_id","reason","created_at"]),
   focus:entry("assessment_focus_events","เหตุการณ์ระหว่างสอบ","academic","attempt",["id","attempt_id","event_type","created_at"]),
   certificates:entry("certificates","วุฒิบัตรและเอกสารรับรอง","documents","course",["id","certificate_code","course_id","cohort_id","issued_at","revoked_at"]),
-  announcements:entry("announcements","ประกาศ","support","cohort",["id","cohort_id","title","visibility","publish_at"]),
+  announcements:entry("announcements","ประกาศ","support","cohort",["id","cohort_id","title","visibility","is_pinned","publish_at","updated_at"]),
   messages:entry("support_messages","รายการติดต่อเจ้าหน้าที่","support","global",["id","member_id","created_at"]),
   outbox:entry("email_outbox","คิวส่งอีเมล","technical","global",["id","template_key","status","attempt_count","created_at","sent_at","last_error_code"]),
   delivery:entry("email_delivery_events","สถานะจากผู้ส่งอีเมล","technical","global",["id","outbox_id","event_type","occurred_at"]),
@@ -70,3 +70,5 @@ export const resources = {
   requests:entry("partner_api_requests","ประวัติเรียก API","technical","global",["id","client_id","status","created_at"]),
   audit:entry("audit_logs","บันทึกตรวจสอบ","auditor","global",["id","action","entity_type","created_at"]),
 } as const;
+
+export const deskActions = ["registrations","applications","payments","announcements","outbox","certificates"] as readonly Resource[];
