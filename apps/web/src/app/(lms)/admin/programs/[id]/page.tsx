@@ -63,7 +63,7 @@ export default async function AdminProgramPage({ params }: { params: Promise<{ i
               <div className="p-5"><EmptyState icon={<CalendarDays className="h-5 w-5" />} title="ยังไม่มีรอบอบรม" /></div>
             ) : (
               <div className="overflow-x-auto p-3">
-                <Table className="[&_td]:py-2.5">
+                <Table className="mobile-records [&_td]:py-2.5">
                   <thead>
                     <tr>
                       <th>รอบ</th>
@@ -79,12 +79,12 @@ export default async function AdminProgramPage({ params }: { params: Promise<{ i
                       const phase = COHORT_PHASE[c.phase];
                       return (
                         <tr key={c.id}>
-                          <td><Link href={`/admin/cohorts/${c.id}`} className="font-medium hover:underline">{c.title}</Link></td>
-                          <td><Badge variant={phase?.variant ?? "secondary"}>{phase?.label ?? c.phase}</Badge></td>
-                          <td className="whitespace-nowrap text-sm text-muted-foreground">{formatDateTimeTh(c.registration_opens_at)}<br />ถึง {formatDateTimeTh(c.registration_closes_at)}</td>
-                          <td className="whitespace-nowrap text-sm text-muted-foreground">{formatDateTimeTh(c.starts_at)}<br />ถึง {formatDateTimeTh(c.ends_at)}</td>
-                          <td className="text-right tabular-nums">{c.approved_count}{c.capacity !== null ? ` / ${c.capacity}` : ""}{c.waitlisted_count > 0 && <span className="block text-xs text-muted-foreground">สำรอง {c.waitlisted_count}</span>}</td>
-                          <td className="text-right tabular-nums">{c.pending_count > 0 ? <Badge variant="warning">{c.pending_count}</Badge> : 0}</td>
+                          <td data-label="รอบ"><Link href={`/admin/cohorts/${c.id}`} className="font-medium hover:underline">{c.title}</Link></td>
+                          <td data-label="สถานะ"><Badge variant={phase?.variant ?? "secondary"}>{phase?.label ?? c.phase}</Badge></td>
+                          <td data-label="รับสมัคร" className="whitespace-nowrap text-sm text-muted-foreground">{formatDateTimeTh(c.registration_opens_at)}<br />ถึง {formatDateTimeTh(c.registration_closes_at)}</td>
+                          <td data-label="อบรม" className="whitespace-nowrap text-sm text-muted-foreground">{formatDateTimeTh(c.starts_at)}<br />ถึง {formatDateTimeTh(c.ends_at)}</td>
+                          <td data-label="ที่นั่ง" className="text-right tabular-nums">{c.approved_count}{c.capacity !== null ? ` / ${c.capacity}` : ""}{c.waitlisted_count > 0 && <span className="block text-xs text-muted-foreground">สำรอง {c.waitlisted_count}</span>}</td>
+                          <td data-label="รอพิจารณา" className="text-right tabular-nums">{c.pending_count > 0 ? <Badge variant="warning">{c.pending_count}</Badge> : 0}</td>
                         </tr>
                       );
                     })}

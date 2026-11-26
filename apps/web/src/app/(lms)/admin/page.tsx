@@ -75,7 +75,7 @@ async function AdminOverview({ user }: { user: NonNullable<Awaited<ReturnType<ty
           {courses.length === 0 ? (
             <EmptyState icon={<BookOpen className="h-5 w-5" />} title="ยังไม่มีหลักสูตร" />
           ) : (
-            <Table className="[&_td]:py-2">
+            <Table className="mobile-records [&_td]:py-2">
               <thead>
                 <tr>
                   <th>หลักสูตร</th>
@@ -89,20 +89,20 @@ async function AdminOverview({ user }: { user: NonNullable<Awaited<ReturnType<ty
                   const vis = VISIBILITY[c.visibility];
                   return (
                     <tr key={c.id}>
-                      <td>
+                      <td data-label="หลักสูตร">
                         <Link href={`/courses/${c.slug}`} className="inline-flex max-w-sm items-center gap-1.5 font-medium hover:underline">
                           <span className="truncate">{c.title}</span>
                           {c.is_verified_course && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-success" aria-label="Verified" />}
                         </Link>
                       </td>
-                      <td>
+                      <td data-label="ผู้สอน">
                         <span className="block">{c.instructor_name || c.instructor_email}</span>
                         {c.instructor_name && <span className="block text-xs text-muted-foreground">{c.instructor_email}</span>}
                       </td>
-                      <td>
+                      <td data-label="สถานะ">
                         <Badge variant={vis?.variant ?? "secondary"}>{vis?.label ?? c.visibility}</Badge>
                       </td>
-                      <td className="text-right">
+                      <td data-label="ดำเนินการ" className="text-right">
                         <CourseAdminControls courseId={c.id} title={c.title} visibility={c.visibility} verified={c.is_verified_course} instructorId={c.instructor_id} instructors={instructors} />
                       </td>
                     </tr>
@@ -118,7 +118,7 @@ async function AdminOverview({ user }: { user: NonNullable<Awaited<ReturnType<ty
             {flags.length === 0 ? (
               <EmptyState icon={<ShieldAlert className="h-5 w-5" />} title="ไม่พบพฤติกรรมผิดปกติ" description="ระบบจะบันทึกเมื่อพบการกรอข้ามหรือเร่งความเร็ววิดีโอ" />
             ) : (
-              <Table>
+              <Table className="mobile-records">
                 <thead>
                   <tr>
                     <th>เวลา</th>
@@ -130,12 +130,12 @@ async function AdminOverview({ user }: { user: NonNullable<Awaited<ReturnType<ty
                 <tbody>
                   {flags.map((f) => (
                     <tr key={String(f.id)}>
-                      <td className="text-muted-foreground">{formatDateTimeTh(f.created_at)}</td>
-                      <td>{f.email}</td>
-                      <td>
+                      <td data-label="เวลา" className="text-muted-foreground">{formatDateTimeTh(f.created_at)}</td>
+                      <td data-label="ผู้ใช้">{f.email}</td>
+                      <td data-label="ประเภท">
                         <Badge variant="warning">{REASONS[f.reason] ?? f.reason}</Badge>
                       </td>
-                      <td className="max-w-xs truncate text-muted-foreground">{f.lesson_title}</td>
+                      <td data-label="บทเรียน" className="max-w-xs truncate text-muted-foreground">{f.lesson_title}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -221,11 +221,11 @@ async function AdminOverview({ user }: { user: NonNullable<Awaited<ReturnType<ty
           </Card>
           <Card>
             <div className="flex items-center gap-3 border-b px-5 py-4"><Mail className="h-5 w-5" /><div><h3 className="font-semibold">ประวัติการส่งอีเมล</h3><p className="text-xs text-muted-foreground">รอส่ง {stats.emailPending} · ล้มเหลว {stats.emailFailed}</p></div></div>
-            <Table><thead><tr><th>สร้างเมื่อ</th><th>ผู้รับ</th><th>ประเภท</th><th>สถานะ</th><th>ครั้ง</th><th /></tr></thead><tbody>{emails.map((email) => <tr key={email.id}><td>{formatDateTimeTh(email.created_at)}</td><td>{email.recipient_email}</td><td>{email.template_key}</td><td><Badge variant={email.status === "sent" ? "success" : email.status === "failed" ? "destructive" : email.status === "suppressed" ? "warning" : "secondary"}>{email.status}</Badge></td><td>{email.attempt_count}</td><td className="text-right">{(email.status === "failed" || email.status === "suppressed") && <RetryEmailButton id={email.id} />}</td></tr>)}</tbody></Table>
+            <Table className="mobile-records"><thead><tr><th>สร้างเมื่อ</th><th>ผู้รับ</th><th>ประเภท</th><th>สถานะ</th><th>ครั้ง</th><th /></tr></thead><tbody>{emails.map((email) => <tr key={email.id}><td data-label="สร้างเมื่อ">{formatDateTimeTh(email.created_at)}</td><td data-label="ผู้รับ">{email.recipient_email}</td><td data-label="ประเภท">{email.template_key}</td><td data-label="สถานะ"><Badge variant={email.status === "sent" ? "success" : email.status === "failed" ? "destructive" : email.status === "suppressed" ? "warning" : "secondary"}>{email.status}</Badge></td><td data-label="ครั้ง">{email.attempt_count}</td><td data-label="ดำเนินการ" className="text-right">{(email.status === "failed" || email.status === "suppressed") && <RetryEmailButton id={email.id} />}</td></tr>)}</tbody></Table>
           </Card>
           <Card>
             <div className="border-b px-5 py-4"><h3 className="font-semibold">อีเมลที่ถูกระงับ</h3><p className="text-xs text-muted-foreground">เกิดจาก hard bounce, complaint หรือการระงับโดยผู้ดูแล</p></div>
-            {suppressions.length ? <Table><thead><tr><th>อีเมล</th><th>เหตุผล</th><th>เมื่อ</th><th /></tr></thead><tbody>{suppressions.map((item) => <tr key={item.email}><td>{item.email}</td><td>{item.reason}</td><td>{formatDateTimeTh(item.created_at)}</td><td className="text-right"><RemoveSuppressionButton email={item.email} /></td></tr>)}</tbody></Table> : <p className="p-5 text-sm text-muted-foreground">ไม่มีอีเมลที่ถูกระงับ</p>}
+            {suppressions.length ? <Table className="mobile-records"><thead><tr><th>อีเมล</th><th>เหตุผล</th><th>เมื่อ</th><th /></tr></thead><tbody>{suppressions.map((item) => <tr key={item.email}><td data-label="อีเมล">{item.email}</td><td data-label="เหตุผล">{item.reason}</td><td data-label="เมื่อ">{formatDateTimeTh(item.created_at)}</td><td data-label="ดำเนินการ" className="text-right"><RemoveSuppressionButton email={item.email} /></td></tr>)}</tbody></Table> : <p className="p-5 text-sm text-muted-foreground">ไม่มีอีเมลที่ถูกระงับ</p>}
           </Card>
         </TabsContent>
         <TabsContent value="partners" className="mt-4">

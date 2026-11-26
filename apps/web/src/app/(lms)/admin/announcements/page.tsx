@@ -39,7 +39,7 @@ async function Announcements({ user }: { user: NonNullable<Awaited<ReturnType<ty
           <div className="p-5"><EmptyState icon={<Megaphone className="h-5 w-5" />} title="ยังไม่มีประกาศ" /></div>
         ) : (
           <div className="overflow-x-auto p-3">
-            <Table className="[&_td]:py-2.5">
+            <Table className="mobile-records [&_td]:py-2.5">
               <thead>
                 <tr><th>หัวข้อ</th><th>ประเภท</th><th>สถานะ</th><th>แสดงตั้งแต่</th><th>หยุดแสดง</th><th>อีเมล</th></tr>
               </thead>
@@ -50,22 +50,22 @@ async function Announcements({ user }: { user: NonNullable<Awaited<ReturnType<ty
                   const expired = !!a.expires_at && a.expires_at <= now;
                   return (
                     <tr key={a.id}>
-                      <td>
+                      <td data-label="หัวข้อ">
                         <Link href={`/admin/announcements/${a.id}`} className="inline-flex max-w-sm items-center gap-1.5 font-medium hover:underline">
                           {a.is_pinned && <Pin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="ปักหมุด" />}
                           <span className="truncate">{a.title}</span>
                         </Link>
                         {a.program_title && <p className="text-xs text-muted-foreground">{a.program_title}</p>}
                       </td>
-                      <td>{ANNOUNCEMENT_KIND[a.kind] ?? a.kind}</td>
-                      <td className="space-x-1">
+                      <td data-label="ประเภท">{ANNOUNCEMENT_KIND[a.kind] ?? a.kind}</td>
+                      <td data-label="สถานะ" className="space-x-1">
                         <Badge variant={vis?.variant ?? "secondary"}>{vis?.label ?? a.visibility}</Badge>
                         {scheduled && <Badge variant="warning">ตั้งเวลาไว้</Badge>}
                         {expired && <Badge variant="outline">หมดอายุ</Badge>}
                       </td>
-                      <td className="whitespace-nowrap text-muted-foreground">{formatDateTimeTh(a.publish_at)}</td>
-                      <td className="whitespace-nowrap text-muted-foreground">{a.expires_at ? formatDateTimeTh(a.expires_at) : "—"}</td>
-                      <td>{a.broadcast_at ? <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Mail className="h-3.5 w-3.5" /> ส่งแล้ว</span> : "—"}</td>
+                      <td data-label="แสดงตั้งแต่" className="whitespace-nowrap text-muted-foreground">{formatDateTimeTh(a.publish_at)}</td>
+                      <td data-label="หยุดแสดง" className="whitespace-nowrap text-muted-foreground">{a.expires_at ? formatDateTimeTh(a.expires_at) : "—"}</td>
+                      <td data-label="อีเมล">{a.broadcast_at ? <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Mail className="h-3.5 w-3.5" /> ส่งแล้ว</span> : "—"}</td>
                     </tr>
                   );
                 })}

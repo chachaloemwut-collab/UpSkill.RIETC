@@ -14,6 +14,18 @@ export const metadata={title:"ตารางจัดการงาน",robots
 const value=(v:unknown)=>v instanceof Date?v.toLocaleString("th-TH",{timeZone:"Asia/Bangkok"}):v===true?"ใช่":v===false?"ไม่":String(v??"—");
 const field=(s:string)=>fieldNames[s]??s;
 
+function recordLink(key: Resource, field: string, row: Record<string,unknown>) {
+  if (field === "user_id" || (key === "users" && field === "username")) return "/admin/users/" + String(row.user_id ?? row.id);
+  if (field === "course_id" || (key === "courses" && field === "title")) return "/instructor/courses/" + String(row.course_id ?? row.id);
+  if (field === "program_id" || (key === "programs" && field === "title")) return "/admin/programs/" + String(row.program_id ?? row.id);
+  if ((field === "cohort_id" && row.cohort_id) || (key === "cohorts" && field === "title")) return "/admin/cohorts/" + String(row.cohort_id ?? row.id);
+  if (key === "announcements" && field === "title") return "/admin/announcements/" + String(row.id);
+  return null;
+}
+function RecordCell({item,fieldKey,row,admin}:{item:Resource;fieldKey:string;row:Record<string,unknown>;admin:boolean}) {
+  const href = admin && row[fieldKey] != null ? recordLink(item,fieldKey,row) : null;
+  return <td data-label={field(fieldKey)} className="p-2">{href ? <Link className="underline" href={href}>{value(row[fieldKey])}</Link> : value(row[fieldKey])}</td>;
+}
 function Decision({item,row}:{item:Resource;row:Record<string,unknown>}) {
   const version=row.updated_at instanceof Date?row.updated_at.toISOString():String(row.status);
   if (item==="outbox" && !["failed","suppressed"].includes(String(row.status))) return null;
@@ -73,7 +85,7 @@ export default async function ManagementPage({searchParams}:{searchParams:Promis
       <label>เรียงตาม <select name="sort" defaultValue={sort}>{resources[key].fields.map(f=><option key={f} value={f}>{field(f)}</option>)}</select></label>
       <select aria-label="ทิศทางการเรียง" name="direction" defaultValue={desc?"desc":"asc"}><option value="desc">มากไปน้อย</option><option value="asc">น้อยไปมาก</option></select><button>แสดงผล</button></form>
     {exporting.includes(key) && <a className="underline" href={`/api/management/export?${query(page)}`}>ส่งออก CSV ตามสิทธิ์และตัวกรอง</a>}
-    {!rows.length?<p>ไม่พบรายการในขอบเขตและตัวกรองนี้</p>:<div className="overflow-auto"><table className="mobile-records w-full text-left text-sm"><thead><tr>{resources[key].fields.map(f=><th scope="col" className="p-2" key={f}>{field(f)}</th>)}{editable&&<th>ดำเนินการ</th>}</tr></thead><tbody>{rows.slice(0,25).map((row,i)=><tr className="border-t" key={String(row.id??i)}>{resources[key].fields.map(f=><td data-label={field(f)} className="p-2" key={f}>{value(row[f])}</td>)}{editable&&<td data-label="ดำเนินการ">{row._can_act===true?<Decision item={key} row={row}/>:"อ่านได้"}</td>}</tr>)}</tbody></table></div>}
+    {!rows.length?<p>ไม่พบรายการในขอบเขตและตัวกรองนี้</p>:<div className="overflow-auto"><table className="mobile-records w-full text-left text-sm"><thead><tr>{resources[key].fields.map(f=><th scope="col" className="p-2" key={f}>{field(f)}</th>)}{editable&&<th>ดำเนินการ</th>}</tr></thead><tbody>{rows.slice(0,25).map((row,i)=><tr className="border-t" key={String(row.id??i)}>{resources[key].fields.map(f=><RecordCell key={f} fieldKey={f} row={row} item={key} admin={actor.role==="admin"}/>)}{editable&&<td data-label="ดำเนินการ">{row._can_act===true?<Decision item={key} row={row}/>:"อ่านได้"}</td>}</tr>)}</tbody></table></div>}
     <nav className="flex gap-3">{page>1&&<Link href={`?${query(page-1)}`}>หน้าก่อน</Link>} หน้า {page} {rows.length>25&&<Link href={`?${query(page+1)}`}>หน้าถัดไป</Link>}</nav>
   </section>;
 }

@@ -58,7 +58,7 @@ async function InstructorOverview({ user }: { user: NonNullable<Awaited<ReturnTy
           </div>
         ) : (
           <div className="p-3">
-            <Table className="[&_td]:py-2.5">
+            <Table className="mobile-records [&_td]:py-2.5">
               <thead>
                 <tr>
                   <th>หลักสูตร</th>
@@ -76,7 +76,7 @@ async function InstructorOverview({ user }: { user: NonNullable<Awaited<ReturnTy
                   const thumb = youtubeThumb(c.cover_video_id);
                   return (
                     <tr key={c.id}>
-                      <td>
+                      <td data-label="หลักสูตร">
                         <Link href={`/instructor/courses/${c.id}`} className="group flex items-center gap-3">
                           <span className="relative block h-10 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
                             {thumb ? <Image src={thumb} alt="" fill sizes="64px" className="object-cover" /> : <BookOpen className="m-auto mt-3 h-4 w-4 text-muted-foreground" />}
@@ -85,20 +85,20 @@ async function InstructorOverview({ user }: { user: NonNullable<Awaited<ReturnTy
                           {c.is_verified_course && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-success" aria-label="Verified" />}
                         </Link>
                       </td>
-                      {isAdmin && <td className="text-muted-foreground">{c.instructor_id === user.id ? "คุณ" : c.instructor_name}</td>}
-                      <td>
+                      {isAdmin && <td data-label="ผู้สอน" className="text-muted-foreground">{c.instructor_id === user.id ? "คุณ" : c.instructor_name}</td>}
+                      <td data-label="สถานะ">
                         <div className="flex gap-1.5">
                           <Badge variant={vis?.variant ?? "secondary"}>{vis?.label ?? c.visibility}</Badge>
                           {c.broken_count > 0 && <Badge variant="destructive">วิดีโอเสีย {c.broken_count}</Badge>}
                           {c.program_count > 0 && <Badge variant="outline">ในหลักสูตรอบรม</Badge>}
                         </div>
                       </td>
-                      <td className="text-right tabular-nums">
+                      <td data-label="บทเรียน" className="text-right tabular-nums">
                         {c.lesson_count} <span className="text-xs text-muted-foreground">({formatStudyDurationTh(c.total_duration_sec)})</span>
                       </td>
-                      <td className="text-right tabular-nums">{c.enrollment_count.toLocaleString("th-TH")}</td>
-                      <td className="text-right tabular-nums">{c.completed_count.toLocaleString("th-TH")}</td>
-                      <td className="text-muted-foreground">{formatDateTh(c.updated_at)}</td>
+                      <td data-label="ผู้เรียน" className="text-right tabular-nums">{c.enrollment_count.toLocaleString("th-TH")}</td>
+                      <td data-label="จบแล้ว" className="text-right tabular-nums">{c.completed_count.toLocaleString("th-TH")}</td>
+                      <td data-label="แก้ไขล่าสุด" className="text-muted-foreground">{formatDateTh(c.updated_at)}</td>
                     </tr>
                   );
                 })}
