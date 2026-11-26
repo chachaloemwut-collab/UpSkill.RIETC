@@ -72,7 +72,7 @@ export function CourseCatalog({ courses, initialQuery, initialType = "all" }: { 
   }, [courses, query, filter, type, sort, search]);
 
   return (
-    <div className="grid gap-5">
+    <div className="grid min-w-0 grid-cols-1 gap-5">
       <div className="flex flex-wrap items-center gap-3">
         <InputGroup
           prefix={query.trim() ? <BrandSignal state="searching" className="size-4" /> : <Search className="h-4 w-4" />}
@@ -98,8 +98,8 @@ export function CourseCatalog({ courses, initialQuery, initialType = "all" }: { 
           />
         </div>
 
-        <div className="flex items-center gap-2 ml-auto">
-          <div className="w-48 sm:w-56">
+        <div className="grid w-full min-w-0 grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:ml-auto sm:flex sm:w-auto sm:items-center">
+          <div className="min-w-0 sm:w-56">
             <Select value={type} onValueChange={(v) => setType(v as TypeFilter)} aria-label="ประเภทหลักสูตร">
               <option value="all">ทุกประเภท</option>
               {COURSE_TYPES.map((t) => (
@@ -109,7 +109,7 @@ export function CourseCatalog({ courses, initialQuery, initialType = "all" }: { 
               ))}
             </Select>
           </div>
-          <div className="w-40 sm:w-44">
+          <div className="min-w-0 sm:w-44">
             <Select value={sort} onValueChange={(v) => setSort(v as Sort)} aria-label="เรียงลำดับ">
               <option value="latest">ล่าสุด</option>
               <option value="popular">ผู้เรียนมากที่สุด</option>
